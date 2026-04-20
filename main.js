@@ -627,8 +627,6 @@ async function collectStatus() {
     checkAccessibility(),
     checkInputMonitoring(),
   ]);
-  const whisperBin = findWhisperBin();
-  const whisperModel = findModel();
   const ollama = await checkOllama();
 
   const wkHelper = findTranscribeHelper();
@@ -639,8 +637,6 @@ async function collectStatus() {
     mic,
     inputMonitoring,
     accessibility,
-    whisperBin: whisperBin ? { path: whisperBin } : null,
-    whisperModel: whisperModel ? { path: whisperModel } : null,
     transcribeHelper: wkHelper ? { path: wkHelper } : null,
     whisperKitModel: wkModel ? { path: wkModel } : null,
     engine,
