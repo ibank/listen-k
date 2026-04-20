@@ -284,6 +284,12 @@ function isSetupComplete(s) {
   );
 }
 
+function getAppBundlePath() {
+  if (!app.isPackaged) return null;
+  const exe = app.getPath('exe');
+  return exe.replace(/\/Contents\/MacOS\/.*$/, '');
+}
+
 async function collectStatus() {
   const mic = systemPreferences.getMediaAccessStatus('microphone');
   const accessibility = await checkAccessibility();
@@ -298,6 +304,10 @@ async function collectStatus() {
     whisperBin: whisperBin ? { path: whisperBin } : null,
     whisperModel: whisperModel ? { path: whisperModel } : null,
     ollama,
+    packaged: app.isPackaged,
+    appBundlePath: getAppBundlePath(),
+    fnListenerPath: resPath('bin', 'fn-listener'),
+    pasteHelperPath: resPath('bin', 'paste-helper'),
   };
 }
 
@@ -535,4 +545,8 @@ ipcMain.handle('request-mic', async () => {
 
 ipcMain.handle('open-url', (_e, url) => {
   require('electron').shell.openExternal(url);
+});
+
+ipcMain.handle('show-in-finder', (_e, p) => {
+  require('electron').shell.showItemInFolder(p);
 });

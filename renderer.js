@@ -408,17 +408,28 @@ async function renderStatus() {
       : [],
   }));
 
+  const targetPath = s.packaged ? s.appBundlePath : s.fnListenerPath;
+  const targetLabel = s.packaged ? 'Listen K.app' : 'fn-listener';
+
   rows.push(buildCheckRow({
     state: s.inputMonitoring ? 'ok' : 'err',
     glyph: s.inputMonitoring ? '✓' : '✕',
     title: '입력 모니터링 (fn 키 감지)',
     desc: s.inputMonitoring
       ? 'fn-listener 실행 중'
-      : '시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링에서 fn-listener 를 허용해주세요.',
+      : `시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링에서 ${targetLabel} 을 허용하세요.\n${targetPath || ''}`,
     actions: s.inputMonitoring ? [] : [
       { label: '시스템 설정 열기', primary: true, onClick: () => window.listenk.openSettingsPane('input-monitoring') },
-    ],
+      targetPath && { label: 'Finder 에서 보기', onClick: () => window.listenk.showInFinder(targetPath) },
+      targetPath && {
+        label: '경로 복사',
+        onClick: async () => { await navigator.clipboard.writeText(targetPath); toast('경로 복사됨'); },
+      },
+    ].filter(Boolean),
   }));
+
+  const axTargetPath = s.packaged ? s.appBundlePath : s.pasteHelperPath;
+  const axTargetLabel = s.packaged ? 'Listen K.app' : 'paste-helper';
 
   rows.push(buildCheckRow({
     state: s.accessibility ? 'ok' : 'err',
@@ -426,10 +437,15 @@ async function renderStatus() {
     title: '손쉬운 사용 (붙여넣기)',
     desc: s.accessibility
       ? '허용됨'
-      : '다른 앱에 ⌘V 로 붙여넣으려면 paste-helper 를 허용해주세요.',
+      : `시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용에서 ${axTargetLabel} 을 허용하세요.\n${axTargetPath || ''}`,
     actions: s.accessibility ? [] : [
       { label: '시스템 설정 열기', primary: true, onClick: () => window.listenk.openSettingsPane('accessibility') },
-    ],
+      axTargetPath && { label: 'Finder 에서 보기', onClick: () => window.listenk.showInFinder(axTargetPath) },
+      axTargetPath && {
+        label: '경로 복사',
+        onClick: async () => { await navigator.clipboard.writeText(axTargetPath); toast('경로 복사됨'); },
+      },
+    ].filter(Boolean),
   }));
 
   rows.push(buildCheckRow({
