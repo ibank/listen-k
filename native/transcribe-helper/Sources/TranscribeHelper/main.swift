@@ -124,6 +124,9 @@ struct TranscribeHelper {
         var confirmedText: String = ""
         var hypothesisText: String = ""
         var streaming: Bool = false
+        var currentLanguage: String? = nil
+        var audioBuffer: [Float] = []
+        var lastLogSize: Int = -1
 
         init(_ wk: WhisperKit) {
             self.whisperKit = wk
@@ -134,6 +137,8 @@ struct TranscribeHelper {
 
             confirmedText = ""
             hypothesisText = ""
+            audioBuffer = []
+            currentLanguage = (language == "auto") ? nil : language
 
             guard let tokenizer = whisperKit.tokenizer else {
                 emit(["type": "error", "message": "tokenizer unavailable"])
@@ -179,17 +184,21 @@ struct TranscribeHelper {
             }
         }
 
-        var lastLogSize: Int = -1
-
         func handleStateChange(_ state: AudioStreamTranscriber.State) async {
+            // Keep the full captured audio so we can run an accurate batch
+            // transcribe on stop (streaming state alone loses the tail
+            // segment when the user hits stop mid-phrase).
+            if state.streamingAudio.count > audioBuffer.count {
+                audioBuffer = state.streamingAudio
+            }
+
             // Lightweight diagnostic: log audio buffer fill every ~1s of new
             // audio. If lastBufferSize stays 0 throughout a take, the mic
-            // isn't producing samples and the transcription will hallucinate
-            // on silence.
+            // isn't producing samples.
             let bufSize = state.lastBufferSize
             if abs(bufSize - lastLogSize) > 16000 {
                 TranscribeHelper.writeStderr(
-                    "[audio] buf=\(bufSize) confirmed=\(state.confirmedSegments.count) unconfirmed=\(state.unconfirmedSegments.count)\n"
+                    "[audio] buf=\(bufSize) audio=\(audioBuffer.count) confirmed=\(state.confirmedSegments.count) unconfirmed=\(state.unconfirmedSegments.count)\n"
                 )
                 lastLogSize = bufSize
             }
@@ -215,27 +224,60 @@ struct TranscribeHelper {
 
         func stop() async {
             guard streaming, let t = transcriber else {
-                // Even if we're not marked streaming, emit a final event so the
-                // caller isn't left hanging.
                 TranscribeHelper.emit(["type": "final", "text": ""])
                 return
             }
             streaming = false
 
             await t.stopStreamTranscription()
-
-            // Wait briefly for the detached stream task to wind down so the
-            // final confirmed/hypothesis text is settled.
             if let task = currentTask {
                 _ = await task.value
             }
             currentTask = nil
 
-            let final = [confirmedText, hypothesisText]
-                .filter { !$0.isEmpty }
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespaces)
+            let captured = audioBuffer
+            audioBuffer = []
             transcriber = nil
+            TranscribeHelper.writeStderr("[stop] captured \(captured.count) samples for final batch\n")
+
+            var final = ""
+            // Re-transcribe the full captured buffer in batch mode. This
+            // avoids the streaming tail-drop where the last segment was in
+            // flight when stop was issued — restores the Phase-1 accuracy
+            // we lost when moving to streaming.
+            if captured.count > 2000 {
+                do {
+                    let decode = DecodingOptions(
+                        task: .transcribe,
+                        language: currentLanguage,
+                        withoutTimestamps: true,
+                        wordTimestamps: false
+                    )
+                    let results = try await whisperKit.transcribe(
+                        audioArray: captured,
+                        decodeOptions: decode
+                    )
+                    final = TranscribeHelper.stripTokens(
+                        results.map { $0.text }.joined(separator: " ")
+                    )
+                    TranscribeHelper.writeStderr("[stop] batch result: \(final.count) chars\n")
+                } catch {
+                    TranscribeHelper.writeStderr("[stop] batch transcribe failed: \(error)\n")
+                }
+            } else {
+                TranscribeHelper.writeStderr("[stop] skip batch (audio too short)\n")
+            }
+
+            // Fall back to whatever streaming produced if the batch pass
+            // failed or produced nothing useful.
+            if final.isEmpty {
+                final = TranscribeHelper.stripTokens(
+                    [confirmedText, hypothesisText]
+                        .filter { !$0.isEmpty }
+                        .joined(separator: " ")
+                )
+            }
+
             TranscribeHelper.emit(["type": "final", "text": final])
         }
     }
