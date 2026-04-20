@@ -333,12 +333,12 @@ function checkOllama() {
 }
 
 function isSetupComplete(s) {
+  const hasEngine = (s.transcribeHelper && s.whisperKitModel) || (s.whisperBin && s.whisperModel);
   return (
     s.mic === 'granted' &&
     s.inputMonitoring &&
     s.accessibility &&
-    s.whisperBin &&
-    s.whisperModel
+    hasEngine
   );
 }
 
@@ -358,12 +358,19 @@ async function collectStatus() {
   const whisperModel = findModel();
   const ollama = await checkOllama();
 
+  const wkHelper = findTranscribeHelper();
+  const wkModel = findWhisperKitModel();
+  const engine = wkHelper && wkModel ? 'whisperkit' : (whisperBin && whisperModel ? 'whisper.cpp' : 'none');
+
   return {
     mic,
     inputMonitoring,
     accessibility,
     whisperBin: whisperBin ? { path: whisperBin } : null,
     whisperModel: whisperModel ? { path: whisperModel } : null,
+    transcribeHelper: wkHelper ? { path: wkHelper } : null,
+    whisperKitModel: wkModel ? { path: wkModel } : null,
+    engine,
     ollama,
     packaged: app.isPackaged,
     appBundlePath: getAppBundlePath(),
@@ -437,6 +444,23 @@ app.on('will-quit', () => {
   }
 });
 
+function findTranscribeHelper() {
+  const p = resPath('bin', 'transcribe-helper');
+  return fs.existsSync(p) ? p : null;
+}
+
+function findWhisperKitModel() {
+  const candidates = [
+    resPath('models', 'whisperkit', 'openai_whisper-small'),
+    resPath('models', 'whisperkit', 'openai_whisper-base'),
+    resPath('models', 'whisperkit', 'openai_whisper-tiny'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 function findWhisperBin() {
   const bundled = resPath('bin', 'whisper-cli');
   if (fs.existsSync(bundled)) return bundled;
@@ -456,7 +480,7 @@ function findWhisperBin() {
   return null;
 }
 
-function findModel() {
+function findGgmlModel() {
   if (process.env.WHISPER_MODEL && fs.existsSync(process.env.WHISPER_MODEL)) {
     return process.env.WHISPER_MODEL;
   }
@@ -471,29 +495,55 @@ function findModel() {
   return null;
 }
 
+// Combined finder used by status dashboard
+function findModel() {
+  return findWhisperKitModel() || findGgmlModel();
+}
+
 ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
-  const whisperBin = findWhisperBin();
-  if (!whisperBin) {
-    throw new Error('whisper-cli 설치 필요:\n  brew install whisper-cpp');
-  }
-
-  const modelPath = findModel();
-  if (!modelPath) {
-    throw new Error(
-      'Whisper 모델 없음. 다운로드:\n' +
-        '  npm run model:base'
-    );
-  }
-
   const tmpFile = path.join(os.tmpdir(), `listenk_${Date.now()}.wav`);
   await fs.promises.writeFile(tmpFile, Buffer.from(wavBuffer));
 
   const lang = (language || '').split('-')[0] || 'auto';
 
+  // Prefer the WhisperKit / Core ML / Neural Engine path when both the
+  // helper binary and a WhisperKit model are available.
+  const wkHelper = findTranscribeHelper();
+  const wkModel = findWhisperKitModel();
+  if (wkHelper && wkModel) {
+    return new Promise((resolve, reject) => {
+      execFile(
+        wkHelper,
+        ['--audio', tmpFile, '--model-dir', wkModel, '--language', lang],
+        { maxBuffer: 20 * 1024 * 1024 },
+        (err, stdout, stderr) => {
+          fs.unlink(tmpFile, () => {});
+          if (err) {
+            reject(new Error(`WhisperKit 실패: ${stderr || err.message}`));
+          } else {
+            resolve(stdout.trim());
+          }
+        }
+      );
+    });
+  }
+
+  // Fallback: bundled whisper.cpp + ggml model (older path).
+  const whisperBin = findWhisperBin();
+  if (!whisperBin) {
+    fs.unlink(tmpFile, () => {});
+    throw new Error('전사 엔진 없음. 빌드: npm run build:transcribe');
+  }
+  const ggmlModel = findGgmlModel();
+  if (!ggmlModel) {
+    fs.unlink(tmpFile, () => {});
+    throw new Error('Whisper 모델 없음. 다운로드: npm run model:whisperkit');
+  }
+
   return new Promise((resolve, reject) => {
     execFile(
       whisperBin,
-      ['-m', modelPath, '-f', tmpFile, '-l', lang, '-nt', '-np'],
+      ['-m', ggmlModel, '-f', tmpFile, '-l', lang, '-nt', '-np'],
       { maxBuffer: 20 * 1024 * 1024 },
       (err, stdout, stderr) => {
         fs.unlink(tmpFile, () => {});

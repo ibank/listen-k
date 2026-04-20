@@ -4,5 +4,7 @@ bin/
 models/
 .whisper-cpp/
 .whisper-cpp-version
+native/transcribe-helper/.build/
+native/transcribe-helper/Package.resolved
 *.log
 .DS_Store

@@ -477,37 +477,52 @@ async function renderStatus() {
     ].filter(Boolean),
   }));
 
-  const whisperBundled = s.whisperBin && s.whisperBin.path && s.whisperBin.path.includes('Listen K.app/Contents/Resources/');
+  const usingWK = s.engine === 'whisperkit';
+  const usingCpp = s.engine === 'whisper.cpp';
+  const engineState = (usingWK || usingCpp) ? 'ok' : 'err';
+  const enginePath = usingWK ? s.transcribeHelper?.path : s.whisperBin?.path;
+  const engineLabel = usingWK
+    ? 'WhisperKit (Core ML · Neural Engine)'
+    : usingCpp
+    ? 'whisper.cpp (Metal GPU · fallback)'
+    : '엔진 없음';
+
   rows.push(buildCheckRow({
-    state: s.whisperBin ? 'ok' : 'err',
-    glyph: s.whisperBin ? '✓' : '✕',
-    title: 'Whisper CLI',
-    desc: s.whisperBin
-      ? (whisperBundled ? '번들 포함' : '시스템 경로') + ' · ' + s.whisperBin.path
-      : '번들 누락. 개발 빌드라면 npm run build:whisper 로 빌드하세요.',
-    actions: s.whisperBin ? [] : [
+    state: engineState,
+    glyph: engineState === 'ok' ? '✓' : '✕',
+    title: '전사 엔진',
+    desc: engineState === 'ok'
+      ? `${engineLabel}\n${enginePath || ''}`
+      : '전사 엔진을 빌드해주세요: npm run build:transcribe',
+    actions: engineState === 'ok' ? [] : [
       {
         label: '빌드 명령 복사',
         primary: true,
         onClick: async () => {
-          await copyToClipboard('npm run build:whisper');
-          toast('"npm run build:whisper" 복사됨');
+          await copyToClipboard('npm run build:transcribe');
+          toast('"npm run build:transcribe" 복사됨');
         },
       },
     ],
   }));
 
+  const modelOk = (usingWK && s.whisperKitModel) || (usingCpp && s.whisperModel);
+  const modelPath = usingWK ? s.whisperKitModel?.path : s.whisperModel?.path;
+  const modelLabel = usingWK ? 'WhisperKit Core ML 모델' : 'ggml 모델';
+
   rows.push(buildCheckRow({
-    state: s.whisperModel ? 'ok' : 'err',
-    glyph: s.whisperModel ? '✓' : '✕',
-    title: 'Whisper 모델',
-    desc: s.whisperModel ? s.whisperModel.path : '모델 파일이 없습니다.',
-    actions: s.whisperModel ? [] : [
+    state: modelOk ? 'ok' : 'err',
+    glyph: modelOk ? '✓' : '✕',
+    title: '전사 모델',
+    desc: modelOk
+      ? `${modelLabel}\n${modelPath || ''}`
+      : '모델 파일이 없습니다. 다운로드: npm run model:whisperkit',
+    actions: modelOk ? [] : [
       {
         label: '다운로드 명령 복사',
         onClick: async () => {
-          await copyToClipboard('npm run model:base');
-          toast('"npm run model:base" 복사됨');
+          await copyToClipboard('npm run model:whisperkit');
+          toast('"npm run model:whisperkit" 복사됨');
         },
       },
     ],
