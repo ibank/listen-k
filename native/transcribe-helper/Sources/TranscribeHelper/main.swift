@@ -101,10 +101,11 @@ struct TranscribeHelper {
                 decodeOptions: decodeOptions
             )
 
-            let text = results
-                .map { $0.text }
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let text = TranscribeHelper.stripTokens(
+                results
+                    .map { $0.text }
+                    .joined(separator: " ")
+            )
 
             print(text)
         } catch {
@@ -178,14 +179,12 @@ struct TranscribeHelper {
         }
 
         func handleStateChange(_ state: AudioStreamTranscriber.State) async {
-            let confirmed = state.confirmedSegments
-                .map { $0.text }
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespaces)
-            let hypothesis = state.unconfirmedSegments
-                .map { $0.text }
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespaces)
+            let confirmed = TranscribeHelper.stripTokens(
+                state.confirmedSegments.map { $0.text }.joined(separator: " ")
+            )
+            let hypothesis = TranscribeHelper.stripTokens(
+                state.unconfirmedSegments.map { $0.text }.joined(separator: " ")
+            )
 
             if confirmed == confirmedText && hypothesis == hypothesisText { return }
             confirmedText = confirmed
@@ -311,6 +310,23 @@ struct TranscribeHelper {
     static func parseNamed(_ args: [String], _ name: String) -> String? {
         guard let i = args.firstIndex(of: name) else { return nil }
         return args[safe: i + 1]
+    }
+
+    /// Remove Whisper's raw special tokens (`<|startoftranscript|>`,
+    /// `<|en|>`, `<|transcribe|>`, `<|notimestamps|>`, `<|endoftext|>`,
+    /// timestamp tokens, etc.) plus the leading space Whisper emits, and
+    /// collapse runs of whitespace.
+    static func stripTokens(_ raw: String) -> String {
+        var s = raw
+        if let re = try? NSRegularExpression(pattern: "<\\|[^|]*\\|>", options: []) {
+            let range = NSRange(s.startIndex..., in: s)
+            s = re.stringByReplacingMatches(in: s, options: [], range: range, withTemplate: "")
+        }
+        if let wsRe = try? NSRegularExpression(pattern: "\\s+", options: []) {
+            let range = NSRange(s.startIndex..., in: s)
+            s = wsRe.stringByReplacingMatches(in: s, options: [], range: range, withTemplate: " ")
+        }
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
