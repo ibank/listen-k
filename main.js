@@ -264,6 +264,14 @@ function checkAccessibility() {
   });
 }
 
+function checkInputMonitoring() {
+  const helper = resPath('bin', 'fn-listener');
+  if (!fs.existsSync(helper)) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    execFile(helper, ['--check'], (err) => resolve(!err));
+  });
+}
+
 function checkOllama() {
   return new Promise((resolve) => {
     const controller = new AbortController();
@@ -302,14 +310,17 @@ function getAppBundlePath() {
 
 async function collectStatus() {
   const mic = systemPreferences.getMediaAccessStatus('microphone');
-  const accessibility = await checkAccessibility();
+  const [accessibility, inputMonitoring] = await Promise.all([
+    checkAccessibility(),
+    checkInputMonitoring(),
+  ]);
   const whisperBin = findWhisperBin();
   const whisperModel = findModel();
   const ollama = await checkOllama();
 
   return {
     mic,
-    inputMonitoring: fnListenerReady,
+    inputMonitoring,
     accessibility,
     whisperBin: whisperBin ? { path: whisperBin } : null,
     whisperModel: whisperModel ? { path: whisperModel } : null,
