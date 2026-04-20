@@ -65,7 +65,7 @@ async function startRecognition() {
   recordBtn.classList.add('recording');
   recordBtn.querySelector('.label').textContent = '녹음 중지';
   setStatus('녹음 중...');
-  window.typeless?.setState?.({ recording: true, processing: false });
+  window.listenk?.setState?.({ recording: true, processing: false });
 }
 
 async function stopRecognition() {
@@ -83,11 +83,11 @@ async function stopRecognition() {
 
   if (pcmChunks.length === 0) {
     setStatus('녹음 데이터 없음', 'error');
-    window.typeless?.setState?.({ recording: false, processing: false });
+    window.listenk?.setState?.({ recording: false, processing: false });
     return;
   }
 
-  window.typeless?.setState?.({ recording: false, processing: true });
+  window.listenk?.setState?.({ recording: false, processing: true });
   setStatus('변환 중... (Whisper)');
 
   const flat = flattenChunks(pcmChunks);
@@ -96,7 +96,7 @@ async function stopRecognition() {
   const wav = encodeWAV(samples16k);
 
   try {
-    const text = await window.typeless.transcribe({
+    const text = await window.listenk.transcribe({
       wavBuffer: wav,
       language: langSel.value,
     });
@@ -108,13 +108,13 @@ async function stopRecognition() {
       await postProcessAndPaste(finalTranscript);
     } else {
       setStatus('음성이 감지되지 않음', 'error');
-      window.typeless?.setState?.({ recording: false, processing: false });
+      window.listenk?.setState?.({ recording: false, processing: false });
     }
   } catch (err) {
     console.error('transcribe failed', err);
     setStatus(`Whisper 오류`, 'error');
     cleanEl.textContent = err.message;
-    window.typeless?.setState?.({ recording: false, processing: false });
+    window.listenk?.setState?.({ recording: false, processing: false });
   } finally {
     if (audioContext) {
       try { await audioContext.close(); } catch {}
@@ -157,7 +157,7 @@ async function cancelRecord() {
 
   pcmChunks = [];
   setStatus('취소됨');
-  window.typeless?.setState?.({ recording: false, processing: false });
+  window.listenk?.setState?.({ recording: false, processing: false });
   setTimeout(() => setStatus('대기'), 1200);
 }
 
@@ -217,17 +217,17 @@ recordBtn.addEventListener('click', () => {
   console.log('[renderer] record button clicked, recording=', recording);
   toggleRecord();
 });
-if (window.typeless?.onToggleRecord) {
-  window.typeless.onToggleRecord(() => {
+if (window.listenk?.onToggleRecord) {
+  window.listenk.onToggleRecord(() => {
     console.log('[renderer] toggle-record IPC received, recording=', recording);
     toggleRecord();
   });
   console.log('[renderer] onToggleRecord handler registered');
 } else {
-  console.warn('[renderer] window.typeless missing — preload failed?');
+  console.warn('[renderer] window.listenk missing — preload failed?');
 }
 
-window.typeless?.onCancelRecord?.(() => {
+window.listenk?.onCancelRecord?.(() => {
   console.log('[renderer] cancel-record IPC received');
   cancelRecord();
 });
@@ -295,14 +295,14 @@ async function finalizePaste(cleanedText) {
   cleanEl.textContent = cleanedText;
   setStatus('붙여넣는 중...');
   try {
-    if (cleanedText && window.typeless?.paste) {
-      await window.typeless.paste(cleanedText);
+    if (cleanedText && window.listenk?.paste) {
+      await window.listenk.paste(cleanedText);
     }
     setStatus('완료', 'ok');
   } catch (pasteErr) {
     setStatus(`붙여넣기 실패: ${pasteErr.message}`, 'error');
   }
-  window.typeless?.setState?.({ recording: false, processing: false });
+  window.listenk?.setState?.({ recording: false, processing: false });
   setTimeout(() => setStatus('대기'), 1500);
 }
 
@@ -370,6 +370,6 @@ async function cleanupWithOllama(raw) {
   } catch (err) {
     cleanEl.textContent = `Ollama 호출 실패: ${err.message}\n\nOllama가 실행 중인지 확인:\n  brew install ollama\n  ollama serve\n  ollama pull ${model}`;
     setStatus('Ollama 오류', 'error');
-    window.typeless?.setState?.({ recording: false, processing: false });
+    window.listenk?.setState?.({ recording: false, processing: false });
   }
 }

@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('typeless', {
+contextBridge.exposeInMainWorld('listenk', {
   onToggleRecord: (cb) => ipcRenderer.on('toggle-record', cb),
   onCancelRecord: (cb) => ipcRenderer.on('cancel-record', cb),
   transcribe: (payload) => ipcRenderer.invoke('transcribe', payload),

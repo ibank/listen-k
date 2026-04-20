@@ -3,14 +3,14 @@ const cancelBtn = document.getElementById('cancelBtn');
 const confirmBtn = document.getElementById('confirmBtn');
 
 cancelBtn.addEventListener('click', () => {
-  window.typelessHud?.cancel?.();
+  window.listenkHud?.cancel?.();
 });
 
 confirmBtn.addEventListener('click', () => {
-  window.typelessHud?.confirm?.();
+  window.listenkHud?.confirm?.();
 });
 
-window.typelessHud?.onState?.((state) => {
+window.listenkHud?.onState?.((state) => {
   if (state === 'recording' || state === 'processing') {
     pill.dataset.state = state;
   }

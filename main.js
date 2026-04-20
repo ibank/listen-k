@@ -44,7 +44,7 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
 
-  if (process.env.TYPELESS_DEBUG === '1') {
+  if (process.env.LISTENK_DEBUG === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
@@ -123,9 +123,9 @@ function updateTrayMenu() {
     : isProcessing
     ? '⏳ 변환/정제 중'
     : '⚪ 대기';
-  tray.setToolTip(`Typeless · ${stateLabel}`);
+  tray.setToolTip(`Listen K · ${stateLabel}`);
   const menu = Menu.buildFromTemplate([
-    { label: `Typeless · ${stateLabel}`, enabled: false },
+    { label: `Listen K · ${stateLabel}`, enabled: false },
     { type: 'separator' },
     { label: '창 열기', click: () => showWindowNonIntrusive() },
     {
@@ -328,7 +328,7 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
     );
   }
 
-  const tmpFile = path.join(os.tmpdir(), `typeless_${Date.now()}.wav`);
+  const tmpFile = path.join(os.tmpdir(), `listenk_${Date.now()}.wav`);
   await fs.promises.writeFile(tmpFile, Buffer.from(wavBuffer));
 
   const lang = (language || '').split('-')[0] || 'auto';
@@ -382,11 +382,11 @@ ipcMain.handle('paste-text', async (_e, text) => {
   const trimmed = text.trim();
   clipboard.writeText(trimmed);
 
-  const ownBundleId = app.getName && app.getName();
+  const OWN_BUNDLE_ID = 'com.ibank.listenk';
   if (
     savedFrontmostBundleId &&
-    !/electron/i.test(savedFrontmostBundleId) &&
-    savedFrontmostBundleId !== ownBundleId
+    savedFrontmostBundleId !== OWN_BUNDLE_ID &&
+    !/electron|com\.github\.electron/i.test(savedFrontmostBundleId)
   ) {
     console.log('[focus] activating target:', savedFrontmostBundleId);
     await activateApp(savedFrontmostBundleId);

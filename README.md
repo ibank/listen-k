@@ -1,4 +1,4 @@
-# Typeless (MVP)
+# Listen K (MVP)
 
 macOS용 AI 음성 받아쓰기 앱. **fn 키 한 번 = 녹음 시작 / 한 번 더 = 포커스된 입력 필드에 자동 붙여넣기**. 로컬 Whisper.cpp로 STT, 로컬 Ollama(Gemma)로 필러 제거·정제. 외부 클라우드 전송 없음.
 
@@ -33,7 +33,7 @@ npm start
 
 1. **마이크** — 자동 프롬프트. 허용.
 2. **입력 모니터링** (fn 키 감지) — 시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링 → `bin/fn-listener` 를 허용.
-3. **손쉬운 사용** (타 앱에 붙여넣기) — 시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 → Electron/Typeless 를 허용.
+3. **손쉬운 사용** (타 앱에 붙여넣기) — 시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 → Electron/Listen K 를 허용.
 
 ### macOS 키보드 설정 (중요)
 
@@ -80,7 +80,7 @@ npm start
 npm run dist
 ```
 
-`dist/Typeless-0.1.0-arm64.dmg`, `dist/Typeless-0.1.0-x64.dmg` 가 생성됩니다.
+`dist/Listen K-0.1.0-arm64.dmg`, `dist/Listen K-0.1.0-x64.dmg` 가 생성됩니다.
 (`predist` 가 자동으로 Swift 헬퍼를 빌드합니다. 모델은 `npm run model:base` 로 미리 받아두세요.)
 
 ### 설치 받는 사용자에게 안내할 것
@@ -92,8 +92,8 @@ npm run dist
    - (선택) `brew install ollama && ollama pull gemma3:4b` — Ollama 모드 사용 시
 4. **권한 3종 허용** (시스템 설정 → 개인정보 보호 및 보안):
    - **마이크**: 첫 녹음 시 자동 프롬프트
-   - **입력 모니터링**: `Typeless.app/Contents/Resources/bin/fn-listener` 추가
-   - **손쉬운 사용**: `Typeless.app/Contents/Resources/bin/paste-helper` 추가
+   - **입력 모니터링**: `Listen K.app/Contents/Resources/bin/fn-listener` 추가
+   - **손쉬운 사용**: `Listen K.app/Contents/Resources/bin/paste-helper` 추가
 5. **macOS 키보드 설정**: `🌐/fn 키 누름` → `아무 작업 안 함`
 
 ### 서명·공증 없이 배포할 때 주의

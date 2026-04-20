@@ -1,7 +1,7 @@
 {
-  "name": "typeless",
+  "name": "listen-k",
   "version": "0.1.0",
-  "description": "AI voice dictation for macOS — local Whisper + optional Ollama post-processing",
+  "description": "Listen K — AI voice dictation for macOS. Local Whisper + optional Ollama post-processing.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -19,8 +19,9 @@
     "electron-builder": "^26.8.1"
   },
   "build": {
-    "appId": "com.ibank.typeless",
-    "productName": "Typeless",
+    "appId": "com.ibank.listenk",
+    "productName": "Listen K",
+    "artifactName": "ListenK-${version}-${arch}.${ext}",
     "asar": true,
     "directories": {
       "output": "dist",
@@ -65,7 +66,7 @@
       "gatekeeperAssess": false
     },
     "dmg": {
-      "title": "Typeless ${version}",
+      "title": "Listen K ${version}",
       "contents": [
         { "x": 140, "y": 200, "type": "file" },
         { "x": 400, "y": 200, "type": "link", "path": "/Applications" }
