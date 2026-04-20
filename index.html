@@ -15,7 +15,7 @@
     <section class="card">
       <div class="card-head">
         <h2>설정 상태</h2>
-        <button id="refreshBtn" class="ghost" title="상태 새로고침">↻ 새로고침</button>
+        <button id="refreshBtn" class="ghost" title="상태 새로고침">새로고침</button>
       </div>
       <div id="checkList" class="check-list"></div>
     </section>
@@ -24,16 +24,23 @@
       <h2>사용법</h2>
       <div class="usage">
         <div class="usage-row">
-          <kbd>fn</kbd> 한 번 — 녹음 시작 (화면 하단에 HUD 표시)
+          <span class="usage-step">1</span>
+          텍스트를 입력하고 싶은 곳에 커서를 둡니다
         </div>
         <div class="usage-row">
-          <kbd>fn</kbd> 한 번 더 또는 HUD의 <span class="icon-check">✓</span> — 정제 후 포커스된 입력 필드에 자동 붙여넣기
+          <span class="usage-step">2</span>
+          <kbd>fn</kbd> 을 한 번 눌러 녹음을 시작합니다 (하단에 HUD 표시)
         </div>
         <div class="usage-row">
-          HUD의 <span class="icon-x">✕</span> — 녹음 취소
+          <span class="usage-step">3</span>
+          말을 마치면 <kbd>fn</kbd> 또는 HUD 의 <span class="icon-check">✓</span> 로 확정
         </div>
         <div class="usage-row">
-          대체 단축키: <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Space</kbd>
+          <span class="usage-step">4</span>
+          정제된 텍스트가 자동으로 포커스된 필드에 붙여넣어집니다
+        </div>
+        <div class="usage-row" style="color: var(--text-3);">
+          취소는 HUD 의 <span class="icon-x">✕</span> · 대체 단축키 <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Space</kbd>
         </div>
       </div>
     </section>

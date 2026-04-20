@@ -365,21 +365,30 @@ copyBtn?.addEventListener('click', async () => {
 
 // ========== Onboarding dashboard ==========
 
-function dot(state, glyph) {
-  return `<div class="check-dot" data-state="${state}">${glyph}</div>`;
+const ICONS = {
+  ok: '<svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5 L6.5 11.5 L12.5 5.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  warn: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 3 L8 9.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="8" cy="12.2" r="1.1" fill="currentColor"/></svg>',
+  err: '<svg viewBox="0 0 16 16" fill="none"><path d="M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  info: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4.5" r="1.1" fill="currentColor"/><path d="M8 7 L8 12.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+};
+
+function dot(state) {
+  return `<div class="check-dot" data-state="${state}">${ICONS[state] || ICONS.info}</div>`;
 }
 
-function buildCheckRow({ state, glyph, title, desc, actions = [] }) {
+function buildCheckRow({ state, title, desc, actions = [] }) {
   const row = document.createElement('div');
   row.className = 'check-row';
   row.innerHTML = `
-    ${dot(state, glyph)}
+    ${dot(state)}
     <div class="check-body">
-      <div class="check-title">${title}</div>
-      <div class="check-desc">${desc}</div>
+      <div class="check-title"></div>
+      <div class="check-desc"></div>
     </div>
     <div class="check-actions"></div>
   `;
+  row.querySelector('.check-title').textContent = title;
+  row.querySelector('.check-desc').textContent = desc;
   const actionsEl = row.querySelector('.check-actions');
   for (const a of actions) {
     const b = document.createElement('button');
