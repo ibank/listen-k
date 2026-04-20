@@ -14,4 +14,7 @@ contextBridge.exposeInMainWorld('listenk', {
   clipboardWrite: (text) => ipcRenderer.invoke('clipboard-write', text),
   getHotkey: () => ipcRenderer.invoke('get-hotkey'),
   setHotkey: (mode) => ipcRenderer.invoke('set-hotkey', mode),
+  onStreamPartial: (cb) => ipcRenderer.on('stream-partial', (_e, text) => cb(text)),
+  onStreamFinal: (cb) => ipcRenderer.on('stream-final', (_e, text) => cb(text)),
+  onStreamError: (cb) => ipcRenderer.on('stream-error', (_e, msg) => cb(msg)),
 });

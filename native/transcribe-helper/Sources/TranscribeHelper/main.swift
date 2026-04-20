@@ -1,16 +1,23 @@
 import Foundation
 import WhisperKit
 
-// Modes:
+// Modes
 //   --check
-//       exit 0 when the helper is runnable (used by onboarding dashboard)
 //   --download <variant> <dest-root>
-//       download the WhisperKit Core ML model bundle to <dest-root>/<variant>/
-//   --audio <wav> --model-dir <dir> [--language <code>]
-//       batch transcribe a WAV file; prints final text to stdout
+//   --audio <wav> --model-dir <dir> [--language <code>]    (batch)
+//   --stream --model-dir <dir> [--language <code>]          (persistent streaming)
 //
-// Phase 2 will add a persistent streaming mode that owns microphone capture
-// and emits NDJSON partial/final events.
+// Streaming protocol
+//   stdin:  NDJSON commands
+//           {"cmd":"start"[,"language":"ko"]}
+//           {"cmd":"stop"}
+//           {"cmd":"quit"}
+//   stdout: NDJSON events
+//           {"type":"ready"}
+//           {"type":"partial","text":"..."}
+//           {"type":"final","text":"..."}
+//           {"type":"stopped"}
+//           {"type":"error","message":"..."}
 
 @main
 struct TranscribeHelper {
@@ -29,8 +36,21 @@ struct TranscribeHelper {
             return
         }
 
+        if args.first == "--stream" {
+            let modelDir = parseNamed(args, "--model-dir")
+            let language = parseNamed(args, "--language") ?? "auto"
+            guard let modelDir else {
+                writeStderr("error: --model-dir <dir> is required\n")
+                exit(2)
+            }
+            await runStream(modelDir: modelDir, language: language)
+            return
+        }
+
         await runBatch(args: args)
     }
+
+    // MARK: - Download
 
     static func runDownload(variant: String, destRoot: String) async {
         do {
@@ -52,40 +72,20 @@ struct TranscribeHelper {
         }
     }
 
+    // MARK: - Batch (phase 1 fallback, unused by renderer when --stream is available)
+
     static func runBatch(args: [String]) async {
-        var audioPath: String?
-        var modelDir: String?
-        var language: String = "auto"
-
-        var i = 0
-        while i < args.count {
-            switch args[i] {
-            case "--audio":
-                audioPath = args[safe: i + 1]
-                i += 2
-            case "--model-dir":
-                modelDir = args[safe: i + 1]
-                i += 2
-            case "--language":
-                language = args[safe: i + 1] ?? "auto"
-                i += 2
-            default:
-                i += 1
-            }
+        guard let audioPath = parseNamed(args, "--audio") else {
+            writeStderr("error: --audio <path> is required\n"); exit(2)
         }
-
-        guard let audio = audioPath else {
-            writeStderr("error: --audio <path> is required\n")
-            exit(2)
+        guard let modelDir = parseNamed(args, "--model-dir") else {
+            writeStderr("error: --model-dir <dir> is required\n"); exit(2)
         }
-        guard let model = modelDir else {
-            writeStderr("error: --model-dir <dir> is required\n")
-            exit(2)
-        }
+        let language = parseNamed(args, "--language") ?? "auto"
 
         do {
             let whisperKit = try await WhisperKit(
-                modelFolder: model,
+                modelFolder: modelDir,
                 verbose: false,
                 logLevel: .none,
                 load: true
@@ -97,7 +97,7 @@ struct TranscribeHelper {
             )
 
             let results = try await whisperKit.transcribe(
-                audioPath: audio,
+                audioPath: audioPath,
                 decodeOptions: decodeOptions
             )
 
@@ -113,13 +113,197 @@ struct TranscribeHelper {
         }
     }
 
+    // MARK: - Streaming
+
+    actor StreamController {
+        let whisperKit: WhisperKit
+        var transcriber: AudioStreamTranscriber?
+        var currentTask: Task<Void, Never>?
+        var confirmedText: String = ""
+        var hypothesisText: String = ""
+        var streaming: Bool = false
+
+        init(_ wk: WhisperKit) {
+            self.whisperKit = wk
+        }
+
+        func start(language: String) async {
+            guard !streaming else { return }
+
+            confirmedText = ""
+            hypothesisText = ""
+
+            guard let tokenizer = whisperKit.tokenizer else {
+                emit(["type": "error", "message": "tokenizer unavailable"])
+                return
+            }
+
+            let decoding = DecodingOptions(
+                task: .transcribe,
+                language: language == "auto" ? nil : language,
+                withoutTimestamps: true,
+                wordTimestamps: false
+            )
+
+            let t = AudioStreamTranscriber(
+                audioEncoder: whisperKit.audioEncoder,
+                featureExtractor: whisperKit.featureExtractor,
+                segmentSeeker: whisperKit.segmentSeeker,
+                textDecoder: whisperKit.textDecoder,
+                tokenizer: tokenizer,
+                audioProcessor: whisperKit.audioProcessor,
+                decodingOptions: decoding,
+                requiredSegmentsForConfirmation: 2,
+                silenceThreshold: 0.3,
+                compressionCheckWindow: 20,
+                useVAD: true,
+                stateChangeCallback: { [weak self] _, newState in
+                    Task { await self?.handleStateChange(newState) }
+                }
+            )
+            transcriber = t
+            streaming = true
+
+            do {
+                try await t.startStreamTranscription()
+            } catch {
+                streaming = false
+                transcriber = nil
+                emit(["type": "error", "message": "stream start failed: \(error)"])
+            }
+        }
+
+        func handleStateChange(_ state: AudioStreamTranscriber.State) async {
+            let confirmed = state.confirmedSegments
+                .map { $0.text }
+                .joined(separator: " ")
+                .trimmingCharacters(in: .whitespaces)
+            let hypothesis = state.unconfirmedSegments
+                .map { $0.text }
+                .joined(separator: " ")
+                .trimmingCharacters(in: .whitespaces)
+
+            if confirmed == confirmedText && hypothesis == hypothesisText { return }
+            confirmedText = confirmed
+            hypothesisText = hypothesis
+
+            let joined = [confirmed, hypothesis]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+                .trimmingCharacters(in: .whitespaces)
+
+            emit(["type": "partial", "text": joined])
+        }
+
+        func stop() async {
+            guard streaming, let t = transcriber else { return }
+            streaming = false
+
+            do {
+                try await t.stopStreamTranscription()
+            } catch {
+                emit(["type": "error", "message": "stream stop failed: \(error)"])
+            }
+
+            let final = [confirmedText, hypothesisText]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+                .trimmingCharacters(in: .whitespaces)
+            transcriber = nil
+            emit(["type": "final", "text": final])
+        }
+    }
+
+    static func runStream(modelDir: String, language: String) async {
+        writeStderr("loading model from \(modelDir) ...\n")
+
+        let whisperKit: WhisperKit
+        do {
+            whisperKit = try await WhisperKit(
+                modelFolder: modelDir,
+                verbose: false,
+                logLevel: .none,
+                load: true
+            )
+        } catch {
+            emit(["type": "error", "message": "model load failed: \(error)"])
+            exit(1)
+        }
+
+        let controller = StreamController(whisperKit)
+        emit(["type": "ready"])
+        writeStderr("ready\n")
+
+        let reader = LineReader(fileHandle: FileHandle.standardInput)
+        while let line = reader.readLine() {
+            guard let data = line.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let cmd = obj["cmd"] as? String else { continue }
+
+            switch cmd {
+            case "start":
+                let lang = (obj["language"] as? String) ?? language
+                await controller.start(language: lang)
+            case "stop":
+                await controller.stop()
+                emit(["type": "stopped"])
+            case "quit":
+                await controller.stop()
+                exit(0)
+            default:
+                emit(["type": "error", "message": "unknown cmd: \(cmd)"])
+            }
+        }
+    }
+
+    // MARK: - Utilities
+
     static func writeStderr(_ s: String) {
         FileHandle.standardError.write(s.data(using: .utf8) ?? Data())
+    }
+
+    static func emit(_ dict: [String: Any]) {
+        if let data = try? JSONSerialization.data(withJSONObject: dict, options: []),
+           let s = String(data: data, encoding: .utf8) {
+            print(s)
+            fflush(stdout)
+        }
+    }
+
+    static func parseNamed(_ args: [String], _ name: String) -> String? {
+        guard let i = args.firstIndex(of: name) else { return nil }
+        return args[safe: i + 1]
     }
 }
 
 extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+// Simple blocking line reader over stdin. Using FileHandle.readLine would
+// be async-friendly but we're in a dispatched context already; this keeps
+// the protocol handling trivial.
+final class LineReader {
+    let handle: FileHandle
+    var buffer = Data()
+
+    init(fileHandle: FileHandle) {
+        self.handle = fileHandle
+    }
+
+    func readLine() -> String? {
+        let newline = Data([0x0A])
+        while true {
+            if let r = buffer.range(of: newline) {
+                let lineData = buffer.subdata(in: buffer.startIndex..<r.lowerBound)
+                buffer.removeSubrange(buffer.startIndex..<r.upperBound)
+                return String(data: lineData, encoding: .utf8) ?? ""
+            }
+            let chunk = handle.availableData
+            if chunk.isEmpty { return nil }
+            buffer.append(chunk)
+        }
     }
 }

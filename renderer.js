@@ -352,10 +352,63 @@ async function cleanupWithOllama(raw) {
 
 // ========== IPC wiring (record/cancel from main/HUD) ==========
 
+// Legacy batch capture (used only when the streaming helper is unavailable).
+// The streaming path is driven by main.js sending stream-partial/final IPC,
+// so the toggle-record fallback is gated by streamingActive below.
+let streamingActive = false;
+let latestPartial = '';
+
 if (window.listenk?.onToggleRecord) {
-  window.listenk.onToggleRecord(() => toggleRecord());
+  window.listenk.onToggleRecord(() => {
+    if (streamingActive) return;  // streaming path handles everything
+    toggleRecord();
+  });
 }
-window.listenk?.onCancelRecord?.(() => cancelRecord());
+window.listenk?.onCancelRecord?.(() => {
+  if (streamingActive) {
+    streamingActive = false;
+    latestPartial = '';
+    showRecent();
+    rawEl.textContent = '(취소됨)';
+    setStatus('취소됨');
+    window.listenk?.setState?.({ recording: false, processing: false });
+    setTimeout(() => setStatus('대기'), 1200);
+    return;
+  }
+  cancelRecord();
+});
+
+window.listenk?.onStreamPartial?.((text) => {
+  streamingActive = true;
+  latestPartial = text || '';
+  setStatus('듣는 중...');
+  showRecent();
+  rawEl.textContent = latestPartial;
+});
+
+window.listenk?.onStreamFinal?.(async (text) => {
+  const finalText = (text || latestPartial || '').trim();
+  streamingActive = false;
+  latestPartial = '';
+  showRecent();
+  rawEl.textContent = finalText;
+
+  if (!finalText) {
+    setStatus('음성이 감지되지 않음', 'error');
+    window.listenk?.setState?.({ recording: false, processing: false });
+    setTimeout(() => setStatus('대기'), 1200);
+    return;
+  }
+
+  await postProcessAndPaste(finalText);
+});
+
+window.listenk?.onStreamError?.((message) => {
+  streamingActive = false;
+  setStatus(`스트리밍 오류: ${message}`, 'error');
+  cleanEl.textContent = message;
+  window.listenk?.setState?.({ recording: false, processing: false });
+});
 
 copyBtn?.addEventListener('click', async () => {
   const text = cleanEl.textContent.trim() || rawEl.textContent.trim();

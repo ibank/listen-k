@@ -1,17 +1,37 @@
 const pill = document.getElementById('pill');
 const cancelBtn = document.getElementById('cancelBtn');
 const confirmBtn = document.getElementById('confirmBtn');
+const liveText = document.getElementById('liveText');
 
 cancelBtn.addEventListener('click', () => {
-  window.listenkHud?.cancel?.();
+  window.typelessHud?.cancel?.();
 });
 
 confirmBtn.addEventListener('click', () => {
-  window.listenkHud?.confirm?.();
+  window.typelessHud?.confirm?.();
 });
 
-window.listenkHud?.onState?.((state) => {
+window.typelessHud?.onState?.((state) => {
   if (state === 'recording' || state === 'processing') {
     pill.dataset.state = state;
+    if (state === 'recording') {
+      liveText.textContent = '';
+      pill.dataset.hasText = 'false';
+    }
   }
+});
+
+window.typelessHud?.onPartial?.((text) => {
+  const t = (text || '').trim();
+  if (!t) {
+    liveText.textContent = '';
+    pill.dataset.hasText = 'false';
+    return;
+  }
+  liveText.textContent = t;
+  pill.dataset.hasText = 'true';
+  // Always scroll to show the most recent content at the right edge.
+  requestAnimationFrame(() => {
+    liveText.scrollLeft = liveText.scrollWidth;
+  });
 });

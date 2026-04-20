@@ -23,6 +23,9 @@ let isRecording = false;
 let isProcessing = false;
 let savedFrontmostBundleId = null;
 let fnListenerReady = false;
+let transcribeStream = null;
+let transcribeStreamReady = false;
+let transcribeStreamBuffer = '';
 
 const HOTKEY_MODES = ['ropt-double', 'rctl-double', 'rcmd-double', 'rshift-double', 'fn'];
 const DEFAULT_HOTKEY = 'rshift-double';
@@ -225,21 +228,36 @@ function activateApp(bundleId) {
   });
 }
 
+function currentLanguage() {
+  return 'auto';
+}
+
 async function handleFnPress() {
   if (isProcessing) return;
   if (!mainWindow) return;
+
+  const streamAvailable = transcribeStream && transcribeStreamReady;
 
   if (!isRecording) {
     savedFrontmostBundleId = await getFrontmostBundleId();
     console.log('[focus] saved frontmost:', savedFrontmostBundleId);
     isRecording = true;
     showHud('recording');
+
+    if (streamAvailable) {
+      sendStreamCmd({ cmd: 'start', language: currentLanguage() });
+    }
   } else {
     isRecording = false;
     showHud('processing');
+
+    if (streamAvailable) {
+      sendStreamCmd({ cmd: 'stop' });
+    }
   }
 
   updateTrayMenu();
+  // Legacy path: tell renderer to flip its own record state (for Electron-side capture fallback).
   mainWindow.webContents.send('toggle-record');
 }
 
@@ -294,6 +312,79 @@ function restartFnListener() {
   }
   fnListenerReady = false;
   startFnListener();
+}
+
+function startTranscribeStream() {
+  const helper = findTranscribeHelper();
+  const model = findWhisperKitModel();
+  if (!helper || !model) {
+    console.warn('[stream] helper or model missing — streaming disabled');
+    return;
+  }
+
+  console.log('[stream] spawning transcribe-helper --stream', model);
+  transcribeStream = spawn(helper, ['--stream', '--model-dir', model, '--language', 'auto'], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+
+  transcribeStream.stdout.on('data', (chunk) => {
+    transcribeStreamBuffer += chunk.toString();
+    const lines = transcribeStreamBuffer.split('\n');
+    transcribeStreamBuffer = lines.pop();
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) continue;
+      let event;
+      try { event = JSON.parse(t); } catch { continue; }
+      handleStreamEvent(event);
+    }
+  });
+
+  transcribeStream.stderr.on('data', (data) => {
+    console.error('[stream stderr]', data.toString().trim());
+  });
+
+  transcribeStream.on('exit', (code, signal) => {
+    console.error('[stream] helper exited', code, signal);
+    transcribeStream = null;
+    transcribeStreamReady = false;
+  });
+}
+
+function handleStreamEvent(event) {
+  switch (event.type) {
+    case 'ready':
+      transcribeStreamReady = true;
+      console.log('[stream] ready');
+      break;
+    case 'partial':
+      if (mainWindow) mainWindow.webContents.send('stream-partial', event.text || '');
+      if (hudWindow && hudWindow.isVisible()) hudWindow.webContents.send('hud-partial', event.text || '');
+      break;
+    case 'final':
+      if (mainWindow) mainWindow.webContents.send('stream-final', event.text || '');
+      break;
+    case 'stopped':
+      // no-op
+      break;
+    case 'error':
+      console.error('[stream] error:', event.message);
+      if (mainWindow) mainWindow.webContents.send('stream-error', event.message || '');
+      break;
+    default:
+      break;
+  }
+}
+
+function sendStreamCmd(cmd) {
+  if (!transcribeStream || !transcribeStreamReady) return false;
+  try {
+    transcribeStream.stdin.write(JSON.stringify(cmd) + '\n');
+    return true;
+  } catch (err) {
+    console.error('[stream] write failed', err);
+    return false;
+  }
 }
 
 function checkAccessibility() {
@@ -412,6 +503,11 @@ app.whenReady().then(async () => {
   startFnListener();
   log('fn-listener spawned');
 
+  // Spawn the long-lived streaming transcriber eagerly — model load takes
+  // several seconds, first fn press should already be warm.
+  startTranscribeStream();
+  log('transcribe-stream spawned');
+
   createWindow();
   log('main window created');
   createHudWindow();
@@ -441,6 +537,12 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (fnListener) {
     try { fnListener.kill('SIGTERM'); } catch {}
+  }
+  if (transcribeStream) {
+    try {
+      transcribeStream.stdin.write(JSON.stringify({ cmd: 'quit' }) + '\n');
+      transcribeStream.kill('SIGTERM');
+    } catch {}
   }
 });
 
