@@ -46,7 +46,11 @@ function saveConfig(cfg) {
   const p = configPath();
   try {
     fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+    // Atomic write: write to temp, then rename. Guards against corruption
+    // if the process dies mid-write.
+    const tmp = p + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2));
+    fs.renameSync(tmp, p);
   } catch (err) {
     console.warn('[config] save failed:', err.message);
   }
@@ -242,8 +246,14 @@ function currentStreamingEnabled() {
 }
 
 let hudSafetyTimer = null;
-function scheduleHudSafetyHide(ms = 45000) {
+function scheduleHudSafetyHide(ms) {
   if (hudSafetyTimer) clearTimeout(hudSafetyTimer);
+  if (ms == null) {
+    // Ollama post-processing can legitimately take 30 s+; regex rules are
+    // instant. Scale the safety net to the active mode so slow Ollama
+    // sessions aren't force-hidden mid-flight.
+    ms = postProcessingMode() === 'ollama' ? 90000 : 20000;
+  }
   hudSafetyTimer = setTimeout(() => {
     if (!isRecording) {
       console.log('[hud] safety timeout — force hide');
@@ -262,51 +272,58 @@ async function handleFnPress() {
   if (!mainWindow) return;
 
   const streamingEnabled = currentStreamingEnabled();
-  const streamAlive = transcribeStream !== null;
-  const streamReady = streamingEnabled && transcribeStreamReady;
   console.log(
     '[fn] press, recording=', isRecording,
     'streamingEnabled=', streamingEnabled,
-    'streamAlive=', streamAlive,
-    'streamReady=', streamReady
+    'streamAlive=', transcribeStream !== null,
+    'streamReady=', transcribeStreamReady
   );
 
-  // If the user chose streaming but the helper is still loading, block the
-  // press instead of dropping into legacy capture.
-  if (streamingEnabled && streamAlive && !transcribeStreamReady) {
-    mainWindow.webContents.send(
-      'toast',
-      '전사 엔진 초기화 중…'
-    );
+  // Streaming path — fully isolated from the legacy getUserMedia path so
+  // audio can never be captured by both at once.
+  if (streamingEnabled) {
+    if (!transcribeStream) {
+      mainWindow.webContents.send('toast', '전사 엔진이 비활성 상태입니다. 앱을 재시작해주세요.');
+      return;
+    }
+    if (!transcribeStreamReady) {
+      mainWindow.webContents.send('toast', '전사 엔진 초기화 중…');
+      return;
+    }
+    if (!isRecording) {
+      savedFrontmostBundleId = await getFrontmostBundleId();
+      console.log('[focus] saved frontmost:', savedFrontmostBundleId);
+      isRecording = true;
+      showHud('recording');
+      cancelHudSafetyHide();
+      sendStreamCmd({ cmd: 'start', language: currentLanguage() });
+      mainWindow.webContents.send('stream-started');
+    } else {
+      isRecording = false;
+      showHud('processing');
+      sendStreamCmd({ cmd: 'stop' });
+      mainWindow.webContents.send('stream-stopping');
+      scheduleHudSafetyHide();
+    }
+    updateTrayMenu();
     return;
   }
 
+  // Legacy batch path — driven entirely by the renderer's own
+  // getUserMedia pipeline (independent of the streaming helper).
   if (!isRecording) {
     savedFrontmostBundleId = await getFrontmostBundleId();
     console.log('[focus] saved frontmost:', savedFrontmostBundleId);
     isRecording = true;
     showHud('recording');
     cancelHudSafetyHide();
-
-    if (streamReady) {
-      sendStreamCmd({ cmd: 'start', language: currentLanguage() });
-      mainWindow.webContents.send('stream-started');
-    } else {
-      mainWindow.webContents.send('toggle-record');
-    }
+    mainWindow.webContents.send('toggle-record');
   } else {
     isRecording = false;
     showHud('processing');
-
-    if (streamReady) {
-      sendStreamCmd({ cmd: 'stop' });
-      mainWindow.webContents.send('stream-stopping');
-      scheduleHudSafetyHide();
-    } else {
-      mainWindow.webContents.send('toggle-record');
-    }
+    scheduleHudSafetyHide();
+    mainWindow.webContents.send('toggle-record');
   }
-
   updateTrayMenu();
 }
 
@@ -363,6 +380,9 @@ function restartFnListener() {
   startFnListener();
 }
 
+let transcribeStreamRestarts = 0;
+const MAX_STREAM_RESTARTS = 3;
+
 function startTranscribeStream() {
   const helper = findTranscribeHelper();
   const model = findWhisperKitModel();
@@ -372,6 +392,7 @@ function startTranscribeStream() {
   }
 
   console.log('[stream] spawning transcribe-helper --stream', model);
+  transcribeStreamBuffer = '';
   transcribeStream = spawn(helper, ['--stream', '--model-dir', model, '--language', 'auto'], {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -397,6 +418,39 @@ function startTranscribeStream() {
     console.error('[stream] helper exited', code, signal);
     transcribeStream = null;
     transcribeStreamReady = false;
+
+    // Release any UI state that assumed the helper was alive, so the HUD
+    // doesn't sit spinning after a crash.
+    const wasActive = isRecording || isProcessing;
+    if (wasActive) {
+      isRecording = false;
+      isProcessing = false;
+      hideHud();
+      updateTrayMenu();
+      if (mainWindow) {
+        mainWindow.webContents.send('toast', '전사 엔진이 비정상 종료됐습니다 — 재시작 중');
+      }
+    }
+
+    // Clean exit (code 0 or SIGTERM from will-quit) → don't resurrect.
+    if (code === 0 || signal === 'SIGTERM') return;
+
+    if (transcribeStreamRestarts >= MAX_STREAM_RESTARTS) {
+      console.error('[stream] max restarts reached, giving up');
+      if (mainWindow) {
+        mainWindow.webContents.send('toast', '전사 엔진이 반복 종료됐습니다. 앱을 재시작해주세요.');
+      }
+      return;
+    }
+    const backoff = 1500 * Math.pow(2, transcribeStreamRestarts);
+    transcribeStreamRestarts++;
+    console.log(`[stream] restarting in ${backoff}ms (attempt ${transcribeStreamRestarts}/${MAX_STREAM_RESTARTS})`);
+    setTimeout(startTranscribeStream, backoff);
+  });
+
+  transcribeStream.on('spawn', () => {
+    // Successful spawn → reset backoff counter after the helper reports
+    // ready (done in handleStreamEvent for correctness).
   });
 }
 
@@ -405,6 +459,7 @@ function handleStreamEvent(event) {
   switch (event.type) {
     case 'ready':
       transcribeStreamReady = true;
+      transcribeStreamRestarts = 0;
       if (mainWindow) mainWindow.webContents.send('toast', '전사 엔진 준비됨');
       break;
     case 'partial':
@@ -509,7 +564,7 @@ async function collectStatus() {
 
   const wkHelper = findTranscribeHelper();
   const wkModel = findWhisperKitModel();
-  const engine = wkHelper && wkModel ? 'whisperkit' : (whisperBin && whisperModel ? 'whisper.cpp' : 'none');
+  const engine = wkHelper && wkModel ? 'whisperkit' : 'none';
 
   return {
     mic,
@@ -610,6 +665,11 @@ function findTranscribeHelper() {
   return fs.existsSync(p) ? p : null;
 }
 
+function postProcessingMode() {
+  const cfg = loadConfig();
+  return cfg.mode || 'rules';
+}
+
 function findWhisperKitModel() {
   const root = resPath('models', 'whisperkit');
   // Prefer the highest-quality variant that's actually on disk. Turbo /
@@ -642,97 +702,38 @@ function findWhisperKitModel() {
   return null;
 }
 
-function findWhisperBin() {
-  const bundled = resPath('bin', 'whisper-cli');
-  if (fs.existsSync(bundled)) return bundled;
-
-  const candidates = ['whisper-cli', 'whisper-cpp', 'whisper'];
-  const pathDirs = (process.env.PATH || '').split(':').concat([
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    '/usr/bin',
-  ]);
-  for (const name of candidates) {
-    for (const dir of pathDirs) {
-      const full = path.join(dir, name);
-      if (fs.existsSync(full)) return full;
-    }
-  }
-  return null;
-}
-
-function findGgmlModel() {
-  if (process.env.WHISPER_MODEL && fs.existsSync(process.env.WHISPER_MODEL)) {
-    return process.env.WHISPER_MODEL;
-  }
-  const candidates = [
-    resPath('models', 'ggml-base.bin'),
-    resPath('models', 'ggml-small.bin'),
-    path.join(os.homedir(), 'models', 'ggml-base.bin'),
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
-}
-
 // Combined finder used by status dashboard
 function findModel() {
-  return findWhisperKitModel() || findGgmlModel();
+  return findWhisperKitModel();
 }
 
 ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
-  const tmpFile = path.join(os.tmpdir(), `listenk_${Date.now()}.wav`);
-  await fs.promises.writeFile(tmpFile, Buffer.from(wavBuffer));
+  const buf = Buffer.from(wavBuffer);
+  // Reject absurdly tiny takes outright — WAV header alone is 44 bytes, and
+  // <200ms of audio almost certainly means the user fumbled the hotkey.
+  if (buf.length < 44 + 16000 * 0.2 * 2) {
+    throw new Error('녹음이 너무 짧습니다.');
+  }
 
-  const lang = (language || '').split('-')[0] || 'auto';
-
-  // Prefer the WhisperKit / Core ML / Neural Engine path when both the
-  // helper binary and a WhisperKit model are available.
   const wkHelper = findTranscribeHelper();
   const wkModel = findWhisperKitModel();
-  if (wkHelper && wkModel) {
-    return new Promise((resolve, reject) => {
-      execFile(
-        wkHelper,
-        ['--audio', tmpFile, '--model-dir', wkModel, '--language', lang],
-        { maxBuffer: 20 * 1024 * 1024 },
-        (err, stdout, stderr) => {
-          fs.unlink(tmpFile, () => {});
-          if (err) {
-            reject(new Error(`WhisperKit 실패: ${stderr || err.message}`));
-          } else {
-            resolve(stdout.trim());
-          }
-        }
-      );
-    });
+  if (!wkHelper || !wkModel) {
+    throw new Error('전사 엔진 또는 모델 누락. npm run build:transcribe && npm run model:whisperkit');
   }
 
-  // Fallback: bundled whisper.cpp + ggml model (older path).
-  const whisperBin = findWhisperBin();
-  if (!whisperBin) {
-    fs.unlink(tmpFile, () => {});
-    throw new Error('전사 엔진 없음. 빌드: npm run build:transcribe');
-  }
-  const ggmlModel = findGgmlModel();
-  if (!ggmlModel) {
-    fs.unlink(tmpFile, () => {});
-    throw new Error('Whisper 모델 없음. 다운로드: npm run model:whisperkit');
-  }
+  const tmpFile = path.join(os.tmpdir(), `listenk_${Date.now()}.wav`);
+  await fs.promises.writeFile(tmpFile, buf);
+  const lang = (language || '').split('-')[0] || 'auto';
 
   return new Promise((resolve, reject) => {
     execFile(
-      whisperBin,
-      ['-m', ggmlModel, '-f', tmpFile, '-l', lang, '-nt', '-np'],
+      wkHelper,
+      ['--audio', tmpFile, '--model-dir', wkModel, '--language', lang],
       { maxBuffer: 20 * 1024 * 1024 },
       (err, stdout, stderr) => {
         fs.unlink(tmpFile, () => {});
-        if (err) {
-          reject(new Error(`whisper 실패: ${stderr || err.message}`));
-        } else {
-          resolve(stdout.trim());
-        }
+        if (err) reject(new Error(`WhisperKit 실패: ${stderr || err.message}`));
+        else resolve(stdout.trim());
       }
     );
   });
@@ -780,14 +781,22 @@ ipcMain.handle('paste-text', async (_e, text) => {
   clipboard.writeText(trimmed);
 
   const OWN_BUNDLE_ID = 'com.ibank.listenk';
-  if (
+  const shouldActivate =
     savedFrontmostBundleId &&
     savedFrontmostBundleId !== OWN_BUNDLE_ID &&
-    !/electron|com\.github\.electron/i.test(savedFrontmostBundleId)
-  ) {
+    !/electron|com\.github\.electron/i.test(savedFrontmostBundleId);
+
+  if (shouldActivate) {
     console.log('[focus] activating target:', savedFrontmostBundleId);
     await activateApp(savedFrontmostBundleId);
-    await new Promise((r) => setTimeout(r, 180));
+    // Poll frontmost until activation actually lands (up to ~600 ms)
+    // instead of guessing with a fixed sleep — critical for slow apps
+    // that don't come forward within 180 ms.
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      const current = await getFrontmostBundleId();
+      if (current === savedFrontmostBundleId) break;
+    }
   } else {
     await new Promise((r) => setTimeout(r, 80));
   }

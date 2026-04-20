@@ -542,29 +542,19 @@ async function renderStatus() {
     ].filter(Boolean),
   }));
 
-  const usingWK = s.engine === 'whisperkit';
-  const usingCpp = s.engine === 'whisper.cpp';
-  const engineState = (usingWK || usingCpp) ? 'ok' : 'err';
-  const enginePath = usingWK ? s.transcribeHelper?.path : s.whisperBin?.path;
-  const engineLabel = usingWK
-    ? 'WhisperKit (Core ML · Neural Engine)'
-    : usingCpp
-    ? 'whisper.cpp (Metal GPU · fallback)'
-    : '엔진 없음';
+  const engineOk = s.engine === 'whisperkit';
   const streamStatus = s.streamReady
-    ? '스트리밍 엔진 준비됨'
-    : usingWK
-    ? '스트리밍 엔진 초기화 중…(첫 실행은 Core ML 컴파일로 ~1분 소요)'
-    : '스트리밍 엔진 없음';
+    ? '스트리밍 준비됨'
+    : '스트리밍 초기화 중… (첫 실행은 Core ML 컴파일로 ~1분)';
 
   rows.push(buildCheckRow({
-    state: engineState,
-    glyph: engineState === 'ok' ? '✓' : '✕',
+    state: engineOk ? 'ok' : 'err',
+    glyph: engineOk ? '✓' : '✕',
     title: '전사 엔진',
-    desc: engineState === 'ok'
-      ? `${engineLabel}\n${streamStatus}\n${enginePath || ''}`
+    desc: engineOk
+      ? `WhisperKit (Core ML · Metal GPU)\n${streamStatus}\n${s.transcribeHelper?.path || ''}`
       : '전사 엔진을 빌드해주세요: npm run build:transcribe',
-    actions: engineState === 'ok' ? [] : [
+    actions: engineOk ? [] : [
       {
         label: '빌드 명령 복사',
         primary: true,
@@ -576,18 +566,14 @@ async function renderStatus() {
     ],
   }));
 
-  const modelOk = (usingWK && s.whisperKitModel) || (usingCpp && s.whisperModel);
-  const modelPath = usingWK ? s.whisperKitModel?.path : s.whisperModel?.path;
-  const modelLabel = usingWK ? 'WhisperKit Core ML 모델' : 'ggml 모델';
-
   rows.push(buildCheckRow({
-    state: modelOk ? 'ok' : 'err',
-    glyph: modelOk ? '✓' : '✕',
+    state: s.whisperKitModel ? 'ok' : 'err',
+    glyph: s.whisperKitModel ? '✓' : '✕',
     title: '전사 모델',
-    desc: modelOk
-      ? `${modelLabel}\n${modelPath || ''}`
+    desc: s.whisperKitModel
+      ? `WhisperKit Core ML\n${s.whisperKitModel.path}`
       : '모델 파일이 없습니다. 다운로드: npm run model:whisperkit',
-    actions: modelOk ? [] : [
+    actions: s.whisperKitModel ? [] : [
       {
         label: '다운로드 명령 복사',
         onClick: async () => {
