@@ -164,12 +164,16 @@ struct TranscribeHelper {
             transcriber = t
             streaming = true
 
-            do {
-                try await t.startStreamTranscription()
-            } catch {
-                streaming = false
-                transcriber = nil
-                emit(["type": "error", "message": "stream start failed: \(error)"])
+            // startStreamTranscription runs the stream loop and only returns
+            // after stopStreamTranscription is called. We fire it in a detached
+            // Task so the command-processing loop stays responsive to `stop`.
+            currentTask = Task { [weak self] in
+                do {
+                    try await t.startStreamTranscription()
+                } catch {
+                    TranscribeHelper.emit(["type": "error", "message": "stream error: \(error)"])
+                }
+                _ = self
             }
         }
 
@@ -196,21 +200,29 @@ struct TranscribeHelper {
         }
 
         func stop() async {
-            guard streaming, let t = transcriber else { return }
+            guard streaming, let t = transcriber else {
+                // Even if we're not marked streaming, emit a final event so the
+                // caller isn't left hanging.
+                TranscribeHelper.emit(["type": "final", "text": ""])
+                return
+            }
             streaming = false
 
-            do {
-                try await t.stopStreamTranscription()
-            } catch {
-                emit(["type": "error", "message": "stream stop failed: \(error)"])
+            await t.stopStreamTranscription()
+
+            // Wait briefly for the detached stream task to wind down so the
+            // final confirmed/hypothesis text is settled.
+            if let task = currentTask {
+                _ = await task.value
             }
+            currentTask = nil
 
             let final = [confirmedText, hypothesisText]
                 .filter { !$0.isEmpty }
                 .joined(separator: " ")
                 .trimmingCharacters(in: .whitespaces)
             transcriber = nil
-            emit(["type": "final", "text": final])
+            TranscribeHelper.emit(["type": "final", "text": final])
         }
     }
 
