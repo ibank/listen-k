@@ -46,13 +46,11 @@ function createWindow() {
   mainWindow.loadFile('index.html');
 
   mainWindow.once('ready-to-show', async () => {
-    setTimeout(async () => {
-      const status = await collectStatus();
-      if (!isSetupComplete(status)) {
-        mainWindow.show();
-        mainWindow.focus();
-      }
-    }, 1200);
+    const status = await collectStatus();
+    if (!isSetupComplete(status)) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
   });
 
   if (process.env.LISTENK_DEBUG === '1') {
@@ -257,7 +255,7 @@ function checkAccessibility() {
 function checkOllama() {
   return new Promise((resolve) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 800);
+    const timer = setTimeout(() => controller.abort(), 300);
     fetch('http://localhost:11434/api/tags', { signal: controller.signal })
       .then((r) => {
         clearTimeout(timer);
@@ -319,26 +317,37 @@ const SETTINGS_URLS = {
 };
 
 app.whenReady().then(async () => {
-  if (process.platform === 'darwin') {
-    if (app.dock) app.dock.hide();
-    try {
-      await systemPreferences.askForMediaAccess('microphone');
-    } catch {}
+  const t0 = Date.now();
+  const log = (msg) => console.log(`[startup +${Date.now() - t0}ms] ${msg}`);
+
+  if (process.platform === 'darwin' && app.dock) app.dock.hide();
+
+  // Non-blocking mic permission: only prompt if status is not-determined.
+  // askForMediaAccess blocks until the user interacts, so we never await it here.
+  const micStatus = systemPreferences.getMediaAccessStatus('microphone');
+  if (micStatus === 'not-determined') {
+    systemPreferences.askForMediaAccess('microphone').catch(() => {});
   }
+  log(`mic status=${micStatus}`);
 
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'media' || permission === 'microphone') return callback(true);
     callback(false);
   });
-
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
     return permission === 'media' || permission === 'microphone';
   });
 
-  createWindow();
-  createHudWindow();
-  createTray();
+  // Spawn fn-listener first so READY can arrive before the window is shown.
   startFnListener();
+  log('fn-listener spawned');
+
+  createWindow();
+  log('main window created');
+  createHudWindow();
+  log('hud window created');
+  createTray();
+  log('tray created');
 
   globalShortcut.register('CommandOrControl+Shift+Space', () => {
     handleFnPress();
