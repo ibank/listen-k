@@ -104,9 +104,9 @@ npm run dist
    ```
    quarantine 속성이 제거되어 Gatekeeper 가 더 이상 막지 않습니다.
 
-3. **사전 요구사항** (사용자가 따로 설치):
-   - `brew install whisper-cpp` — STT 엔진 (번들에 미포함)
-   - (선택) `brew install ollama && ollama pull gemma3:4b` — Ollama 모드 사용 시
+3. **사전 요구사항** (선택):
+   - (선택) `brew install ollama && ollama pull gemma3:4b` — Ollama 후처리 모드 사용 시에만 필요. 기본값인 규칙 기반 모드라면 설치 불필요
+   - Whisper 엔진은 앱 번들에 정적 빌드되어 포함 (추가 설치 불필요)
 
 4. **권한 2종 허용** (시스템 설정 → 개인정보 보호 및 보안 — 앱이 첫 실행 후 대시보드에서 한 번에 안내):
    - **입력 모니터링**: `/Applications/Listen K.app` 추가

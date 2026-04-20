@@ -2,5 +2,7 @@ node_modules/
 dist/
 bin/
 models/
+.whisper-cpp/
+.whisper-cpp-version
 *.log
 .DS_Store

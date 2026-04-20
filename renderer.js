@@ -473,18 +473,21 @@ async function renderStatus() {
     ].filter(Boolean),
   }));
 
+  const whisperBundled = s.whisperBin && s.whisperBin.path && s.whisperBin.path.includes('Listen K.app/Contents/Resources/');
   rows.push(buildCheckRow({
     state: s.whisperBin ? 'ok' : 'err',
     glyph: s.whisperBin ? '✓' : '✕',
     title: 'Whisper CLI',
-    desc: s.whisperBin ? s.whisperBin.path : 'brew install whisper-cpp 로 설치해주세요.',
+    desc: s.whisperBin
+      ? (whisperBundled ? '번들 포함' : '시스템 경로') + ' · ' + s.whisperBin.path
+      : '번들 누락. 개발 빌드라면 npm run build:whisper 로 빌드하세요.',
     actions: s.whisperBin ? [] : [
       {
-        label: '명령 복사',
+        label: '빌드 명령 복사',
         primary: true,
         onClick: async () => {
-          await copyToClipboard('brew install whisper-cpp');
-          toast('"brew install whisper-cpp" 복사됨');
+          await copyToClipboard('npm run build:whisper');
+          toast('"npm run build:whisper" 복사됨');
         },
       },
     ],

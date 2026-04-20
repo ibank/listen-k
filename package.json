@@ -7,10 +7,11 @@
     "start": "electron .",
     "icon": "node scripts/generate-icon.js",
     "build:helper": "bash scripts/build-helper.sh",
+    "build:whisper": "bash scripts/build-whisper.sh",
     "model:base": "bash scripts/download-model.sh base",
     "model:small": "bash scripts/download-model.sh small",
     "model:tiny": "bash scripts/download-model.sh tiny",
-    "predist": "npm run build:helper",
+    "predist": "npm run build:helper && npm run build:whisper",
     "dist": "electron-builder --mac dmg",
     "dist:dir": "electron-builder --mac --dir"
   },
