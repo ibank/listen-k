@@ -8,6 +8,7 @@ const modelInput = $('model');
 const toneSel = $('tone');
 const modeSel = $('mode');
 const hotkeySel = $('hotkey');
+const streamingSel = $('streaming');
 const copyBtn = $('copyBtn');
 const refreshBtn = $('refreshBtn');
 const checkListEl = $('checkList');
@@ -657,6 +658,19 @@ langSel?.addEventListener('change', () => {
   toast(`언어: ${langSel.options[langSel.selectedIndex].textContent}`);
 });
 if (langSel) window.listenk?.setLanguage?.(langSel.value);
+
+(async () => {
+  try {
+    const enabled = await window.listenk?.getStreaming?.();
+    if (streamingSel) streamingSel.value = enabled === false ? 'off' : 'on';
+  } catch {}
+})();
+
+streamingSel?.addEventListener('change', async () => {
+  const enabled = streamingSel.value === 'on';
+  await window.listenk?.setStreaming?.(enabled);
+  toast(`실시간 표시: ${enabled ? '켜짐' : '꺼짐'}`);
+});
 
 const HOTKEY_LABELS = {
   'ropt-double': '⌥⌥',

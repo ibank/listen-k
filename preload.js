@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('listenk', {
   getHotkey: () => ipcRenderer.invoke('get-hotkey'),
   setHotkey: (mode) => ipcRenderer.invoke('set-hotkey', mode),
   setLanguage: (lang) => ipcRenderer.invoke('set-language', lang),
+  getStreaming: () => ipcRenderer.invoke('get-streaming'),
+  setStreaming: (enabled) => ipcRenderer.invoke('set-streaming', enabled),
   onStreamPartial: (cb) => ipcRenderer.on('stream-partial', (_e, text) => cb(text)),
   onStreamFinal: (cb) => ipcRenderer.on('stream-final', (_e, text) => cb(text)),
   onStreamError: (cb) => ipcRenderer.on('stream-error', (_e, msg) => cb(msg)),

@@ -236,6 +236,11 @@ function currentLanguage() {
   return (raw.split('-')[0] || 'ko').toLowerCase();
 }
 
+function currentStreamingEnabled() {
+  const cfg = loadConfig();
+  return cfg.streaming !== false;
+}
+
 let hudSafetyTimer = null;
 function scheduleHudSafetyHide(ms = 45000) {
   if (hudSafetyTimer) clearTimeout(hudSafetyTimer);
@@ -256,17 +261,22 @@ async function handleFnPress() {
   if (isProcessing) return;
   if (!mainWindow) return;
 
+  const streamingEnabled = currentStreamingEnabled();
   const streamAlive = transcribeStream !== null;
-  const streamReady = transcribeStreamReady;
-  console.log('[fn] press, recording=', isRecording, 'streamAlive=', streamAlive, 'streamReady=', streamReady);
+  const streamReady = streamingEnabled && transcribeStreamReady;
+  console.log(
+    '[fn] press, recording=', isRecording,
+    'streamingEnabled=', streamingEnabled,
+    'streamAlive=', streamAlive,
+    'streamReady=', streamReady
+  );
 
-  // Streaming helper is alive but still loading the Core ML model — first
-  // launch takes 30–60 s. Block hotkey input instead of confusingly dropping
-  // into the legacy Electron-side capture path.
-  if (streamAlive && !streamReady) {
+  // If the user chose streaming but the helper is still loading, block the
+  // press instead of dropping into legacy capture.
+  if (streamingEnabled && streamAlive && !transcribeStreamReady) {
     mainWindow.webContents.send(
       'toast',
-      '전사 엔진 초기화 중… (첫 실행은 Core ML 컴파일로 ~1분 소요)'
+      '전사 엔진 초기화 중…'
     );
     return;
   }
@@ -846,6 +856,15 @@ ipcMain.handle('set-language', (_e, lang) => {
   saveConfig(cfg);
   return { ok: true };
 });
+
+ipcMain.handle('set-streaming', (_e, enabled) => {
+  const cfg = loadConfig();
+  cfg.streaming = !!enabled;
+  saveConfig(cfg);
+  return { ok: true, streaming: cfg.streaming };
+});
+
+ipcMain.handle('get-streaming', () => currentStreamingEnabled());
 
 ipcMain.handle('set-hotkey', (_e, mode) => {
   if (!HOTKEY_MODES.includes(mode)) return { ok: false, error: 'invalid mode' };
