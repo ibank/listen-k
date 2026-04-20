@@ -436,13 +436,17 @@ async function renderStatus() {
   const targetPath = s.packaged ? s.appBundlePath : s.fnListenerPath;
   const targetLabel = s.packaged ? 'Listen K.app' : 'fn-listener';
 
+  const imCoveredByAx = s.inputMonitoring && s.accessibility;
+
   rows.push(buildCheckRow({
     state: s.inputMonitoring ? 'ok' : 'err',
     glyph: s.inputMonitoring ? '✓' : '✕',
-    title: '입력 모니터링 (fn 키 감지)',
+    title: '단축키 감지',
     desc: s.inputMonitoring
-      ? 'fn-listener 실행 중'
-      : `시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링에서 ${targetLabel} 을 허용하세요.\n${targetPath || ''}`,
+      ? (imCoveredByAx
+          ? '허용됨 · 손쉬운 사용 권한에 자동 포함'
+          : '허용됨 · 입력 모니터링')
+      : `시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링 (또는 손쉬운 사용) 에서 ${targetLabel} 을 허용하세요.\n${targetPath || ''}`,
     actions: s.inputMonitoring ? [] : [
       { label: '시스템 설정 열기', primary: true, onClick: () => window.listenk.openSettingsPane('input-monitoring') },
       targetPath && { label: 'Finder 에서 보기', onClick: () => window.listenk.showInFinder(targetPath) },
@@ -459,9 +463,9 @@ async function renderStatus() {
   rows.push(buildCheckRow({
     state: s.accessibility ? 'ok' : 'err',
     glyph: s.accessibility ? '✓' : '✕',
-    title: '손쉬운 사용 (붙여넣기)',
+    title: '자동 붙여넣기',
     desc: s.accessibility
-      ? '허용됨'
+      ? '허용됨 · 손쉬운 사용'
       : `시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용에서 ${axTargetLabel} 을 허용하세요.\n${axTargetPath || ''}`,
     actions: s.accessibility ? [] : [
       { label: '시스템 설정 열기', primary: true, onClick: () => window.listenk.openSettingsPane('accessibility') },
