@@ -29,11 +29,11 @@
         </div>
         <div class="usage-row">
           <span class="usage-step">2</span>
-          <kbd>fn</kbd> 을 한 번 눌러 녹음을 시작합니다 (하단에 HUD 표시)
+          <kbd id="hotkeyHint">단축키</kbd> 을 한 번 눌러 녹음을 시작합니다 (하단에 HUD 표시)
         </div>
         <div class="usage-row">
           <span class="usage-step">3</span>
-          말을 마치면 <kbd>fn</kbd> 또는 HUD 의 <span class="icon-check">✓</span> 로 확정
+          말을 마치면 <kbd id="hotkeyHint">단축키</kbd> 또는 HUD 의 <span class="icon-check">✓</span> 로 확정
         </div>
         <div class="usage-row">
           <span class="usage-step">4</span>
@@ -48,6 +48,16 @@
     <section class="card">
       <h2>환경설정</h2>
       <div class="settings">
+        <label>
+          단축키
+          <select id="hotkey">
+            <option value="ropt-double">Right ⌥ 두 번 탭 (권장)</option>
+            <option value="rctl-double">Right ⌃ 두 번 탭</option>
+            <option value="rcmd-double">Right ⌘ 두 번 탭</option>
+            <option value="rshift-double">Right ⇧ 두 번 탭</option>
+            <option value="fn">fn (Globe 키)</option>
+          </select>
+        </label>
         <label>
           언어
           <select id="lang">

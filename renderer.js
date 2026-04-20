@@ -7,6 +7,7 @@ const langSel = $('lang');
 const modelInput = $('model');
 const toneSel = $('tone');
 const modeSel = $('mode');
+const hotkeySel = $('hotkey');
 const copyBtn = $('copyBtn');
 const refreshBtn = $('refreshBtn');
 const checkListEl = $('checkList');
@@ -557,6 +558,47 @@ async function refresh() {
 
 refreshBtn?.addEventListener('click', refresh);
 modeSel?.addEventListener('change', refresh);
+
+const HOTKEY_LABELS = {
+  'ropt-double': '⌥⌥',
+  'rctl-double': '⌃⌃',
+  'rcmd-double': '⌘⌘',
+  'rshift-double': '⇧⇧',
+  'fn': 'fn',
+};
+
+function applyHotkeyHint(mode) {
+  const hintEls = document.querySelectorAll('#hotkeyHint');
+  const label = HOTKEY_LABELS[mode] || '⌥⌥';
+  hintEls.forEach((el) => { el.textContent = label; });
+}
+
+(async () => {
+  try {
+    const current = await window.listenk.getHotkey();
+    if (current && hotkeySel) hotkeySel.value = current;
+    applyHotkeyHint(current);
+  } catch (err) {
+    console.warn('[hotkey] load failed', err);
+  }
+})();
+
+hotkeySel?.addEventListener('change', async () => {
+  const mode = hotkeySel.value;
+  try {
+    const res = await window.listenk.setHotkey(mode);
+    if (res?.ok) {
+      const label = hotkeySel.options[hotkeySel.selectedIndex].textContent;
+      toast(`단축키: ${label}`);
+      applyHotkeyHint(mode);
+      setTimeout(refresh, 400);
+    } else {
+      toast('단축키 변경 실패');
+    }
+  } catch (err) {
+    toast(`변경 실패: ${err.message}`);
+  }
+});
 
 refresh();
 setInterval(refresh, 4000);

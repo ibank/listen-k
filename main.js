@@ -24,6 +24,36 @@ let isProcessing = false;
 let savedFrontmostBundleId = null;
 let fnListenerReady = false;
 
+const HOTKEY_MODES = ['ropt-double', 'rctl-double', 'rcmd-double', 'rshift-double', 'fn'];
+const DEFAULT_HOTKEY = 'ropt-double';
+
+function configPath() {
+  return path.join(app.getPath('userData'), 'config.json');
+}
+
+function loadConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(configPath(), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveConfig(cfg) {
+  const p = configPath();
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+  } catch (err) {
+    console.warn('[config] save failed:', err.message);
+  }
+}
+
+function currentHotkey() {
+  const cfg = loadConfig();
+  return HOTKEY_MODES.includes(cfg.hotkey) ? cfg.hotkey : DEFAULT_HOTKEY;
+}
+
 function resPath(...parts) {
   const base = app.isPackaged ? process.resourcesPath : __dirname;
   return path.join(base, ...parts);
@@ -215,13 +245,14 @@ async function handleFnPress() {
 
 function startFnListener() {
   const helperPath = resPath('bin', 'fn-listener');
-  console.log('[fn-listener] spawn path:', helperPath);
+  const mode = currentHotkey();
+  console.log('[fn-listener] spawn path:', helperPath, 'mode=', mode);
   if (!fs.existsSync(helperPath)) {
     console.warn('[fn-listener] 미빌드. 실행:  npm run build:helper');
     return;
   }
 
-  fnListener = spawn(helperPath, [], { stdio: ['ignore', 'pipe', 'pipe'] });
+  fnListener = spawn(helperPath, [mode], { stdio: ['ignore', 'pipe', 'pipe'] });
 
   fnListener.on('spawn', () => console.log('[fn-listener] spawned, pid=', fnListener.pid));
   fnListener.on('error', (err) => console.error('[fn-listener] spawn error:', err));
@@ -254,6 +285,15 @@ function startFnListener() {
     fnListener = null;
     fnListenerReady = false;
   });
+}
+
+function restartFnListener() {
+  if (fnListener) {
+    try { fnListener.kill('SIGTERM'); } catch {}
+    fnListener = null;
+  }
+  fnListenerReady = false;
+  startFnListener();
 }
 
 function checkAccessibility() {
@@ -586,4 +626,15 @@ ipcMain.handle('show-in-finder', (_e, p) => {
 ipcMain.handle('clipboard-write', (_e, text) => {
   clipboard.writeText(text == null ? '' : String(text));
   return true;
+});
+
+ipcMain.handle('get-hotkey', () => currentHotkey());
+
+ipcMain.handle('set-hotkey', (_e, mode) => {
+  if (!HOTKEY_MODES.includes(mode)) return { ok: false, error: 'invalid mode' };
+  const cfg = loadConfig();
+  cfg.hotkey = mode;
+  saveConfig(cfg);
+  restartFnListener();
+  return { ok: true, mode };
 });

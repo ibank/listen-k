@@ -12,4 +12,6 @@ contextBridge.exposeInMainWorld('listenk', {
   openUrl: (url) => ipcRenderer.invoke('open-url', url),
   showInFinder: (p) => ipcRenderer.invoke('show-in-finder', p),
   clipboardWrite: (text) => ipcRenderer.invoke('clipboard-write', text),
+  getHotkey: () => ipcRenderer.invoke('get-hotkey'),
+  setHotkey: (mode) => ipcRenderer.invoke('set-hotkey', mode),
 });
