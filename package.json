@@ -9,6 +9,7 @@
     "build:helper": "bash scripts/build-helper.sh",
     "build:transcribe": "bash scripts/build-transcribe-helper.sh",
     "model:whisperkit": "bash scripts/download-whisperkit-model.sh",
+    "smoke": "bash scripts/smoke.sh",
     "predist": "npm run build:helper && npm run build:transcribe && npm run model:whisperkit",
     "dist": "electron-builder --mac dmg",
     "dist:dir": "electron-builder --mac --dir"

@@ -63,6 +63,64 @@
   --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
   --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
   --font-mono: 'SF Mono', ui-monospace, Menlo, monospace;
+
+  color-scheme: dark light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-0: #f4f4f6;
+    --bg-1: #ffffff;
+    --bg-2: #f9f9fb;
+    --bg-3: #f2f2f4;
+    --bg-4: #ececef;
+
+    --surface-card: #ffffff;
+    --surface-elevated: #f9f9fb;
+    --surface-hover: rgba(0, 0, 0, 0.03);
+    --surface-glass: rgba(255, 255, 255, 0.82);
+
+    --border-hairline: rgba(0, 0, 0, 0.08);
+    --border-soft: rgba(0, 0, 0, 0.12);
+    --border-medium: rgba(0, 0, 0, 0.18);
+
+    --text-1: #0c0c0e;
+    --text-2: #35353a;
+    --text-3: #6c6c72;
+    --text-4: #9c9ca2;
+    --text-5: #c7c7cc;
+
+    --accent: #0a66ff;
+    --accent-hover: #1e75ff;
+    --accent-soft: rgba(10, 102, 255, 0.12);
+    --accent-ring: rgba(10, 102, 255, 0.28);
+
+    --ok: #16a34a;
+    --ok-soft: rgba(22, 163, 74, 0.12);
+    --warn: #d97706;
+    --warn-soft: rgba(217, 119, 6, 0.12);
+    --err: #dc2626;
+    --err-soft: rgba(220, 38, 38, 0.12);
+    --info: #64748b;
+    --info-soft: rgba(100, 116, 139, 0.12);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.14);
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse at top, rgba(10, 102, 255, 0.05) 0%, transparent 55%),
+      var(--bg-1);
+  }
+
+  button.primary {
+    box-shadow: 0 0 0 0 var(--accent-ring), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
+  button.primary:hover {
+    box-shadow: 0 0 0 3px var(--accent-ring), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
 }
 
 * {
@@ -149,6 +207,44 @@ main {
   max-width: 680px;
   margin: 0 auto;
 }
+
+/* ========== First-run banner ========== */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: linear-gradient(180deg,
+    rgba(91, 141, 255, 0.14) 0%,
+    rgba(91, 141, 255, 0.05) 100%);
+  border: 1px solid rgba(91, 141, 255, 0.28);
+  border-radius: var(--r-lg);
+}
+.banner-body { flex: 1; }
+.banner-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-1);
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+.banner-desc {
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.banner-spinner {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ========== Cards ========== */
 
@@ -413,6 +509,64 @@ kbd {
   content: attr(data-placeholder);
   color: var(--text-4);
   font-style: italic;
+}
+
+/* ========== History list ========== */
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.history-empty {
+  padding: var(--space-5) var(--space-4);
+  color: var(--text-4);
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+}
+.history-item {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-hairline);
+  transition: background var(--dur-fast);
+}
+.history-item:last-child { border-bottom: none; }
+.history-item:hover { background: var(--surface-hover); }
+
+.history-body {
+  flex: 1;
+  min-width: 0;
+}
+.history-text {
+  color: var(--text-1);
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.history-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+  color: var(--text-4);
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+}
+.history-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+.history-actions button {
+  padding: 4px 9px;
+  font-size: 11px;
 }
 
 /* ========== Toast ========== */

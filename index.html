@@ -12,6 +12,17 @@
   </header>
 
   <main>
+    <section class="banner" id="firstRunBanner" hidden>
+      <div class="banner-body">
+        <div class="banner-title">환영합니다 · Listen K</div>
+        <div class="banner-desc">
+          최초 실행은 WhisperKit 모델을 Core ML 로 준비하는 데 <strong>30~60초</strong>가 걸립니다.
+          준비 완료 후 상단 우측 상태가 <span class="icon-check">준비됨</span> 으로 바뀌면 단축키를 사용할 수 있습니다.
+        </div>
+      </div>
+      <div class="banner-spinner"></div>
+    </section>
+
     <section class="card">
       <div class="card-head">
         <h2>설정 상태</h2>
@@ -99,11 +110,21 @@
 
     <section class="card" id="recentCard" hidden>
       <div class="card-head">
-        <h2>최근 전사</h2>
+        <h2>현재 전사</h2>
         <button id="copyBtn" class="ghost">복사</button>
       </div>
       <div id="raw" class="output raw" spellcheck="false"></div>
       <div id="clean" class="output clean"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>전사 이력</h2>
+        <div class="panel-actions">
+          <button id="historyClearBtn" class="ghost" title="모든 이력 삭제">전체 삭제</button>
+        </div>
+      </div>
+      <div id="historyList" class="history-list"></div>
     </section>
   </main>
 

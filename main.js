@@ -265,6 +265,55 @@ function currentStreamingEnabled() {
   return cfg.streaming !== false;
 }
 
+// ---- Transcription history (JSONL on disk) ----
+
+function historyPath() {
+  return path.join(app.getPath('userData'), 'history.jsonl');
+}
+
+const HISTORY_MAX = 500;
+
+function appendHistory(entry) {
+  const p = historyPath();
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.appendFileSync(p, JSON.stringify(entry) + '\n');
+    // Lazy truncation: if the file grows too big, keep the last HISTORY_MAX lines.
+    const stats = fs.statSync(p);
+    if (stats.size > 2 * 1024 * 1024) {
+      const lines = fs.readFileSync(p, 'utf8').split('\n').filter(Boolean);
+      const trimmed = lines.slice(-HISTORY_MAX).join('\n') + '\n';
+      const tmp = p + '.tmp';
+      fs.writeFileSync(tmp, trimmed);
+      fs.renameSync(tmp, p);
+    }
+  } catch (err) {
+    console.warn('[history] append failed:', err.message);
+  }
+}
+
+function loadHistory(limit = 50) {
+  const p = historyPath();
+  if (!fs.existsSync(p)) return [];
+  try {
+    const lines = fs.readFileSync(p, 'utf8').split('\n').filter(Boolean);
+    return lines
+      .slice(-limit)
+      .reverse()
+      .map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      })
+      .filter(Boolean);
+  } catch (err) {
+    console.warn('[history] load failed:', err.message);
+    return [];
+  }
+}
+
+function clearHistory() {
+  try { fs.unlinkSync(historyPath()); } catch {}
+}
+
 let hudSafetyTimer = null;
 function scheduleHudSafetyHide(ms) {
   if (hudSafetyTimer) clearTimeout(hudSafetyTimer);
@@ -896,6 +945,10 @@ ipcMain.handle('clipboard-write', (_e, text) => {
   clipboard.writeText(text == null ? '' : String(text));
   return true;
 });
+
+ipcMain.handle('history-list', (_e, limit) => loadHistory(typeof limit === 'number' ? limit : 50));
+ipcMain.handle('history-append', (_e, entry) => { appendHistory(entry || {}); return true; });
+ipcMain.handle('history-clear', () => { clearHistory(); return true; });
 
 ipcMain.handle('get-hotkey', () => currentHotkey());
 

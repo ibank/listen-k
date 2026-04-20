@@ -252,14 +252,31 @@ function cleanupWithRules(text) {
 async function finalizePaste(cleanedText) {
   cleanEl.textContent = cleanedText;
   setStatus('붙여넣는 중...');
+  let pasted = true;
   try {
     if (cleanedText && window.listenk?.paste) {
       await window.listenk.paste(cleanedText);
     }
     setStatus('완료', 'ok');
   } catch (pasteErr) {
+    pasted = false;
     setStatus(`붙여넣기 실패: ${pasteErr.message}`, 'error');
   }
+
+  if (cleanedText) {
+    try {
+      await window.listenk?.historyAppend?.({
+        at: new Date().toISOString(),
+        raw: (finalTranscript || '').trim(),
+        clean: cleanedText,
+        mode: modeSel?.value || 'rules',
+        language: langSel?.value || 'ko-KR',
+        pasted,
+      });
+      refreshHistory();
+    } catch {}
+  }
+
   window.listenk?.setState?.({ recording: false, processing: false });
   setTimeout(() => setStatus('대기'), 1500);
 }
@@ -631,12 +648,24 @@ async function renderStatus(statusArg) {
   rows.forEach((r) => checkListEl.appendChild(r));
 }
 
+const firstRunBanner = $('firstRunBanner');
+
 let lastStatusFingerprint = '';
 async function refresh() {
   try {
     const status = await window.listenk.getStatus();
-    // Skip DOM work if nothing observable has changed. Cuts repaints of
-    // the full check-list every 4 s to only when state actually moves.
+    // The welcome banner stays visible only while the engine hasn't
+    // come up yet — once streamReady flips true it retires permanently
+    // for the rest of the session.
+    if (firstRunBanner) {
+      if (status.engine === 'whisperkit' && !status.streamReady && !firstRunBanner.dataset.shown) {
+        firstRunBanner.hidden = false;
+        firstRunBanner.dataset.shown = 'true';
+      } else if (status.streamReady) {
+        firstRunBanner.hidden = true;
+      }
+    }
+
     const fp = JSON.stringify(status);
     if (fp === lastStatusFingerprint) return;
     lastStatusFingerprint = fp;
@@ -646,9 +675,97 @@ async function refresh() {
   }
 }
 
+// ========== Transcription history ==========
+
+const historyListEl = $('historyList');
+const historyClearBtn = $('historyClearBtn');
+
+function formatHistoryTimestamp(iso) {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const same = d.toDateString() === now.toDateString();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    if (same) return `오늘 ${hh}:${mm}`;
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${mo}/${dd} ${hh}:${mm}`;
+  } catch {
+    return iso || '';
+  }
+}
+
+function buildHistoryRow(entry) {
+  const row = document.createElement('div');
+  row.className = 'history-item';
+  row.innerHTML = `
+    <div class="history-body">
+      <div class="history-text"></div>
+      <div class="history-meta"></div>
+    </div>
+    <div class="history-actions">
+      <button class="ghost" data-action="copy">복사</button>
+      <button class="ghost" data-action="paste">붙여넣기</button>
+    </div>
+  `;
+  row.querySelector('.history-text').textContent = entry.clean || entry.raw || '';
+  const meta = [
+    formatHistoryTimestamp(entry.at),
+    entry.mode || '',
+    entry.language || '',
+    entry.pasted === false ? '미붙여넣음' : '',
+  ].filter(Boolean).join(' · ');
+  row.querySelector('.history-meta').textContent = meta;
+
+  row.querySelector('[data-action="copy"]').addEventListener('click', async () => {
+    await copyToClipboard(entry.clean || entry.raw || '');
+    toast('복사됨');
+  });
+  row.querySelector('[data-action="paste"]').addEventListener('click', async () => {
+    const text = entry.clean || entry.raw || '';
+    if (!text) return;
+    try {
+      await window.listenk.paste(text);
+      toast('다시 붙여넣기 완료');
+    } catch (err) {
+      toast(`실패: ${err.message}`);
+    }
+  });
+  return row;
+}
+
+async function refreshHistory() {
+  if (!historyListEl) return;
+  try {
+    const entries = await window.listenk.historyList(50);
+    historyListEl.innerHTML = '';
+    if (!entries.length) {
+      const empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = '아직 전사 이력이 없습니다. 단축키로 한 번 받아써 보세요.';
+      historyListEl.appendChild(empty);
+      return;
+    }
+    entries.forEach((e) => historyListEl.appendChild(buildHistoryRow(e)));
+  } catch (err) {
+    console.warn('[history] refresh failed', err);
+  }
+}
+
+historyClearBtn?.addEventListener('click', async () => {
+  if (!confirm('전사 이력을 모두 삭제할까요?')) return;
+  await window.listenk.historyClear();
+  refreshHistory();
+  toast('이력 삭제됨');
+});
+
+refreshHistory();
+
 refreshBtn?.addEventListener('click', () => {
   lastStatusFingerprint = '';  // force redraw on user-initiated refresh
   refresh();
+  refreshHistory();
 });
 modeSel?.addEventListener('change', () => {
   lastStatusFingerprint = '';
