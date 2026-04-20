@@ -9,6 +9,9 @@
     "build:helper": "bash scripts/build-helper.sh",
     "build:transcribe": "bash scripts/build-transcribe-helper.sh",
     "model:whisperkit": "bash scripts/download-whisperkit-model.sh",
+    "model:base": "bash scripts/download-whisperkit-model.sh openai_whisper-base",
+    "model:small": "bash scripts/download-whisperkit-model.sh openai_whisper-small",
+    "model:turbo": "bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_turbo_632MB",
     "smoke": "bash scripts/smoke.sh",
     "predist": "npm run build:helper && npm run build:transcribe && npm run model:whisperkit",
     "dist": "electron-builder --mac dmg",
@@ -49,7 +52,10 @@
       {
         "from": "models/whisperkit",
         "to": "models/whisperkit",
-        "filter": ["**/*"]
+        "filter": [
+          "openai_whisper-base/**",
+          "openai_whisper-large-v3-v20240930_turbo_632MB/**"
+        ]
       }
     ],
     "mac": {

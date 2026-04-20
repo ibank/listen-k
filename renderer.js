@@ -9,6 +9,7 @@ const toneSel = $('tone');
 const modeSel = $('mode');
 const hotkeySel = $('hotkey');
 const streamingSel = $('streaming');
+const whisperModelSel = $('whisperModel');
 const copyBtn = $('copyBtn');
 const refreshBtn = $('refreshBtn');
 const checkListEl = $('checkList');
@@ -789,6 +790,33 @@ streamingSel?.addEventListener('change', async () => {
   const enabled = streamingSel.value === 'on';
   await window.listenk?.setStreaming?.(enabled);
   toast(`실시간 표시: ${enabled ? '켜짐' : '꺼짐'}`);
+});
+
+(async () => {
+  if (!whisperModelSel) return;
+  try {
+    const info = await window.listenk?.listWhisperModels?.();
+    if (!info) return;
+    // Wipe everything except the leading "auto" sentinel
+    while (whisperModelSel.options.length > 1) whisperModelSel.remove(1);
+    for (const name of info.available) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      whisperModelSel.appendChild(opt);
+    }
+    whisperModelSel.value = info.selected || '';
+  } catch (err) {
+    console.warn('[whisper-model] list failed', err);
+  }
+})();
+
+whisperModelSel?.addEventListener('change', async () => {
+  const name = whisperModelSel.value;
+  await window.listenk?.setWhisperModel?.(name);
+  toast(name ? `모델: ${name} (재로딩 중)` : '자동 선택 (재로딩 중)');
+  lastStatusFingerprint = '';
+  setTimeout(refresh, 500);
 });
 
 const HOTKEY_LABELS = {

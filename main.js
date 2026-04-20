@@ -735,8 +735,33 @@ function postProcessingMode() {
   return cfg.mode || 'rules';
 }
 
+function listWhisperKitModels() {
+  const root = resPath('models', 'whisperkit');
+  if (!fs.existsSync(root)) return [];
+  try {
+    return fs
+      .readdirSync(root)
+      .filter((n) => {
+        try {
+          return fs.statSync(path.join(root, n)).isDirectory();
+        } catch { return false; }
+      })
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 function findWhisperKitModel() {
   const root = resPath('models', 'whisperkit');
+
+  // Honour explicit user override before falling back to auto-pick.
+  const cfg = loadConfig();
+  if (cfg.whisperKitModel) {
+    const explicit = path.join(root, cfg.whisperKitModel);
+    if (fs.existsSync(explicit)) return explicit;
+  }
+
   // Prefer the highest-quality variant that's actually on disk. Turbo /
   // large-v3 variants give markedly better Korean accuracy than small.
   const preferred = [
@@ -945,6 +970,31 @@ ipcMain.handle('clipboard-write', (_e, text) => {
 ipcMain.handle('history-list', (_e, limit) => loadHistory(typeof limit === 'number' ? limit : 50));
 ipcMain.handle('history-append', (_e, entry) => { appendHistory(entry || {}); return true; });
 ipcMain.handle('history-clear', () => { clearHistory(); return true; });
+
+ipcMain.handle('list-whisper-models', () => {
+  const cfg = loadConfig();
+  return {
+    available: listWhisperKitModels(),
+    selected: cfg.whisperKitModel || null,
+    active: path.basename(findWhisperKitModel() || ''),
+  };
+});
+
+ipcMain.handle('set-whisper-model', (_e, name) => {
+  const cfg = loadConfig();
+  if (name) cfg.whisperKitModel = name;
+  else delete cfg.whisperKitModel;
+  saveConfig(cfg);
+  // Bounce the streaming helper so the new model loads immediately.
+  if (transcribeStream) {
+    try { transcribeStream.kill('SIGTERM'); } catch {}
+  }
+  // Reset the restart counter so the user-initiated swap doesn't burn the
+  // crash-recovery budget.
+  transcribeStreamRestarts = 0;
+  setTimeout(startTranscribeStream, 300);
+  return { ok: true };
+});
 
 ipcMain.handle('get-hotkey', () => currentHotkey());
 

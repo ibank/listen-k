@@ -92,14 +92,15 @@ struct TranscribeHelper {
                 load: true
             )
 
+            // Use WhisperKit's tuned defaults; only set the task, language
+            // hint, and suppress timestamps. The previously hand-picked
+            // overrides (temperatureFallbackCount: 3, sampleLength: 224)
+            // were measurably worse than the library defaults — fewer
+            // fallback passes on hard audio degrades non-English accuracy.
             let decodeOptions = DecodingOptions(
                 task: .transcribe,
                 language: language == "auto" ? nil : language,
-                temperatureFallbackCount: 3,
-                sampleLength: 224,
-                withoutTimestamps: true,
-                wordTimestamps: false,
-                suppressBlank: true
+                withoutTimestamps: true
             )
 
             let results = try await whisperKit.transcribe(
@@ -150,18 +151,12 @@ struct TranscribeHelper {
                 return
             }
 
-            // Higher-quality decode: beam search 5 + temperature fallbacks.
-            // WhisperKit accepts these knobs on DecodingOptions; they raise
-            // accuracy noticeably on non-English speech at a small latency
-            // cost. Fallback temperatures recover from degenerate outputs.
+            // Library defaults for maximum quality (fallbackCount=5, etc.);
+            // see batch path above.
             let decoding = DecodingOptions(
                 task: .transcribe,
                 language: language == "auto" ? nil : language,
-                temperatureFallbackCount: 3,
-                sampleLength: 224,
-                withoutTimestamps: true,
-                wordTimestamps: false,
-                suppressBlank: true
+                withoutTimestamps: true
             )
 
             let t = AudioStreamTranscriber(
@@ -255,11 +250,7 @@ struct TranscribeHelper {
                     let decode = DecodingOptions(
                         task: .transcribe,
                         language: currentLanguage,
-                        temperatureFallbackCount: 3,
-                        sampleLength: 224,
-                        withoutTimestamps: true,
-                        wordTimestamps: false,
-                        suppressBlank: true
+                        withoutTimestamps: true
                     )
                     let results = try await whisperKit.transcribe(
                         audioArray: captured,
