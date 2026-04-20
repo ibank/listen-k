@@ -227,24 +227,47 @@ struct TranscribeHelper {
     }
 
     static func runStream(modelDir: String, language: String) async {
-        writeStderr("loading model from \(modelDir) ...\n")
+        writeStderr("[init] loading WhisperKit from \(modelDir)\n")
+        let t0 = Date()
+
+        // Force CPU+GPU compute — skipping the Neural Engine avoids the
+        // multi-minute first-run Core ML → ANE compilation. Inference is
+        // still fast on Metal and this keeps the first launch under ~30s.
+        let computeOptions = ModelComputeOptions(
+            melCompute: .cpuAndGPU,
+            audioEncoderCompute: .cpuAndGPU,
+            textDecoderCompute: .cpuAndGPU,
+            prefillCompute: .cpuAndGPU
+        )
+
+        let config = WhisperKitConfig(
+            modelFolder: modelDir,
+            computeOptions: computeOptions,
+            verbose: true,
+            logLevel: .debug,
+            prewarm: true,
+            load: true
+        )
 
         let whisperKit: WhisperKit
         do {
-            whisperKit = try await WhisperKit(
-                modelFolder: modelDir,
-                verbose: false,
-                logLevel: .none,
-                load: true
-            )
+            whisperKit = try await WhisperKit(config)
         } catch {
             emit(["type": "error", "message": "model load failed: \(error)"])
+            writeStderr("[init] FAILED: \(error)\n")
             exit(1)
+        }
+        writeStderr("[init] WhisperKit loaded in \(String(format: "%.1f", Date().timeIntervalSince(t0)))s\n")
+
+        if whisperKit.tokenizer == nil {
+            writeStderr("[init] WARNING: tokenizer is nil — streaming will fail\n")
+        } else {
+            writeStderr("[init] tokenizer ready\n")
         }
 
         let controller = StreamController(whisperKit)
         emit(["type": "ready"])
-        writeStderr("ready\n")
+        writeStderr("[init] ready event emitted\n")
 
         let reader = LineReader(fileHandle: FileHandle.standardInput)
         while let line = reader.readLine() {
