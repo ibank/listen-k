@@ -185,20 +185,10 @@ struct TranscribeHelper {
         }
 
         func handleStateChange(_ state: AudioStreamTranscriber.State) async {
-            // Keep the full captured audio so we can run an accurate batch
-            // transcribe on stop (streaming state alone loses the tail
-            // segment when the user hits stop mid-phrase).
-            if state.streamingAudio.count > audioBuffer.count {
-                audioBuffer = state.streamingAudio
-            }
-
-            // Lightweight diagnostic: log audio buffer fill every ~1s of new
-            // audio. If lastBufferSize stays 0 throughout a take, the mic
-            // isn't producing samples.
             let bufSize = state.lastBufferSize
             if abs(bufSize - lastLogSize) > 16000 {
                 TranscribeHelper.writeStderr(
-                    "[audio] buf=\(bufSize) audio=\(audioBuffer.count) confirmed=\(state.confirmedSegments.count) unconfirmed=\(state.unconfirmedSegments.count)\n"
+                    "[audio] buf=\(bufSize) confirmed=\(state.confirmedSegments.count) unconfirmed=\(state.unconfirmedSegments.count)\n"
                 )
                 lastLogSize = bufSize
             }
@@ -229,14 +219,17 @@ struct TranscribeHelper {
             }
             streaming = false
 
+            // Grab captured audio BEFORE stopping the stream — the
+            // AudioProcessor holds the accumulated samples via its
+            // audioSamples array. Stopping the stream can clear this.
+            let captured: [Float] = Array(whisperKit.audioProcessor.audioSamples)
+
             await t.stopStreamTranscription()
             if let task = currentTask {
                 _ = await task.value
             }
             currentTask = nil
 
-            let captured = audioBuffer
-            audioBuffer = []
             transcriber = nil
             TranscribeHelper.writeStderr("[stop] captured \(captured.count) samples for final batch\n")
 
