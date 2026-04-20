@@ -46,10 +46,22 @@ function createWindow() {
   mainWindow.loadFile('index.html');
 
   mainWindow.once('ready-to-show', async () => {
+    const firstRunFlag = path.join(app.getPath('userData'), '.first-run-done');
+    const isFirstRun = !fs.existsSync(firstRunFlag);
+
     const status = await collectStatus();
-    if (!isSetupComplete(status)) {
+    if (isFirstRun || !isSetupComplete(status)) {
       mainWindow.show();
       mainWindow.focus();
+    }
+
+    if (isFirstRun) {
+      try {
+        fs.mkdirSync(path.dirname(firstRunFlag), { recursive: true });
+        fs.writeFileSync(firstRunFlag, new Date().toISOString());
+      } catch (err) {
+        console.warn('[first-run] failed to write marker:', err.message);
+      }
     }
   });
 
