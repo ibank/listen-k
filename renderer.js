@@ -506,15 +506,17 @@ async function renderStatus() {
     ],
   }));
 
-  rows.push(buildCheckRow({
-    state: 'info',
-    glyph: 'ⓘ',
-    title: 'macOS fn 키 동작 설정',
-    desc: '시스템 설정 → 키보드 → "🌐/fn 키 누름" 을 "아무 작업 안 함" 으로 설정하세요.',
-    actions: [
-      { label: '키보드 설정 열기', onClick: () => window.listenk.openSettingsPane('keyboard') },
-    ],
-  }));
+  if (currentHotkey === 'fn') {
+    rows.push(buildCheckRow({
+      state: 'info',
+      glyph: 'ⓘ',
+      title: 'macOS fn 키 동작 설정',
+      desc: '시스템 설정 → 키보드 → "🌐/fn 키 누름" 을 "아무 작업 안 함" 으로 설정하세요.',
+      actions: [
+        { label: '키보드 설정 열기', onClick: () => window.listenk.openSettingsPane('keyboard') },
+      ],
+    }));
+  }
 
   const mode = modeSel?.value;
   const hasGemma = s.ollama?.models?.some((m) => m.startsWith('gemma3'));
@@ -567,9 +569,12 @@ const HOTKEY_LABELS = {
   'fn': 'fn',
 };
 
+let currentHotkey = 'ropt-double';
+
 function applyHotkeyHint(mode) {
+  currentHotkey = mode || 'ropt-double';
   const hintEls = document.querySelectorAll('#hotkeyHint');
-  const label = HOTKEY_LABELS[mode] || '⌥⌥';
+  const label = HOTKEY_LABELS[currentHotkey] || '⌥⌥';
   hintEls.forEach((el) => { el.textContent = label; });
 }
 
