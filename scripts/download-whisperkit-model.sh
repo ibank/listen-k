@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-MODEL="${1:-openai_whisper-small}"
+MODEL="${1:-openai_whisper-large-v3-v20240930_turbo_632MB}"
 DEST_ROOT="models/whisperkit"
 DEST="$DEST_ROOT/$MODEL"
 HELPER="bin/transcribe-helper"

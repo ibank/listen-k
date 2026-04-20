@@ -611,14 +611,34 @@ function findTranscribeHelper() {
 }
 
 function findWhisperKitModel() {
-  const candidates = [
-    resPath('models', 'whisperkit', 'openai_whisper-small'),
-    resPath('models', 'whisperkit', 'openai_whisper-base'),
-    resPath('models', 'whisperkit', 'openai_whisper-tiny'),
+  const root = resPath('models', 'whisperkit');
+  // Prefer the highest-quality variant that's actually on disk. Turbo /
+  // large-v3 variants give markedly better Korean accuracy than small.
+  const preferred = [
+    'openai_whisper-large-v3-v20240930_turbo_632MB',
+    'openai_whisper-large-v3-v20240930_turbo',
+    'openai_whisper-large-v3_turbo_954MB',
+    'openai_whisper-large-v3_turbo',
+    'openai_whisper-large-v3-v20240930_626MB',
+    'openai_whisper-large-v3-v20240930',
+    'openai_whisper-large-v3_947MB',
+    'openai_whisper-large-v3',
+    'openai_whisper-large-v2_turbo_955MB',
+    'openai_whisper-large-v2_turbo',
+    'openai_whisper-medium',
+    'openai_whisper-small',
+    'openai_whisper-base',
+    'openai_whisper-tiny',
   ];
-  for (const p of candidates) {
+  for (const name of preferred) {
+    const p = path.join(root, name);
     if (fs.existsSync(p)) return p;
   }
+  // Fallback: take whatever is there.
+  try {
+    const entries = fs.readdirSync(root).map((n) => path.join(root, n)).filter((p) => fs.statSync(p).isDirectory());
+    if (entries.length) return entries[0];
+  } catch {}
   return null;
 }
 
