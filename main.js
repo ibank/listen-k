@@ -114,13 +114,28 @@ function createWindow() {
   });
 }
 
+const HUD_WIDTH = 260;
+const HUD_HEIGHT = 64;
+
+function positionHudOnActiveScreen() {
+  if (!hudWindow) return;
+  const { screen } = require('electron');
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursor);
+  const { x, y, width, height } = display.workArea;
+  const bounds = hudWindow.getBounds();
+  hudWindow.setBounds({
+    x: x + Math.round((width - bounds.width) / 2),
+    y: y + height - bounds.height - 48,
+    width: bounds.width,
+    height: bounds.height,
+  });
+}
+
 function createHudWindow() {
   const { screen } = require('electron');
   const primary = screen.getPrimaryDisplay();
   const { width, height } = primary.workAreaSize;
-
-  const HUD_WIDTH = 260;
-  const HUD_HEIGHT = 64;
 
   hudWindow = new BrowserWindow({
     width: HUD_WIDTH,
@@ -153,6 +168,11 @@ function createHudWindow() {
 
 function showHud(state) {
   if (!hudWindow) return;
+  // Re-anchor to the screen containing the cursor every time the HUD is
+  // summoned — fixes multi-monitor setups where the HUD would otherwise
+  // always appear on the primary display regardless of where the user is
+  // looking.
+  positionHudOnActiveScreen();
   hudWindow.webContents.send('hud-state', state || 'recording');
   if (!hudWindow.isVisible()) hudWindow.showInactive();
 }

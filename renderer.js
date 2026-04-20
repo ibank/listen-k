@@ -481,8 +481,8 @@ function describeMic(status) {
   }
 }
 
-async function renderStatus() {
-  const s = await window.listenk.getStatus();
+async function renderStatus(statusArg) {
+  const s = statusArg || (await window.listenk.getStatus());
   const rows = [];
 
   const mic = describeMic(s.mic);
@@ -631,13 +631,29 @@ async function renderStatus() {
   rows.forEach((r) => checkListEl.appendChild(r));
 }
 
+let lastStatusFingerprint = '';
 async function refresh() {
-  try { await renderStatus(); }
-  catch (err) { console.error('[renderer] status refresh failed', err); }
+  try {
+    const status = await window.listenk.getStatus();
+    // Skip DOM work if nothing observable has changed. Cuts repaints of
+    // the full check-list every 4 s to only when state actually moves.
+    const fp = JSON.stringify(status);
+    if (fp === lastStatusFingerprint) return;
+    lastStatusFingerprint = fp;
+    await renderStatus(status);
+  } catch (err) {
+    console.error('[renderer] status refresh failed', err);
+  }
 }
 
-refreshBtn?.addEventListener('click', refresh);
-modeSel?.addEventListener('change', refresh);
+refreshBtn?.addEventListener('click', () => {
+  lastStatusFingerprint = '';  // force redraw on user-initiated refresh
+  refresh();
+});
+modeSel?.addEventListener('change', () => {
+  lastStatusFingerprint = '';
+  refresh();
+});
 
 langSel?.addEventListener('change', () => {
   window.listenk?.setLanguage?.(langSel.value);

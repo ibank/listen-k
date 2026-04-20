@@ -54,11 +54,14 @@
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] }
+        { "target": "dmg", "arch": ["arm64"] }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "음성 받아쓰기를 위해 마이크에 접근합니다.",
-        "LSUIElement": true
+        "NSMicrophoneUsageDescription": "받아쓴 음성을 텍스트로 변환하는 데 마이크를 사용합니다.",
+        "NSSpeechRecognitionUsageDescription": "로컬 Whisper 모델로 음성을 텍스트로 변환합니다. 음성 데이터는 이 기기에서만 처리됩니다.",
+        "NSAppleEventsUsageDescription": "포커스된 다른 앱의 입력 필드에 정제된 텍스트를 자동으로 붙여넣기 위해 시스템 이벤트를 전송합니다.",
+        "LSUIElement": true,
+        "LSMinimumSystemVersion": "14.0"
       },
       "identity": null,
       "hardenedRuntime": false,

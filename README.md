@@ -1,129 +1,117 @@
-# Listen K (MVP)
+# Listen K
 
-macOS용 AI 음성 받아쓰기 앱. **fn 키 한 번 = 녹음 시작 / 한 번 더 = 포커스된 입력 필드에 자동 붙여넣기**. 로컬 Whisper.cpp로 STT, 로컬 Ollama(Gemma)로 필러 제거·정제. 외부 클라우드 전송 없음.
+Apple Silicon macOS용 **로컬 AI 음성 받아쓰기**. Right Shift 를 두 번 탭하면 HUD 가 뜨고, 말한 내용이 실시간으로 표시된 뒤 한 번 더 탭하면 포커스된 앱의 입력 필드에 자동으로 붙여넣어집니다.
 
-## 사전 준비 (최초 1회)
+- **전사**: WhisperKit (Core ML · Metal GPU, `openai_whisper-large-v3-turbo` 기본)
+- **후처리**: 규칙 기반(기본, 0-deps) / 끄기 / Ollama (Gemma) 중 선택
+- **전송 없음**: 음성도 텍스트도 기기를 벗어나지 않음
+- **대상**: Apple Silicon macOS 14+
 
-### 1) 의존성 설치
-```bash
-brew install whisper-cpp ollama
-xcode-select --install          # swiftc 필요 (fn 키 감지 헬퍼 빌드용)
-```
+---
 
-### 2) Node 의존성 + 모델
-```bash
-npm install
-npm run build:helper            # Swift 헬퍼 bin/fn-listener 컴파일
-npm run model:base              # Whisper ggml-base.bin 다운로드 (~142MB)
-```
+## 설치 (DMG)
 
-### 3) Ollama 모델
-```bash
-ollama serve                    # 백그라운드 데몬 (brew services start ollama)
-ollama pull gemma3:4b
-```
+1. `dist/ListenK-0.1.0-arm64.dmg` 열고 Listen K 를 Applications 로 드래그
+2. 첫 실행 전 Gatekeeper 우회 (아직 공증 전이라 1회 필요)
+   - 빠름: `xattr -cr "/Applications/Listen K.app"`
+   - 또는: 시스템 설정 → 개인정보 보호 및 보안 → "Listen K 가 차단되었습니다" 옆 **그래도 열기**
+3. Applications 에서 Listen K 실행 — 최초 실행 시 대시보드가 자동으로 열립니다
+4. 대시보드 안내를 따라 권한 2가지 허용
+   - **손쉬운 사용**: `/Applications/Listen K.app` 추가 (단축키 감지 + 자동 붙여넣기 둘 다 커버)
+   - **마이크**: 첫 녹음 시 자동 프롬프트
+5. (선택) Ollama 후처리를 쓸 경우: `brew install ollama && ollama pull gemma3:4b`
 
-## 실행
-
-```bash
-npm start
-```
-
-### 최초 실행 시 권한 허용 3가지
-
-1. **마이크** — 자동 프롬프트. 허용.
-2. **입력 모니터링** (fn 키 감지) — 시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링 → `bin/fn-listener` 를 허용.
-3. **손쉬운 사용** (타 앱에 붙여넣기) — 시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 → Electron/Listen K 를 허용.
-
-### macOS 키보드 설정 (중요)
-
-시스템 설정 → 키보드 → `🌐/fn 키 누름` 을 **"아무 작업 안 함"** 으로 설정하세요. 기본값 "받아쓰기" 등으로 두면 macOS 자체 기능이 fn을 먼저 소비해 우리 앱이 감지 못 합니다.
+첫 실행 시 Core ML 이 모델을 컴파일하면서 ~40초 대기합니다. 캐시되면 이후엔 바로 준비됩니다.
 
 ## 사용법
 
-앱이 실행되면 메뉴바에 상태 아이콘이 표시되고 창은 숨겨진 채 대기합니다.
+1. 텍스트를 넣을 곳에 커서 두기
+2. **⇧⇧** (Right Shift 두 번 탭) — HUD 뜨면서 녹음 시작
+3. 말하기 (HUD 에 실시간 텍스트 흐름)
+4. **⇧⇧** 또는 HUD `✓` — 후처리 → 포커스된 입력 필드에 자동 붙여넣기
+5. 취소: HUD `✕`
 
-1. 텍스트를 입력할 앱(메모, 메일, Slack, VS Code 등)에서 커서를 원하는 입력 필드에 둠
-2. **fn 키** 한 번 누름 → 녹음 시작 (메뉴바 🔴)
-3. 말함
-4. **fn 키** 한 번 더 누름 → Whisper 변환 → Gemma 정제 → **자동으로 ⌘V 로 붙여넣음**
+**대체 단축키**: `⌘⇧Space`. 메뉴바(⚪) 아이콘 클릭으로 대시보드 재열기.
 
-대체 단축키: `⌘⇧Space`
+---
 
-메뉴바 아이콘을 클릭하면 전사 이력을 볼 수 있는 창이 뜹니다.
+## 설정
 
-## 파일 구조
+`~/Library/Application Support/Listen K/config.json` 에 지속됨 (앱이 직접 갱신):
 
-- `native/fn-listener.swift` — CGEventTap으로 fn 키 감지, stdout에 `FN_DOWN` 출력
-- `bin/fn-listener` — 컴파일된 바이너리 (빌드 후 생성)
-- `main.js` — Electron 메인. 헬퍼 실행, whisper-cli 호출, 클립보드 + ⌘V 전송, Tray
-- `preload.js` — IPC 브릿지
-- `index.html` / `styles.css` / `renderer.js` — 창 UI + PCM 캡처 + Ollama 호출
-- `scripts/build-helper.sh` — swiftc 빌드
-- `scripts/download-model.sh` — Whisper 모델 다운로더
+| 키 | 값 | 설명 |
+|---|---|---|
+| `hotkey` | `rshift-double` (기본) · `ropt-double` · `rctl-double` · `rcmd-double` · `fn` | 전역 핫키 |
+| `language` | `ko-KR` (기본) · `en-US` · `ja-JP` | Whisper 언어 힌트 |
+| `streaming` | `true` (기본) · `false` | HUD 실시간 텍스트 표시 여부. off 는 녹음 완료 후 일괄 변환 |
+| `mode` | `rules` (기본) · `off` · `ollama` | 후처리. Ollama 선택 시 `gemma3:4b` 필요 |
 
-## 환경변수
+첫 실행 마커: 같은 디렉토리 `.first-run-done` (지우면 다시 대시보드 자동 오픈)
 
-- `WHISPER_MODEL=/path/to/model.bin` — Whisper 모델 경로 오버라이드
+---
+
+## 개발
+
+```bash
+brew install cmake         # (선택) whisper.cpp 정적 빌드가 필요할 때만
+xcode-select --install     # swiftc
+
+npm install
+npm run build:helper       # bin/fn-listener, paste-helper, focus-helper
+npm run build:transcribe   # bin/transcribe-helper (WhisperKit Swift Package)
+npm run model:whisperkit   # Core ML 모델 (~632 MB) → models/whisperkit/
+
+npm start                  # 개발 모드
+npm run dist               # DMG 빌드 (predist 로 위 3개 자동 실행)
+npm run icon               # 아이콘 재생성
+```
+
+다른 모델 변형으로 바꾸려면:
+```bash
+bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_turbo_632MB
+# 또는
+bash scripts/download-whisperkit-model.sh openai_whisper-base
+```
+`models/whisperkit/` 밑에 있는 폴더 중 품질 우선순위 순서대로 자동 선택됩니다.
+
+## 구조
+
+```
+main.js                         Electron main: IPC, 상태, Tray, 헬퍼 라이프사이클
+preload.js / preload-hud.js     contextIsolation 브릿지
+index.html + renderer.js        대시보드 창 (상태, 설정, 최근 전사)
+hud.html + hud.js               플로팅 HUD (파형 / 실시간 텍스트 / ✕ / ✓)
+styles.css / hud.css            2026 darkfirst 디자인 시스템
+
+native/fn-listener.swift        CGEventTap (modifier double-tap / fn)
+native/paste-helper.swift       Accessibility check + CGEventPost ⌘V
+native/focus-helper.swift       NSWorkspace frontmost 저장/복구
+native/transcribe-helper/       Swift Package. WhisperKit AudioStreamTranscriber
+                                + 배치 재전사 (--stream / --audio / --download)
+
+scripts/build-helper.sh         3개 Swift 헬퍼 ad-hoc 서명 빌드
+scripts/build-transcribe-helper.sh
+scripts/download-whisperkit-model.sh
+scripts/after-pack.js           electron-builder afterPack ad-hoc 서명
+scripts/generate-icon.js        순수 Node PNG 인코더 (의존성 0)
+```
 
 ## 트러블슈팅
 
-- **fn 눌러도 반응 없음**: `bin/fn-listener` 가 입력 모니터링 권한을 받았는지 확인. macOS 키보드 설정에서 fn 키 동작이 "아무 작업 안 함"인지 확인.
-- **붙여넣기 실패**: 손쉬운 사용 권한 미허용. 시스템 설정에서 Electron 또는 터미널(개발 중) 허용.
-- **"whisper-cli 설치 필요"**: `brew install whisper-cpp`.
-- **Ollama 호출 실패**: `ollama serve` 실행 중인지, `ollama list` 에 `gemma3:4b` 있는지 확인.
+- **HUD 뜨는데 텍스트가 안 나옴**: 터미널에서 `npm start` 로 실행해 `[audio] buf=` 로그 확인. buf 가 0 에서 멈추면 마이크 권한 누락.
+- **환각 (말 안 했는데 "Thank you for watching" 등)**: 마이크가 무음을 받는 중. 앱 번들에 마이크 권한 부여했는지 확인. `openai_whisper-large-v3-turbo` 가 작은 모델보다 환각이 적음.
+- **⇧⇧ 눌러도 반응 없음**: 대시보드 "단축키 감지" 행 확인. 손쉬운 사용이 켜져 있으면 초록. 그래도 안 되면 Right Shift 두 번 탭 간격을 380ms 이내로.
+- **포커스 복구 실패, 붙여넣기가 Listen K 에 들어감**: `bin/focus-helper` 로그 확인. 대부분 앱 bundle id 인식 실패. 일반 macOS 앱이 아닐 때 발생 (웹 브라우저 탭 내부 위젯 등).
+- **Core ML 로딩 > 1분**: ANE 컴파일을 돌고 있을 수 있음 (현재 코드는 cpuAndGPU 만 쓰므로 정상적으로는 ~40초). `rm -rf ~/Library/Caches/transcribe-helper` 후 재실행.
 
-## 배포 (.dmg 빌드)
+## 배포 정책
 
-### 빌드
-```bash
-npm run dist
-```
+현재 ad-hoc 서명 only — 배포받은 사람이 위 Gatekeeper 우회를 한 번 해야 합니다. 정식 배포는 Apple Developer 가입 ($99/년) 후 `Developer ID Application` + `notarytool` 공증 경로로 이관 예정. 공증 후에는 우회 없이 더블클릭 실행.
 
-`dist/Listen K-0.1.0-arm64.dmg`, `dist/Listen K-0.1.0-x64.dmg` 가 생성됩니다.
-(`predist` 가 자동으로 Swift 헬퍼를 빌드합니다. 모델은 `npm run model:base` 로 미리 받아두세요.)
+## 로드맵
 
-### 설치 받는 사용자에게 안내할 것
-
-1. **DMG 열고 Applications 로 드래그**
-
-2. **첫 실행 — Gatekeeper 우회** (둘 중 하나)
-
-   macOS Ventura(13) 이후로 우클릭 → `열기` 바이패스는 더 이상 동작하지 않습니다.
-   현행 macOS (Sonoma 14 / Sequoia 15 / 2026년 버전) 에서는 다음 둘 중 하나로 진행하세요.
-
-   **방법 A — 시스템 설정** (관리자 암호 필요)
-   1. 앱을 한 번 실행 시도 → "확인되지 않은 개발자" 경고 → `완료`
-   2. 시스템 설정 → **개인정보 보호 및 보안** → 화면 하단 보안 섹션
-   3. "Listen K 가 차단되었습니다" 옆 **`그래도 열기`** 클릭 → 암호 입력
-   4. 다시 한 번 실행하면 정상 열림
-
-   **방법 B — 터미널** (가장 빠름)
-   ```bash
-   xattr -cr "/Applications/Listen K.app"
-   ```
-   quarantine 속성이 제거되어 Gatekeeper 가 더 이상 막지 않습니다.
-
-3. **사전 요구사항** (선택):
-   - (선택) `brew install ollama && ollama pull gemma3:4b` — Ollama 후처리 모드 사용 시에만 필요. 기본값인 규칙 기반 모드라면 설치 불필요
-   - Whisper 엔진은 앱 번들에 정적 빌드되어 포함 (추가 설치 불필요)
-
-4. **권한 2종 허용** (시스템 설정 → 개인정보 보호 및 보안 — 앱이 첫 실행 후 대시보드에서 한 번에 안내):
-   - **입력 모니터링**: `/Applications/Listen K.app` 추가
-   - **손쉬운 사용**: `/Applications/Listen K.app` 추가
-   (마이크는 첫 녹음 시 자동 프롬프트)
-
-5. (단축키를 fn 으로 쓸 때만) **macOS 키보드 설정**: `🌐/fn 키 누름` → `아무 작업 안 함`. 기본값인 `Right ⌥ 두 번 탭` 을 쓸 경우 불필요.
-
-### 서명·공증 없이 배포할 때 주의
-
-- ad-hoc 서명이라 위 Gatekeeper 우회가 사용자 측에서 한 번 필요
-- 재빌드/업데이트로 cdhash 가 바뀌면 헬퍼 TCC 권한 재허용이 필요할 수 있음 (앱 번들에 권한을 부여하면 대부분 유지됨)
-- 본격 배포는 Apple Developer 가입 후 `Developer ID Application` 인증서로 서명 + `notarytool` 공증이 권장. 공증 후엔 사용자가 위 우회 절차 없이 그냥 더블클릭으로 열림
-
-## 다음 단계 (로드맵)
-
-- [ ] 스트리밍 STT (whisper.cpp stream + VAD)
-- [ ] 앱별 톤 자동 전환 (frontmost 앱 감지)
-- [ ] 사용자 어투 학습
-- [ ] 전사 이력 저장 및 검색
+- [ ] 전사 이력 저장 및 재전사
+- [ ] 앱별 톤/스타일 자동 전환
+- [ ] 사용자 어투 학습 (vocab / 커스텀 발음 사전)
+- [ ] 라이트 모드 (`prefers-color-scheme`)
+- [ ] 자동 업데이트 (electron-updater, 공증 이후)
