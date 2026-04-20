@@ -22,6 +22,7 @@ let fnListener = null;
 let isRecording = false;
 let isProcessing = false;
 let savedFrontmostBundleId = null;
+let fnListenerReady = false;
 
 function resPath(...parts) {
   const base = app.isPackaged ? process.resourcesPath : __dirname;
@@ -43,6 +44,16 @@ function createWindow() {
   });
 
   mainWindow.loadFile('index.html');
+
+  mainWindow.once('ready-to-show', async () => {
+    setTimeout(async () => {
+      const status = await collectStatus();
+      if (!isSetupComplete(status)) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }, 1200);
+  });
 
   if (process.env.LISTENK_DEBUG === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -216,6 +227,7 @@ function startFnListener() {
         console.log('[fn-listener] FN_DOWN received → toggle');
         handleFnPress();
       } else if (t === 'READY') {
+        fnListenerReady = true;
         console.log('[fn-listener] READY');
       } else if (t) {
         console.log('[fn-listener] stdout:', t);
@@ -230,8 +242,71 @@ function startFnListener() {
   fnListener.on('exit', (code, signal) => {
     console.error('[fn-listener] exited code=', code, 'signal=', signal);
     fnListener = null;
+    fnListenerReady = false;
   });
 }
+
+function checkAccessibility() {
+  const helper = resPath('bin', 'paste-helper');
+  if (!fs.existsSync(helper)) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    execFile(helper, ['--check'], (err) => resolve(!err));
+  });
+}
+
+function checkOllama() {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 800);
+    fetch('http://localhost:11434/api/tags', { signal: controller.signal })
+      .then((r) => {
+        clearTimeout(timer);
+        if (!r.ok) return resolve({ running: false });
+        return r.json().then((json) => {
+          const models = (json.models || []).map((m) => m.name);
+          resolve({ running: true, models });
+        });
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        resolve({ running: false });
+      });
+  });
+}
+
+function isSetupComplete(s) {
+  return (
+    s.mic === 'granted' &&
+    s.inputMonitoring &&
+    s.accessibility &&
+    s.whisperBin &&
+    s.whisperModel
+  );
+}
+
+async function collectStatus() {
+  const mic = systemPreferences.getMediaAccessStatus('microphone');
+  const accessibility = await checkAccessibility();
+  const whisperBin = findWhisperBin();
+  const whisperModel = findModel();
+  const ollama = await checkOllama();
+
+  return {
+    mic,
+    inputMonitoring: fnListenerReady,
+    accessibility,
+    whisperBin: whisperBin ? { path: whisperBin } : null,
+    whisperModel: whisperModel ? { path: whisperModel } : null,
+    ollama,
+  };
+}
+
+const SETTINGS_URLS = {
+  mic: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+  'input-monitoring': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent',
+  accessibility: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+  keyboard: 'x-apple.systempreferences:com.apple.preference.keyboard',
+};
 
 app.whenReady().then(async () => {
   if (process.platform === 'darwin') {
@@ -439,3 +514,25 @@ ipcMain.handle('paste-text', async (_e, text) => {
 });
 
 ipcMain.handle('show-window', () => showWindowActive());
+
+ipcMain.handle('get-status', () => collectStatus());
+
+ipcMain.handle('open-settings-pane', (_e, pane) => {
+  const url = SETTINGS_URLS[pane];
+  if (!url) return false;
+  require('electron').shell.openExternal(url);
+  return true;
+});
+
+ipcMain.handle('request-mic', async () => {
+  try {
+    const ok = await systemPreferences.askForMediaAccess('microphone');
+    return ok;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle('open-url', (_e, url) => {
+  require('electron').shell.openExternal(url);
+});

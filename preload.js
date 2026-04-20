@@ -6,4 +6,8 @@ contextBridge.exposeInMainWorld('listenk', {
   transcribe: (payload) => ipcRenderer.invoke('transcribe', payload),
   paste: (text) => ipcRenderer.invoke('paste-text', text),
   setState: (state) => ipcRenderer.invoke('set-state', state),
+  getStatus: () => ipcRenderer.invoke('get-status'),
+  openSettingsPane: (pane) => ipcRenderer.invoke('open-settings-pane', pane),
+  requestMic: () => ipcRenderer.invoke('request-mic'),
+  openUrl: (url) => ipcRenderer.invoke('open-url', url),
 });

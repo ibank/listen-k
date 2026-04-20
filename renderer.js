@@ -1,18 +1,20 @@
 const $ = (id) => document.getElementById(id);
 
-const recordBtn = $('recordBtn');
 const rawEl = $('raw');
 const cleanEl = $('clean');
 const statusEl = $('status');
 const langSel = $('lang');
 const modelInput = $('model');
 const toneSel = $('tone');
-const cleanBtn = $('cleanBtn');
-const copyBtn = $('copyBtn');
 const modeSel = $('mode');
+const copyBtn = $('copyBtn');
+const refreshBtn = $('refreshBtn');
+const checkListEl = $('checkList');
+const recentCard = $('recentCard');
+const toastEl = $('toast');
 
-rawEl.dataset.placeholder = '녹음을 시작하고 멈추면 여기에 Whisper 결과가 표시됩니다...';
-cleanEl.dataset.placeholder = 'Whisper 결과가 Ollama로 정제되어 여기에 표시됩니다.';
+rawEl.dataset.placeholder = '전사 결과가 여기에 표시됩니다.';
+cleanEl.dataset.placeholder = '정제된 텍스트가 여기에 표시됩니다.';
 
 const OLLAMA_URL = 'http://localhost:11434/api/generate';
 
@@ -30,9 +32,14 @@ function setStatus(text, kind = '') {
   statusEl.dataset.kind = kind;
 }
 
-function renderRaw() {
-  rawEl.textContent = finalTranscript;
+function toast(msg, ms = 1500) {
+  toastEl.textContent = msg;
+  toastEl.hidden = false;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toastEl.hidden = true; }, ms);
 }
+
+// ========== Audio capture / transcription / post-processing ==========
 
 async function startRecognition() {
   console.log('[renderer] startRecognition()');
@@ -40,10 +47,10 @@ async function startRecognition() {
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
-    console.log('[renderer] got mic stream, tracks=', micStream.getTracks().length);
   } catch (err) {
     console.error('[renderer] mic permission/capture failed', err);
-    setStatus(`마이크 실패: ${err.name} — ${err.message}`, 'error');
+    setStatus(`마이크 실패: ${err.name}`, 'error');
+    window.listenk?.setState?.({ recording: false, processing: false });
     return;
   }
 
@@ -62,8 +69,6 @@ async function startRecognition() {
   processor.connect(audioContext.destination);
 
   recording = true;
-  recordBtn.classList.add('recording');
-  recordBtn.querySelector('.label').textContent = '녹음 중지';
   setStatus('녹음 중...');
   window.listenk?.setState?.({ recording: true, processing: false });
 }
@@ -71,9 +76,6 @@ async function startRecognition() {
 async function stopRecognition() {
   if (!recording) return;
   recording = false;
-
-  recordBtn.classList.remove('recording');
-  recordBtn.querySelector('.label').textContent = '녹음 시작';
 
   try {
     processor.disconnect();
@@ -102,7 +104,8 @@ async function stopRecognition() {
     });
 
     finalTranscript = cleanWhisperOutput(text);
-    renderRaw();
+    showRecent();
+    rawEl.textContent = finalTranscript;
 
     if (finalTranscript.trim()) {
       await postProcessAndPaste(finalTranscript);
@@ -112,7 +115,8 @@ async function stopRecognition() {
     }
   } catch (err) {
     console.error('transcribe failed', err);
-    setStatus(`Whisper 오류`, 'error');
+    setStatus('Whisper 오류', 'error');
+    showRecent();
     cleanEl.textContent = err.message;
     window.listenk?.setState?.({ recording: false, processing: false });
   } finally {
@@ -121,6 +125,26 @@ async function stopRecognition() {
       audioContext = null;
     }
   }
+}
+
+async function cancelRecord() {
+  if (!recording) return;
+  recording = false;
+
+  try {
+    processor?.disconnect();
+    source?.disconnect();
+    micStream?.getTracks().forEach((t) => t.stop());
+    if (audioContext) {
+      try { await audioContext.close(); } catch {}
+      audioContext = null;
+    }
+  } catch {}
+
+  pcmChunks = [];
+  setStatus('취소됨');
+  window.listenk?.setState?.({ recording: false, processing: false });
+  setTimeout(() => setStatus('대기'), 1200);
 }
 
 function cleanWhisperOutput(text) {
@@ -137,28 +161,8 @@ function toggleRecord() {
   else startRecognition();
 }
 
-async function cancelRecord() {
-  console.log('[renderer] cancelRecord()');
-  if (!recording) return;
-  recording = false;
-
-  recordBtn.classList.remove('recording');
-  recordBtn.querySelector('.label').textContent = '녹음 시작';
-
-  try {
-    processor?.disconnect();
-    source?.disconnect();
-    micStream?.getTracks().forEach((t) => t.stop());
-    if (audioContext) {
-      try { await audioContext.close(); } catch {}
-      audioContext = null;
-    }
-  } catch {}
-
-  pcmChunks = [];
-  setStatus('취소됨');
-  window.listenk?.setState?.({ recording: false, processing: false });
-  setTimeout(() => setStatus('대기'), 1200);
+function showRecent() {
+  if (recentCard?.hasAttribute('hidden')) recentCard.removeAttribute('hidden');
 }
 
 function flattenChunks(chunks) {
@@ -213,72 +217,10 @@ function encodeWAV(samples) {
   return buffer;
 }
 
-recordBtn.addEventListener('click', () => {
-  console.log('[renderer] record button clicked, recording=', recording);
-  toggleRecord();
-});
-if (window.listenk?.onToggleRecord) {
-  window.listenk.onToggleRecord(() => {
-    console.log('[renderer] toggle-record IPC received, recording=', recording);
-    toggleRecord();
-  });
-  console.log('[renderer] onToggleRecord handler registered');
-} else {
-  console.warn('[renderer] window.listenk missing — preload failed?');
-}
-
-window.listenk?.onCancelRecord?.(() => {
-  console.log('[renderer] cancel-record IPC received');
-  cancelRecord();
-});
-
-cleanBtn.addEventListener('click', () => {
-  const text = rawEl.textContent.trim();
-  if (!text) return;
-  finalTranscript = text;
-  postProcessAndPaste(text);
-});
-
-copyBtn.addEventListener('click', async () => {
-  const text = cleanEl.textContent.trim() || rawEl.textContent.trim();
-  if (!text) return;
-  await navigator.clipboard.writeText(text);
-  setStatus('클립보드에 복사됨', 'ok');
-  setTimeout(() => setStatus('준비됨'), 1500);
-});
-
-function buildPrompt(raw) {
-  const tone = toneSel.value;
-  const toneInstruction = {
-    neutral: '자연스럽고 깔끔한 문어체로',
-    formal: '격식 있는 존댓말로',
-    casual: '친근한 구어체로',
-    email: '이메일에 적합한 정중하고 간결한 톤으로',
-  }[tone] || '자연스럽게';
-
-  return `당신은 음성 받아쓰기 결과를 정제하는 편집기입니다. 아래 원문은 사용자의 발화를 받아쓴 것입니다. 다음 규칙을 따르세요.
-
-규칙:
-1. "음", "어", "그", "뭐", "아", "그니까", "um", "uh", "you know" 같은 필러 단어 제거
-2. 반복되는 표현 정리
-3. 중간에 말을 바꾼 경우 최종 의도를 반영해 문맥에 맞게 수정
-4. 목록/단계를 말했으면 줄바꿈으로 정리
-5. 문장부호와 대소문자를 자연스럽게 복원
-6. ${toneInstruction} 다듬되, 의미와 원래 언어는 유지
-7. 번역하지 마세요. 내용을 요약하거나 추가하지 마세요.
-8. 설명 없이 정제된 결과 텍스트만 출력하세요.
-
-원문:
-"""
-${raw}
-"""
-
-정제된 텍스트:`;
-}
+// ========== Post-processing ==========
 
 function cleanupWithRules(text) {
   let t = text;
-
   t = t.replace(
     /(^|[\s.,!?])(음+|어+|아+|에+|으+음*|그니까|그러니까|그러면|뭐|막|좀|이제|자|아니|어디|그+)(?=[\s.,!?]|$)/g,
     '$1'
@@ -287,7 +229,6 @@ function cleanupWithRules(text) {
   t = t.replace(/(^|\s)(\S{1,4})(\s+\2){1,}/g, '$1$2');
   t = t.replace(/\s+([.,!?])/g, '$1');
   t = t.replace(/\s{2,}/g, ' ').trim();
-
   return t;
 }
 
@@ -308,22 +249,46 @@ async function finalizePaste(cleanedText) {
 
 async function postProcessAndPaste(raw) {
   const mode = modeSel?.value || 'rules';
-
   if (mode === 'off') {
-    setStatus('정제 없이 붙여넣는 중...');
+    setStatus('붙여넣는 중...');
     await finalizePaste(raw.trim());
     return;
   }
-
   if (mode === 'rules') {
-    setStatus('규칙 기반 정제 중...');
-    const cleaned = cleanupWithRules(raw);
-    await finalizePaste(cleaned);
+    setStatus('규칙 정제 중...');
+    await finalizePaste(cleanupWithRules(raw));
     return;
   }
-
   setStatus('Ollama 정제 중...');
   await cleanupWithOllama(raw);
+}
+
+function buildPrompt(raw) {
+  const toneInstruction = {
+    neutral: '자연스럽고 깔끔한 문어체로',
+    formal: '격식 있는 존댓말로',
+    casual: '친근한 구어체로',
+    email: '이메일에 적합한 정중하고 간결한 톤으로',
+  }[toneSel.value] || '자연스럽게';
+
+  return `당신은 음성 받아쓰기 결과를 정제하는 편집기입니다. 아래 원문은 사용자의 발화를 받아쓴 것입니다.
+
+규칙:
+1. "음", "어", "그", "뭐", "아", "그니까", "um", "uh", "you know" 같은 필러 단어 제거
+2. 반복되는 표현 정리
+3. 중간에 말을 바꾼 경우 최종 의도를 반영해 문맥에 맞게 수정
+4. 목록/단계를 말했으면 줄바꿈으로 정리
+5. 문장부호와 대소문자를 자연스럽게 복원
+6. ${toneInstruction} 다듬되, 의미와 원래 언어는 유지
+7. 번역하지 마세요. 내용을 요약하거나 추가하지 마세요.
+8. 설명 없이 정제된 결과 텍스트만 출력하세요.
+
+원문:
+"""
+${raw}
+"""
+
+정제된 텍스트:`;
 }
 
 async function cleanupWithOllama(raw) {
@@ -337,17 +302,13 @@ async function cleanupWithOllama(raw) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, prompt, stream: true }),
     });
-
     if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Ollama ${res.status}: ${errText}`);
+      throw new Error(`Ollama ${res.status}: ${await res.text()}`);
     }
-
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
     let output = '';
-
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -365,11 +326,197 @@ async function cleanupWithOllama(raw) {
         } catch {}
       }
     }
-
     await finalizePaste(output.trim());
   } catch (err) {
-    cleanEl.textContent = `Ollama 호출 실패: ${err.message}\n\nOllama가 실행 중인지 확인:\n  brew install ollama\n  ollama serve\n  ollama pull ${model}`;
+    cleanEl.textContent = `Ollama 호출 실패: ${err.message}\n\n  brew install ollama && ollama serve\n  ollama pull ${model}`;
     setStatus('Ollama 오류', 'error');
     window.listenk?.setState?.({ recording: false, processing: false });
   }
 }
+
+// ========== IPC wiring (record/cancel from main/HUD) ==========
+
+if (window.listenk?.onToggleRecord) {
+  window.listenk.onToggleRecord(() => toggleRecord());
+}
+window.listenk?.onCancelRecord?.(() => cancelRecord());
+
+copyBtn?.addEventListener('click', async () => {
+  const text = cleanEl.textContent.trim() || rawEl.textContent.trim();
+  if (!text) return;
+  await navigator.clipboard.writeText(text);
+  toast('복사됨');
+});
+
+// ========== Onboarding dashboard ==========
+
+function dot(state, glyph) {
+  return `<div class="check-dot" data-state="${state}">${glyph}</div>`;
+}
+
+function buildCheckRow({ state, glyph, title, desc, actions = [] }) {
+  const row = document.createElement('div');
+  row.className = 'check-row';
+  row.innerHTML = `
+    ${dot(state, glyph)}
+    <div class="check-body">
+      <div class="check-title">${title}</div>
+      <div class="check-desc">${desc}</div>
+    </div>
+    <div class="check-actions"></div>
+  `;
+  const actionsEl = row.querySelector('.check-actions');
+  for (const a of actions) {
+    const b = document.createElement('button');
+    b.className = a.primary ? 'primary' : 'ghost';
+    b.textContent = a.label;
+    b.addEventListener('click', a.onClick);
+    actionsEl.appendChild(b);
+  }
+  return row;
+}
+
+function describeMic(status) {
+  switch (status) {
+    case 'granted':
+      return { state: 'ok', glyph: '✓', desc: '허용됨' };
+    case 'denied':
+      return { state: 'err', glyph: '✕', desc: '거부됨. 시스템 설정에서 허용해주세요.' };
+    case 'not-determined':
+      return { state: 'warn', glyph: '!', desc: '아직 허용 요청 전입니다.' };
+    case 'restricted':
+      return { state: 'err', glyph: '✕', desc: '기기 정책으로 제한됨.' };
+    default:
+      return { state: 'warn', glyph: '?', desc: String(status) };
+  }
+}
+
+async function renderStatus() {
+  const s = await window.listenk.getStatus();
+  const rows = [];
+
+  const mic = describeMic(s.mic);
+  rows.push(buildCheckRow({
+    state: mic.state,
+    glyph: mic.glyph,
+    title: '마이크 접근',
+    desc: mic.desc,
+    actions: s.mic === 'not-determined'
+      ? [{ label: '허용 요청', primary: true, onClick: async () => { await window.listenk.requestMic(); refresh(); } }]
+      : s.mic === 'denied' || s.mic === 'restricted'
+      ? [{ label: '시스템 설정 열기', onClick: () => window.listenk.openSettingsPane('mic') }]
+      : [],
+  }));
+
+  rows.push(buildCheckRow({
+    state: s.inputMonitoring ? 'ok' : 'err',
+    glyph: s.inputMonitoring ? '✓' : '✕',
+    title: '입력 모니터링 (fn 키 감지)',
+    desc: s.inputMonitoring
+      ? 'fn-listener 실행 중'
+      : '시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링에서 fn-listener 를 허용해주세요.',
+    actions: s.inputMonitoring ? [] : [
+      { label: '시스템 설정 열기', primary: true, onClick: () => window.listenk.openSettingsPane('input-monitoring') },
+    ],
+  }));
+
+  rows.push(buildCheckRow({
+    state: s.accessibility ? 'ok' : 'err',
+    glyph: s.accessibility ? '✓' : '✕',
+    title: '손쉬운 사용 (붙여넣기)',
+    desc: s.accessibility
+      ? '허용됨'
+      : '다른 앱에 ⌘V 로 붙여넣으려면 paste-helper 를 허용해주세요.',
+    actions: s.accessibility ? [] : [
+      { label: '시스템 설정 열기', primary: true, onClick: () => window.listenk.openSettingsPane('accessibility') },
+    ],
+  }));
+
+  rows.push(buildCheckRow({
+    state: s.whisperBin ? 'ok' : 'err',
+    glyph: s.whisperBin ? '✓' : '✕',
+    title: 'Whisper CLI',
+    desc: s.whisperBin ? s.whisperBin.path : 'brew install whisper-cpp 로 설치해주세요.',
+    actions: s.whisperBin ? [] : [
+      {
+        label: '명령 복사',
+        primary: true,
+        onClick: async () => {
+          await navigator.clipboard.writeText('brew install whisper-cpp');
+          toast('“brew install whisper-cpp” 복사됨');
+        },
+      },
+    ],
+  }));
+
+  rows.push(buildCheckRow({
+    state: s.whisperModel ? 'ok' : 'err',
+    glyph: s.whisperModel ? '✓' : '✕',
+    title: 'Whisper 모델',
+    desc: s.whisperModel ? s.whisperModel.path : '모델 파일이 없습니다.',
+    actions: s.whisperModel ? [] : [
+      {
+        label: '다운로드 명령 복사',
+        onClick: async () => {
+          await navigator.clipboard.writeText('npm run model:base');
+          toast('“npm run model:base” 복사됨');
+        },
+      },
+    ],
+  }));
+
+  rows.push(buildCheckRow({
+    state: 'info',
+    glyph: 'ⓘ',
+    title: 'macOS fn 키 동작 설정',
+    desc: '시스템 설정 → 키보드 → "🌐/fn 키 누름" 을 "아무 작업 안 함" 으로 설정하세요.',
+    actions: [
+      { label: '키보드 설정 열기', onClick: () => window.listenk.openSettingsPane('keyboard') },
+    ],
+  }));
+
+  const mode = modeSel?.value;
+  const hasGemma = s.ollama?.models?.some((m) => m.startsWith('gemma3'));
+  if (mode === 'ollama' || s.ollama?.running) {
+    let ollamaState, ollamaDesc, ollamaActions = [];
+    if (!s.ollama?.running) {
+      ollamaState = mode === 'ollama' ? 'err' : 'info';
+      ollamaDesc = 'localhost:11434 응답 없음. “ollama serve” 가 실행 중인지 확인하세요.';
+      ollamaActions = [{
+        label: '실행 명령 복사',
+        onClick: async () => { await navigator.clipboard.writeText('brew services start ollama'); toast('복사됨'); },
+      }];
+    } else if (!hasGemma) {
+      ollamaState = mode === 'ollama' ? 'warn' : 'info';
+      ollamaDesc = `실행 중 · 모델 없음 (${(s.ollama.models || []).join(', ') || '—'})`;
+      ollamaActions = [{
+        label: 'pull 명령 복사',
+        onClick: async () => { await navigator.clipboard.writeText('ollama pull gemma3:4b'); toast('복사됨'); },
+      }];
+    } else {
+      ollamaState = 'ok';
+      ollamaDesc = `실행 중 · ${s.ollama.models.join(', ')}`;
+    }
+    rows.push(buildCheckRow({
+      state: ollamaState,
+      glyph: ollamaState === 'ok' ? '✓' : ollamaState === 'warn' ? '!' : ollamaState === 'err' ? '✕' : 'ⓘ',
+      title: `Ollama ${mode === 'ollama' ? '(필수)' : '(선택)'}`,
+      desc: ollamaDesc,
+      actions: ollamaActions,
+    }));
+  }
+
+  checkListEl.innerHTML = '';
+  rows.forEach((r) => checkListEl.appendChild(r));
+}
+
+async function refresh() {
+  try { await renderStatus(); }
+  catch (err) { console.error('[renderer] status refresh failed', err); }
+}
+
+refreshBtn?.addEventListener('click', refresh);
+modeSel?.addEventListener('change', refresh);
+
+refresh();
+setInterval(refresh, 4000);

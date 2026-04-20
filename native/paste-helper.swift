@@ -2,6 +2,13 @@ import Cocoa
 import CoreGraphics
 import ApplicationServices
 
+let args = CommandLine.arguments
+
+// --check: non-prompting query, exit 0 if trusted, 1 if not. Used by onboarding.
+if args.count >= 2 && args[1] == "--check" {
+    exit(AXIsProcessTrusted() ? 0 : 1)
+}
+
 // Verify Accessibility permission; if missing, prompt and exit with clear error.
 let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
 let opts = [promptKey: true] as CFDictionary
