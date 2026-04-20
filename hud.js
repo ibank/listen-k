@@ -30,8 +30,13 @@ window.typelessHud?.onPartial?.((text) => {
   }
   liveText.textContent = t;
   pill.dataset.hasText = 'true';
-  // Always scroll to show the most recent content at the right edge.
   requestAnimationFrame(() => {
     liveText.scrollLeft = liveText.scrollWidth;
   });
+});
+
+window.typelessHud?.onReset?.(() => {
+  liveText.textContent = '';
+  pill.dataset.hasText = 'false';
+  pill.dataset.state = 'recording';
 });

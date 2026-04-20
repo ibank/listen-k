@@ -156,6 +156,8 @@ function showHud(state) {
 function hideHud() {
   if (!hudWindow) return;
   if (hudWindow.isVisible()) hudWindow.hide();
+  hudWindow.webContents.send('hud-reset');
+  cancelHudSafetyHide();
 }
 
 function createTray() {
@@ -232,20 +234,41 @@ function currentLanguage() {
   return 'auto';
 }
 
+let hudSafetyTimer = null;
+function scheduleHudSafetyHide(ms = 45000) {
+  if (hudSafetyTimer) clearTimeout(hudSafetyTimer);
+  hudSafetyTimer = setTimeout(() => {
+    if (!isRecording) {
+      console.log('[hud] safety timeout — force hide');
+      isProcessing = false;
+      hideHud();
+      updateTrayMenu();
+    }
+  }, ms);
+}
+function cancelHudSafetyHide() {
+  if (hudSafetyTimer) { clearTimeout(hudSafetyTimer); hudSafetyTimer = null; }
+}
+
 async function handleFnPress() {
   if (isProcessing) return;
   if (!mainWindow) return;
 
   const streamAvailable = transcribeStream && transcribeStreamReady;
+  console.log('[fn] press, recording=', isRecording, 'streamAvailable=', streamAvailable);
 
   if (!isRecording) {
     savedFrontmostBundleId = await getFrontmostBundleId();
     console.log('[focus] saved frontmost:', savedFrontmostBundleId);
     isRecording = true;
     showHud('recording');
+    cancelHudSafetyHide();
 
     if (streamAvailable) {
       sendStreamCmd({ cmd: 'start', language: currentLanguage() });
+      mainWindow.webContents.send('stream-started');
+    } else {
+      mainWindow.webContents.send('toggle-record');
     }
   } else {
     isRecording = false;
@@ -253,12 +276,14 @@ async function handleFnPress() {
 
     if (streamAvailable) {
       sendStreamCmd({ cmd: 'stop' });
+      mainWindow.webContents.send('stream-stopping');
+      scheduleHudSafetyHide();
+    } else {
+      mainWindow.webContents.send('toggle-record');
     }
   }
 
   updateTrayMenu();
-  // Legacy path: tell renderer to flip its own record state (for Electron-side capture fallback).
-  mainWindow.webContents.send('toggle-record');
 }
 
 function startFnListener() {
@@ -665,7 +690,8 @@ ipcMain.handle('set-state', (_e, { recording, processing }) => {
     isProcessing = processing;
     if (processing) showHud('processing');
   }
-  if (!recording && !processing) hideHud();
+  console.log('[state] recording=', isRecording, 'processing=', isProcessing);
+  if (!isRecording && !isProcessing) hideHud();
   updateTrayMenu();
 });
 
