@@ -86,21 +86,40 @@ npm run dist
 ### 설치 받는 사용자에게 안내할 것
 
 1. **DMG 열고 Applications 로 드래그**
-2. **첫 실행**: macOS 가 "확인되지 않은 개발자" 라며 막음 → Finder에서 우클릭 → `열기` → 다이얼로그에서 다시 `열기`
+
+2. **첫 실행 — Gatekeeper 우회** (둘 중 하나)
+
+   macOS Ventura(13) 이후로 우클릭 → `열기` 바이패스는 더 이상 동작하지 않습니다.
+   현행 macOS (Sonoma 14 / Sequoia 15 / 2026년 버전) 에서는 다음 둘 중 하나로 진행하세요.
+
+   **방법 A — 시스템 설정** (관리자 암호 필요)
+   1. 앱을 한 번 실행 시도 → "확인되지 않은 개발자" 경고 → `완료`
+   2. 시스템 설정 → **개인정보 보호 및 보안** → 화면 하단 보안 섹션
+   3. "Listen K 가 차단되었습니다" 옆 **`그래도 열기`** 클릭 → 암호 입력
+   4. 다시 한 번 실행하면 정상 열림
+
+   **방법 B — 터미널** (가장 빠름)
+   ```bash
+   xattr -cr "/Applications/Listen K.app"
+   ```
+   quarantine 속성이 제거되어 Gatekeeper 가 더 이상 막지 않습니다.
+
 3. **사전 요구사항** (사용자가 따로 설치):
    - `brew install whisper-cpp` — STT 엔진 (번들에 미포함)
    - (선택) `brew install ollama && ollama pull gemma3:4b` — Ollama 모드 사용 시
-4. **권한 3종 허용** (시스템 설정 → 개인정보 보호 및 보안):
-   - **마이크**: 첫 녹음 시 자동 프롬프트
-   - **입력 모니터링**: `Listen K.app/Contents/Resources/bin/fn-listener` 추가
-   - **손쉬운 사용**: `Listen K.app/Contents/Resources/bin/paste-helper` 추가
-5. **macOS 키보드 설정**: `🌐/fn 키 누름` → `아무 작업 안 함`
+
+4. **권한 2종 허용** (시스템 설정 → 개인정보 보호 및 보안 — 앱이 첫 실행 후 대시보드에서 한 번에 안내):
+   - **입력 모니터링**: `/Applications/Listen K.app` 추가
+   - **손쉬운 사용**: `/Applications/Listen K.app` 추가
+   (마이크는 첫 녹음 시 자동 프롬프트)
+
+5. (단축키를 fn 으로 쓸 때만) **macOS 키보드 설정**: `🌐/fn 키 누름` → `아무 작업 안 함`. 기본값인 `Right ⌥ 두 번 탭` 을 쓸 경우 불필요.
 
 ### 서명·공증 없이 배포할 때 주의
 
-- 서명이 ad-hoc 이므로 사용자가 우클릭→열기 한 번 필요
-- 앱 업데이트 시 매번 같은 헬퍼 권한을 다시 허용해야 할 수 있음 (해시 변경)
-- 본격 배포는 Apple Developer 가입 후 `Developer ID Application` 인증서로 서명 + `notarytool` 공증 필요
+- ad-hoc 서명이라 위 Gatekeeper 우회가 사용자 측에서 한 번 필요
+- 재빌드/업데이트로 cdhash 가 바뀌면 헬퍼 TCC 권한 재허용이 필요할 수 있음 (앱 번들에 권한을 부여하면 대부분 유지됨)
+- 본격 배포는 Apple Developer 가입 후 `Developer ID Application` 인증서로 서명 + `notarytool` 공증이 권장. 공증 후엔 사용자가 위 우회 절차 없이 그냥 더블클릭으로 열림
 
 ## 다음 단계 (로드맵)
 
