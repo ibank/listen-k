@@ -17,4 +17,5 @@ contextBridge.exposeInMainWorld('listenk', {
   onStreamPartial: (cb) => ipcRenderer.on('stream-partial', (_e, text) => cb(text)),
   onStreamFinal: (cb) => ipcRenderer.on('stream-final', (_e, text) => cb(text)),
   onStreamError: (cb) => ipcRenderer.on('stream-error', (_e, msg) => cb(msg)),
+  onToast: (cb) => ipcRenderer.on('toast', (_e, msg) => cb(msg)),
 });

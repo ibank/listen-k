@@ -254,8 +254,20 @@ async function handleFnPress() {
   if (isProcessing) return;
   if (!mainWindow) return;
 
-  const streamAvailable = transcribeStream && transcribeStreamReady;
-  console.log('[fn] press, recording=', isRecording, 'streamAvailable=', streamAvailable);
+  const streamAlive = transcribeStream !== null;
+  const streamReady = transcribeStreamReady;
+  console.log('[fn] press, recording=', isRecording, 'streamAlive=', streamAlive, 'streamReady=', streamReady);
+
+  // Streaming helper is alive but still loading the Core ML model — first
+  // launch takes 30–60 s. Block hotkey input instead of confusingly dropping
+  // into the legacy Electron-side capture path.
+  if (streamAlive && !streamReady) {
+    mainWindow.webContents.send(
+      'toast',
+      '전사 엔진 초기화 중… (첫 실행은 Core ML 컴파일로 ~1분 소요)'
+    );
+    return;
+  }
 
   if (!isRecording) {
     savedFrontmostBundleId = await getFrontmostBundleId();
@@ -264,7 +276,7 @@ async function handleFnPress() {
     showHud('recording');
     cancelHudSafetyHide();
 
-    if (streamAvailable) {
+    if (streamReady) {
       sendStreamCmd({ cmd: 'start', language: currentLanguage() });
       mainWindow.webContents.send('stream-started');
     } else {
@@ -274,7 +286,7 @@ async function handleFnPress() {
     isRecording = false;
     showHud('processing');
 
-    if (streamAvailable) {
+    if (streamReady) {
       sendStreamCmd({ cmd: 'stop' });
       mainWindow.webContents.send('stream-stopping');
       scheduleHudSafetyHide();
@@ -381,6 +393,7 @@ function handleStreamEvent(event) {
   switch (event.type) {
     case 'ready':
       transcribeStreamReady = true;
+      if (mainWindow) mainWindow.webContents.send('toast', '전사 엔진 준비됨');
       break;
     case 'partial':
       if (mainWindow) mainWindow.webContents.send('stream-partial', event.text || '');
@@ -495,6 +508,7 @@ async function collectStatus() {
     transcribeHelper: wkHelper ? { path: wkHelper } : null,
     whisperKitModel: wkModel ? { path: wkModel } : null,
     engine,
+    streamReady: transcribeStreamReady,
     ollama,
     packaged: app.isPackaged,
     appBundlePath: getAppBundlePath(),

@@ -410,6 +410,10 @@ window.listenk?.onStreamFinal?.(async (text) => {
   }
 });
 
+window.listenk?.onToast?.((msg) => {
+  if (msg) toast(msg, 2500);
+});
+
 window.listenk?.onStreamError?.((message) => {
   streamingActive = false;
   setStatus(`스트리밍 오류: ${message}`, 'error');
@@ -546,13 +550,18 @@ async function renderStatus() {
     : usingCpp
     ? 'whisper.cpp (Metal GPU · fallback)'
     : '엔진 없음';
+  const streamStatus = s.streamReady
+    ? '스트리밍 엔진 준비됨'
+    : usingWK
+    ? '스트리밍 엔진 초기화 중…(첫 실행은 Core ML 컴파일로 ~1분 소요)'
+    : '스트리밍 엔진 없음';
 
   rows.push(buildCheckRow({
     state: engineState,
     glyph: engineState === 'ok' ? '✓' : '✕',
     title: '전사 엔진',
     desc: engineState === 'ok'
-      ? `${engineLabel}\n${enginePath || ''}`
+      ? `${engineLabel}\n${streamStatus}\n${enginePath || ''}`
       : '전사 엔진을 빌드해주세요: npm run build:transcribe',
     actions: engineState === 'ok' ? [] : [
       {
