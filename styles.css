@@ -441,17 +441,6 @@ kbd {
   to   { transform: translate(-50%, 0);    opacity: 1; }
 }
 
-/* ========== Scrollbar ========== */
-
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  border: 2px solid var(--bg-1);
-}
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.14); }
-
 /* ========== Reduced motion ========== */
 
 @media (prefers-reduced-motion: reduce) {
