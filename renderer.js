@@ -652,6 +652,12 @@ async function refresh() {
 refreshBtn?.addEventListener('click', refresh);
 modeSel?.addEventListener('change', refresh);
 
+langSel?.addEventListener('change', () => {
+  window.listenk?.setLanguage?.(langSel.value);
+  toast(`언어: ${langSel.options[langSel.selectedIndex].textContent}`);
+});
+if (langSel) window.listenk?.setLanguage?.(langSel.value);
+
 const HOTKEY_LABELS = {
   'ropt-double': '⌥⌥',
   'rctl-double': '⌃⌃',

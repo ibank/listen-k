@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import WhisperKit
 
 // Modes
@@ -178,7 +179,20 @@ struct TranscribeHelper {
             }
         }
 
+        var lastLogSize: Int = -1
+
         func handleStateChange(_ state: AudioStreamTranscriber.State) async {
+            // Lightweight diagnostic: log audio buffer fill + VAD every ~1s of
+            // new audio. If lastBufferSize stays 0 the mic isn't producing
+            // samples and the transcription will hallucinate on silence.
+            let bufSize = state.lastBufferSize
+            if abs(bufSize - lastLogSize) > 16000 {
+                TranscribeHelper.writeStderr(
+                    "[audio] buf=\(bufSize) speech=\(state.isRecordingSpeech) confirmed=\(state.confirmedSegments.count) unconfirmed=\(state.unconfirmedSegments.count)\n"
+                )
+                lastLogSize = bufSize
+            }
+
             let confirmed = TranscribeHelper.stripTokens(
                 state.confirmedSegments.map { $0.text }.joined(separator: " ")
             )
@@ -226,6 +240,30 @@ struct TranscribeHelper {
     }
 
     static func runStream(modelDir: String, language: String) async {
+        // Mic permission: this helper binary has its own TCC identity, so
+        // it must be authorised independently of the Electron app that
+        // spawned it. Without mic access, AudioStreamTranscriber reads
+        // silence and Whisper hallucinates English phrases from its
+        // training distribution ("I'm not even gonna…", "Thank you.",
+        // " ♪", etc.) which surfaces as wildly wrong transcripts.
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        writeStderr("[init] mic status before request: \(micStatus)\n")
+
+        if micStatus == .notDetermined {
+            writeStderr("[init] requesting mic access…\n")
+            let granted = await AVCaptureDevice.requestAccess(for: .audio)
+            writeStderr("[init] mic request → \(granted)\n")
+            if !granted {
+                emit(["type": "error", "message": "마이크 권한이 거부되었습니다. 시스템 설정에서 허용해주세요."])
+                exit(3)
+            }
+        } else if micStatus == .denied || micStatus == .restricted {
+            emit(["type": "error", "message": "마이크 권한 없음. 시스템 설정 → 개인정보 보호 및 보안 → 마이크에서 Listen K.app 또는 transcribe-helper 를 허용해주세요."])
+            writeStderr("[init] mic denied — aborting\n")
+            exit(3)
+        }
+        writeStderr("[init] mic authorized\n")
+
         writeStderr("[init] loading WhisperKit from \(modelDir)\n")
         let t0 = Date()
 

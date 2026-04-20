@@ -231,7 +231,9 @@ function activateApp(bundleId) {
 }
 
 function currentLanguage() {
-  return 'auto';
+  const cfg = loadConfig();
+  const raw = cfg.language || 'ko-KR';
+  return (raw.split('-')[0] || 'ko').toLowerCase();
 }
 
 let hudSafetyTimer = null;
@@ -837,6 +839,13 @@ ipcMain.handle('clipboard-write', (_e, text) => {
 });
 
 ipcMain.handle('get-hotkey', () => currentHotkey());
+
+ipcMain.handle('set-language', (_e, lang) => {
+  const cfg = loadConfig();
+  cfg.language = lang || 'ko-KR';
+  saveConfig(cfg);
+  return { ok: true };
+});
 
 ipcMain.handle('set-hotkey', (_e, mode) => {
   if (!HOTKEY_MODES.includes(mode)) return { ok: false, error: 'invalid mode' };
