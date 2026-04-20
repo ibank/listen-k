@@ -3,15 +3,17 @@ const cancelBtn = document.getElementById('cancelBtn');
 const confirmBtn = document.getElementById('confirmBtn');
 const liveText = document.getElementById('liveText');
 
+const api = window.listenkHud;
+
 cancelBtn.addEventListener('click', () => {
-  window.typelessHud?.cancel?.();
+  api?.cancel?.();
 });
 
 confirmBtn.addEventListener('click', () => {
-  window.typelessHud?.confirm?.();
+  api?.confirm?.();
 });
 
-window.typelessHud?.onState?.((state) => {
+api?.onState?.((state) => {
   if (state === 'recording' || state === 'processing') {
     pill.dataset.state = state;
     if (state === 'recording') {
@@ -21,7 +23,7 @@ window.typelessHud?.onState?.((state) => {
   }
 });
 
-window.typelessHud?.onPartial?.((text) => {
+api?.onPartial?.((text) => {
   const t = (text || '').trim();
   if (!t) {
     liveText.textContent = '';
@@ -35,7 +37,7 @@ window.typelessHud?.onPartial?.((text) => {
   });
 });
 
-window.typelessHud?.onReset?.(() => {
+api?.onReset?.(() => {
   liveText.textContent = '';
   pill.dataset.hasText = 'false';
   pill.dataset.state = 'recording';
