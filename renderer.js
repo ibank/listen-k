@@ -39,6 +39,21 @@ function toast(msg, ms = 1500) {
   toast._t = setTimeout(() => { toastEl.hidden = true; }, ms);
 }
 
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    console.warn('[clipboard] navigator.clipboard failed, falling back to IPC', err);
+    try {
+      return await window.listenk.clipboardWrite(text);
+    } catch (err2) {
+      console.error('[clipboard] IPC fallback failed', err2);
+      return false;
+    }
+  }
+}
+
 // ========== Audio capture / transcription / post-processing ==========
 
 async function startRecognition() {
@@ -344,7 +359,7 @@ window.listenk?.onCancelRecord?.(() => cancelRecord());
 copyBtn?.addEventListener('click', async () => {
   const text = cleanEl.textContent.trim() || rawEl.textContent.trim();
   if (!text) return;
-  await navigator.clipboard.writeText(text);
+  await copyToClipboard(text);
   toast('복사됨');
 });
 
@@ -423,7 +438,7 @@ async function renderStatus() {
       targetPath && { label: 'Finder 에서 보기', onClick: () => window.listenk.showInFinder(targetPath) },
       targetPath && {
         label: '경로 복사',
-        onClick: async () => { await navigator.clipboard.writeText(targetPath); toast('경로 복사됨'); },
+        onClick: async () => { await copyToClipboard(targetPath); toast('경로 복사됨'); },
       },
     ].filter(Boolean),
   }));
@@ -443,7 +458,7 @@ async function renderStatus() {
       axTargetPath && { label: 'Finder 에서 보기', onClick: () => window.listenk.showInFinder(axTargetPath) },
       axTargetPath && {
         label: '경로 복사',
-        onClick: async () => { await navigator.clipboard.writeText(axTargetPath); toast('경로 복사됨'); },
+        onClick: async () => { await copyToClipboard(axTargetPath); toast('경로 복사됨'); },
       },
     ].filter(Boolean),
   }));
@@ -458,8 +473,8 @@ async function renderStatus() {
         label: '명령 복사',
         primary: true,
         onClick: async () => {
-          await navigator.clipboard.writeText('brew install whisper-cpp');
-          toast('“brew install whisper-cpp” 복사됨');
+          await copyToClipboard('brew install whisper-cpp');
+          toast('"brew install whisper-cpp" 복사됨');
         },
       },
     ],
@@ -474,8 +489,8 @@ async function renderStatus() {
       {
         label: '다운로드 명령 복사',
         onClick: async () => {
-          await navigator.clipboard.writeText('npm run model:base');
-          toast('“npm run model:base” 복사됨');
+          await copyToClipboard('npm run model:base');
+          toast('"npm run model:base" 복사됨');
         },
       },
     ],
@@ -500,14 +515,14 @@ async function renderStatus() {
       ollamaDesc = 'localhost:11434 응답 없음. “ollama serve” 가 실행 중인지 확인하세요.';
       ollamaActions = [{
         label: '실행 명령 복사',
-        onClick: async () => { await navigator.clipboard.writeText('brew services start ollama'); toast('복사됨'); },
+        onClick: async () => { await copyToClipboard('brew services start ollama'); toast('복사됨'); },
       }];
     } else if (!hasGemma) {
       ollamaState = mode === 'ollama' ? 'warn' : 'info';
       ollamaDesc = `실행 중 · 모델 없음 (${(s.ollama.models || []).join(', ') || '—'})`;
       ollamaActions = [{
         label: 'pull 명령 복사',
-        onClick: async () => { await navigator.clipboard.writeText('ollama pull gemma3:4b'); toast('복사됨'); },
+        onClick: async () => { await copyToClipboard('ollama pull gemma3:4b'); toast('복사됨'); },
       }];
     } else {
       ollamaState = 'ok';

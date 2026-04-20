@@ -582,3 +582,8 @@ ipcMain.handle('open-url', (_e, url) => {
 ipcMain.handle('show-in-finder', (_e, p) => {
   require('electron').shell.showItemInFolder(p);
 });
+
+ipcMain.handle('clipboard-write', (_e, text) => {
+  clipboard.writeText(text == null ? '' : String(text));
+  return true;
+});

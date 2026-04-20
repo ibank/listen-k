@@ -22,6 +22,12 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
   font-size: 13px;
   line-height: 1.5;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
 }
 
 .titlebar {
@@ -33,6 +39,8 @@ html, body {
   padding: 0 16px 0 84px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
+  flex-shrink: 0;
+  z-index: 10;
 }
 .brand { font-weight: 600; letter-spacing: 0.5px; }
 .status { color: var(--muted); font-size: 12px; }
@@ -42,6 +50,10 @@ main {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 .card {

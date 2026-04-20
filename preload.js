@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('listenk', {
   requestMic: () => ipcRenderer.invoke('request-mic'),
   openUrl: (url) => ipcRenderer.invoke('open-url', url),
   showInFinder: (p) => ipcRenderer.invoke('show-in-finder', p),
+  clipboardWrite: (text) => ipcRenderer.invoke('clipboard-write', text),
 });
