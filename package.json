@@ -1,0 +1,76 @@
+{
+  "name": "typeless",
+  "version": "0.1.0",
+  "description": "AI voice dictation for macOS — local Whisper + optional Ollama post-processing",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "icon": "node scripts/generate-icon.js",
+    "build:helper": "bash scripts/build-helper.sh",
+    "model:base": "bash scripts/download-model.sh base",
+    "model:small": "bash scripts/download-model.sh small",
+    "model:tiny": "bash scripts/download-model.sh tiny",
+    "predist": "npm run build:helper",
+    "dist": "electron-builder --mac dmg",
+    "dist:dir": "electron-builder --mac --dir"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.ibank.typeless",
+    "productName": "Typeless",
+    "asar": true,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "afterPack": "scripts/after-pack.js",
+    "files": [
+      "main.js",
+      "preload.js",
+      "preload-hud.js",
+      "index.html",
+      "hud.html",
+      "styles.css",
+      "hud.css",
+      "renderer.js",
+      "hud.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "models",
+        "to": "models",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "음성 받아쓰기를 위해 마이크에 접근합니다.",
+        "LSUIElement": true
+      },
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "Typeless ${version}",
+      "contents": [
+        { "x": 140, "y": 200, "type": "file" },
+        { "x": 400, "y": 200, "type": "link", "path": "/Applications" }
+      ],
+      "window": { "width": 540, "height": 380 }
+    }
+  }
+}

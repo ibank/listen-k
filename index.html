@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Typeless</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="titlebar">
+    <div class="brand">Typeless</div>
+    <div class="status" id="status">준비됨</div>
+  </header>
+
+  <main>
+    <section class="controls">
+      <button id="recordBtn" class="record">
+        <span class="dot"></span>
+        <span class="label">녹음 시작</span>
+      </button>
+
+      <div class="settings">
+        <label>
+          언어
+          <select id="lang">
+            <option value="ko-KR" selected>한국어</option>
+            <option value="en-US">English (US)</option>
+            <option value="ja-JP">日本語</option>
+          </select>
+        </label>
+        <label>
+          후처리
+          <select id="mode">
+            <option value="rules" selected>규칙 기반 (필러 제거)</option>
+            <option value="off">끄기 (원문)</option>
+            <option value="ollama">Ollama</option>
+          </select>
+        </label>
+        <label>
+          Ollama 모델
+          <input id="model" type="text" value="gemma3:4b" />
+        </label>
+        <label>
+          톤 (Ollama용)
+          <select id="tone">
+            <option value="neutral" selected>자연스럽게</option>
+            <option value="formal">격식체</option>
+            <option value="casual">캐주얼</option>
+            <option value="email">이메일</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>실시간 받아쓰기 (원문)</h2>
+      </div>
+      <div id="raw" class="output raw" contenteditable="true" spellcheck="false"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>정제된 텍스트</h2>
+        <div class="panel-actions">
+          <button id="cleanBtn" class="ghost">정제하기</button>
+          <button id="copyBtn" class="ghost">복사</button>
+        </div>
+      </div>
+      <div id="clean" class="output clean"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span class="hint">fn 또는 ⌘⇧Space 로 녹음 토글 · 로컬 Whisper 사용 · Ollama는 후처리 모드 선택 시에만 필요</span>
+  </footer>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
