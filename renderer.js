@@ -650,20 +650,57 @@ async function renderStatus(statusArg) {
 }
 
 const firstRunBanner = $('firstRunBanner');
+const bannerElapsedEl = $('bannerElapsed');
+const bannerTitleEl = $('bannerTitle');
+
+let bannerStart = null;
+let bannerTimer = null;
+
+function updateBannerElapsed() {
+  if (!bannerElapsedEl) return;
+  const s = Math.round((Date.now() - (bannerStart || Date.now())) / 1000);
+  bannerElapsedEl.textContent = `경과: ${s}초`;
+  if (bannerTitleEl) {
+    if (s > 120) {
+      bannerTitleEl.textContent = '로딩이 예상보다 오래 걸립니다';
+      bannerElapsedEl.textContent = `경과: ${s}초 · 터미널 로그의 [stream stderr] 줄을 확인해 주세요`;
+    } else if (s > 60) {
+      bannerTitleEl.textContent = '계속 로딩 중…';
+    }
+  }
+}
+
+function showFirstRunBanner() {
+  if (!firstRunBanner) return;
+  if (!firstRunBanner.hidden) return;
+  firstRunBanner.hidden = false;
+  bannerStart = Date.now();
+  updateBannerElapsed();
+  if (bannerTimer) clearInterval(bannerTimer);
+  bannerTimer = setInterval(updateBannerElapsed, 1000);
+}
+
+function hideFirstRunBanner() {
+  if (!firstRunBanner) return;
+  firstRunBanner.hidden = true;
+  if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null; }
+  bannerStart = null;
+}
+
+// Direct IPC signal from main as soon as the helper reports ready —
+// avoids waiting up to 4 s for the next status poll to catch up.
+window.listenk?.onStreamReady?.(() => hideFirstRunBanner());
 
 let lastStatusFingerprint = '';
 async function refresh() {
   try {
     const status = await window.listenk.getStatus();
-    // The welcome banner stays visible only while the engine hasn't
-    // come up yet — once streamReady flips true it retires permanently
-    // for the rest of the session.
+
     if (firstRunBanner) {
-      if (status.engine === 'whisperkit' && !status.streamReady && !firstRunBanner.dataset.shown) {
-        firstRunBanner.hidden = false;
-        firstRunBanner.dataset.shown = 'true';
-      } else if (status.streamReady) {
-        firstRunBanner.hidden = true;
+      if (status.streamReady) {
+        hideFirstRunBanner();
+      } else if (status.engine === 'whisperkit' && !firstRunBanner.dataset.dismissed) {
+        showFirstRunBanner();
       }
     }
 

@@ -14,11 +14,11 @@
   <main>
     <section class="banner" id="firstRunBanner" hidden>
       <div class="banner-body">
-        <div class="banner-title">환영합니다 · Listen K</div>
+        <div class="banner-title" id="bannerTitle">전사 엔진 준비 중</div>
         <div class="banner-desc">
-          최초 실행은 WhisperKit 모델을 Core ML 로 준비하는 데 <strong>30~60초</strong>가 걸립니다.
-          준비 완료 후 상단 우측 상태가 <span class="icon-check">준비됨</span> 으로 바뀌면 단축키를 사용할 수 있습니다.
+          WhisperKit 모델을 Core ML 로 컴파일하고 있습니다. 앱 재설치/업데이트 직후에는 <strong>30~90초</strong> 걸릴 수 있고, 이후 실행은 캐시되어 수 초 내에 준비됩니다.
         </div>
+        <div class="banner-elapsed" id="bannerElapsed">경과: 0초</div>
       </div>
       <div class="banner-spinner"></div>
     </section>

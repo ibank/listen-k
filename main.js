@@ -529,7 +529,10 @@ function handleStreamEvent(event) {
     case 'ready':
       transcribeStreamReady = true;
       transcribeStreamRestarts = 0;
-      if (mainWindow) mainWindow.webContents.send('toast', '전사 엔진 준비됨');
+      if (mainWindow) {
+        mainWindow.webContents.send('toast', '전사 엔진 준비됨');
+        mainWindow.webContents.send('stream-ready');
+      }
       break;
     case 'partial':
       if (mainWindow) mainWindow.webContents.send('stream-partial', event.text || '');
