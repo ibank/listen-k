@@ -377,24 +377,32 @@ function startTranscribeStream() {
 }
 
 function handleStreamEvent(event) {
+  console.log('[stream event]', event.type, event.text ? `text(${event.text.length})` : '');
   switch (event.type) {
     case 'ready':
       transcribeStreamReady = true;
-      console.log('[stream] ready');
       break;
     case 'partial':
       if (mainWindow) mainWindow.webContents.send('stream-partial', event.text || '');
       if (hudWindow && hudWindow.isVisible()) hudWindow.webContents.send('hud-partial', event.text || '');
       break;
     case 'final':
+      cancelHudSafetyHide();
       if (mainWindow) mainWindow.webContents.send('stream-final', event.text || '');
+      // Belt-and-suspenders: if the renderer's post-process + paste pipeline
+      // never reports back within 15 s, force the HUD away.
+      scheduleHudSafetyHide(15000);
       break;
     case 'stopped':
-      // no-op
       break;
     case 'error':
       console.error('[stream] error:', event.message);
       if (mainWindow) mainWindow.webContents.send('stream-error', event.message || '');
+      if (!isRecording) {
+        isProcessing = false;
+        hideHud();
+        updateTrayMenu();
+      }
       break;
     default:
       break;
@@ -699,6 +707,14 @@ ipcMain.handle('hud-cancel', () => {
   if (!isRecording && !isProcessing) return;
   isRecording = false;
   isProcessing = false;
+  // If the streaming helper is active, tell it to stop so it doesn't keep
+  // holding the microphone. We discard whatever final it emits because the
+  // user asked to cancel.
+  if (transcribeStream && transcribeStreamReady) {
+    try {
+      transcribeStream.stdin.write(JSON.stringify({ cmd: 'stop' }) + '\n');
+    } catch {}
+  }
   hideHud();
   updateTrayMenu();
   if (mainWindow) mainWindow.webContents.send('cancel-record');

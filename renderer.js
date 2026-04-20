@@ -387,6 +387,7 @@ window.listenk?.onStreamPartial?.((text) => {
 });
 
 window.listenk?.onStreamFinal?.(async (text) => {
+  console.log('[renderer] stream-final received, length=', (text || '').length);
   const finalText = (text || latestPartial || '').trim();
   streamingActive = false;
   latestPartial = '';
@@ -400,7 +401,13 @@ window.listenk?.onStreamFinal?.(async (text) => {
     return;
   }
 
-  await postProcessAndPaste(finalText);
+  try {
+    await postProcessAndPaste(finalText);
+  } catch (err) {
+    console.error('[renderer] postProcessAndPaste failed', err);
+    setStatus(`후처리 실패: ${err.message}`, 'error');
+    window.listenk?.setState?.({ recording: false, processing: false });
+  }
 });
 
 window.listenk?.onStreamError?.((message) => {

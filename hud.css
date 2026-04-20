@@ -147,8 +147,8 @@ body {
 
 .pill[data-state='processing'] .wave { display: none; }
 .pill[data-state='processing'] .spinner { display: block; }
-.pill[data-state='processing'] .btn.cancel,
 .pill[data-state='processing'] .btn.confirm { opacity: 0.35; pointer-events: none; }
+.pill[data-state='processing'] .btn.cancel { opacity: 0.7; }
 
 .live-text {
   display: none;

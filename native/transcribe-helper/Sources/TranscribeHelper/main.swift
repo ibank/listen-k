@@ -240,13 +240,16 @@ struct TranscribeHelper {
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let cmd = obj["cmd"] as? String else { continue }
 
+            writeStderr("cmd: \(cmd)\n")
             switch cmd {
             case "start":
                 let lang = (obj["language"] as? String) ?? language
                 await controller.start(language: lang)
+                writeStderr("started\n")
             case "stop":
                 await controller.stop()
                 emit(["type": "stopped"])
+                writeStderr("stopped\n")
             case "quit":
                 await controller.stop()
                 exit(0)
