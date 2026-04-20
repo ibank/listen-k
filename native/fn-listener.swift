@@ -20,7 +20,7 @@ if args.count >= 2 && args[1] == "--check" {
 //   rctl-double   — Right Control (⌃) double-tap
 //   rcmd-double   — Right Command (⌘) double-tap
 //   rshift-double — Right Shift (⇧) double-tap
-let mode = args.count >= 2 ? args[1] : "ropt-double"
+let mode = args.count >= 2 ? args[1] : "rshift-double"
 
 let access = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
 if access != kIOHIDAccessTypeGranted {

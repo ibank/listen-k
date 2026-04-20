@@ -569,12 +569,12 @@ const HOTKEY_LABELS = {
   'fn': 'fn',
 };
 
-let currentHotkey = 'ropt-double';
+let currentHotkey = 'rshift-double';
 
 function applyHotkeyHint(mode) {
-  currentHotkey = mode || 'ropt-double';
+  currentHotkey = mode || 'rshift-double';
   const hintEls = document.querySelectorAll('#hotkeyHint');
-  const label = HOTKEY_LABELS[currentHotkey] || '⌥⌥';
+  const label = HOTKEY_LABELS[currentHotkey] || '⇧⇧';
   hintEls.forEach((el) => { el.textContent = label; });
 }
 

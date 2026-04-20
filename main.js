@@ -25,7 +25,7 @@ let savedFrontmostBundleId = null;
 let fnListenerReady = false;
 
 const HOTKEY_MODES = ['ropt-double', 'rctl-double', 'rcmd-double', 'rshift-double', 'fn'];
-const DEFAULT_HOTKEY = 'ropt-double';
+const DEFAULT_HOTKEY = 'rshift-double';
 
 function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
