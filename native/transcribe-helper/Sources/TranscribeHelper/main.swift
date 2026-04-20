@@ -182,13 +182,14 @@ struct TranscribeHelper {
         var lastLogSize: Int = -1
 
         func handleStateChange(_ state: AudioStreamTranscriber.State) async {
-            // Lightweight diagnostic: log audio buffer fill + VAD every ~1s of
-            // new audio. If lastBufferSize stays 0 the mic isn't producing
-            // samples and the transcription will hallucinate on silence.
+            // Lightweight diagnostic: log audio buffer fill every ~1s of new
+            // audio. If lastBufferSize stays 0 throughout a take, the mic
+            // isn't producing samples and the transcription will hallucinate
+            // on silence.
             let bufSize = state.lastBufferSize
             if abs(bufSize - lastLogSize) > 16000 {
                 TranscribeHelper.writeStderr(
-                    "[audio] buf=\(bufSize) speech=\(state.isRecordingSpeech) confirmed=\(state.confirmedSegments.count) unconfirmed=\(state.unconfirmedSegments.count)\n"
+                    "[audio] buf=\(bufSize) confirmed=\(state.confirmedSegments.count) unconfirmed=\(state.unconfirmedSegments.count)\n"
                 )
                 lastLogSize = bufSize
             }
