@@ -192,6 +192,10 @@ struct TranscribeHelper {
         }
 
         func handleStateChange(_ state: AudioStreamTranscriber.State) async {
+            // Once we've started shutting down, ignore further partials so we
+            // don't keep nudging the renderer's HUD after stop was issued.
+            if !streaming { return }
+
             let bufSize = state.lastBufferSize
             if abs(bufSize - lastLogSize) > 16000 {
                 TranscribeHelper.writeStderr(
@@ -226,15 +230,19 @@ struct TranscribeHelper {
             }
             streaming = false
 
-            // Grab captured audio BEFORE stopping the stream — the
-            // AudioProcessor holds the accumulated samples via its
-            // audioSamples array. Stopping the stream can clear this.
+            // Snapshot the audio buffer first — the AudioProcessor's
+            // audioSamples array is the canonical capture record and may be
+            // released once the stream is asked to stop.
             let captured: [Float] = Array(whisperKit.audioProcessor.audioSamples)
 
-            await t.stopStreamTranscription()
-            if let task = currentTask {
-                _ = await task.value
-            }
+            // stopStreamTranscription has been observed to hang under some
+            // WhisperKit/AudioProcessor combinations — the await never
+            // returns and the helper's command loop wedges on the next
+            // start. Fire it as a detached background task and cancel the
+            // long-running start task so we can move straight to the batch
+            // re-transcribe instead of blocking the user's fn-press.
+            Task.detached { try? await t.stopStreamTranscription() }
+            currentTask?.cancel()
             currentTask = nil
 
             transcriber = nil
