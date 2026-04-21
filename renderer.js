@@ -11,6 +11,7 @@ const hotkeySel = $('hotkey');
 const streamingSel = $('streaming');
 const whisperModelSel = $('whisperModel');
 const engineSel = $('engine');
+const translateTargetSel = $('translateTarget');
 const copyBtn = $('copyBtn');
 const refreshBtn = $('refreshBtn');
 const checkListEl = $('checkList');
@@ -295,11 +296,29 @@ async function postProcessAndPaste(raw) {
     await finalizePaste(cleanupWithRules(raw));
     return;
   }
+  if (mode === 'translate') {
+    const targetLang = translateTargetSel?.value || 'English';
+    setStatus(`Ollama 번역 중… (${targetLang})`);
+    await cleanupWithOllama(raw, { task: 'translate', targetLang });
+    return;
+  }
   setStatus('Ollama 정제 중...');
   await cleanupWithOllama(raw);
 }
 
-function buildPrompt(raw) {
+function buildPrompt(raw, opts = {}) {
+  if (opts.task === 'translate') {
+    const target = opts.targetLang || 'English';
+    return `You are a professional translator. Translate the following text to ${target}. Preserve meaning, tone, names, and formatting. Output only the translation — no commentary, no quotes, no preamble.
+
+Source:
+"""
+${raw}
+"""
+
+${target} translation:`;
+  }
+
   const toneInstruction = {
     neutral: '자연스럽고 깔끔한 문어체로',
     formal: '격식 있는 존댓말로',
@@ -327,9 +346,9 @@ ${raw}
 정제된 텍스트:`;
 }
 
-async function cleanupWithOllama(raw) {
+async function cleanupWithOllama(raw, opts = {}) {
   cleanEl.textContent = '';
-  const prompt = buildPrompt(raw);
+  const prompt = buildPrompt(raw, opts);
   const model = modelInput.value.trim() || 'gemma3:4b';
 
   try {
@@ -895,6 +914,16 @@ streamingSel?.addEventListener('change', async () => {
   await window.listenk?.setStreaming?.(enabled);
   toast(`실시간 표시: ${enabled ? '켜짐' : '꺼짐'}`);
 });
+
+function applyModeVisibility(mode) {
+  document.querySelectorAll('[data-mode-only]').forEach((el) => {
+    const allowed = el.dataset.modeOnly.split(',').map((s) => s.trim());
+    el.style.display = allowed.includes(mode) ? '' : 'none';
+  });
+}
+
+modeSel?.addEventListener('change', () => applyModeVisibility(modeSel.value));
+applyModeVisibility(modeSel?.value || 'rules');
 
 function applyEngineVisibility(engine) {
   document.querySelectorAll('[data-engine-only]').forEach((el) => {

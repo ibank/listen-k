@@ -103,10 +103,26 @@
           <select id="mode">
             <option value="rules" selected>규칙 기반 (필러 제거)</option>
             <option value="off">끄기 (Whisper 원문)</option>
-            <option value="ollama">Ollama</option>
+            <option value="ollama">Ollama · 정제</option>
+            <option value="translate">Ollama · 번역</option>
           </select>
         </label>
-        <label>
+        <label data-mode-only="translate">
+          번역 대상 언어
+          <select id="translateTarget">
+            <option value="English" selected>English (영어)</option>
+            <option value="Japanese">日本語 (일본어)</option>
+            <option value="Chinese (Simplified)">简体中文 (중국어 간체)</option>
+            <option value="Chinese (Traditional)">繁體中文 (중국어 번체)</option>
+            <option value="Spanish">Español (스페인어)</option>
+            <option value="French">Français (프랑스어)</option>
+            <option value="German">Deutsch (독일어)</option>
+            <option value="Vietnamese">Tiếng Việt (베트남어)</option>
+            <option value="Indonesian">Bahasa Indonesia (인도네시아어)</option>
+            <option value="Korean">한국어 (한국어)</option>
+          </select>
+        </label>
+        <label data-mode-only="ollama,translate">
           Ollama 모델
           <input id="model" type="text" value="gemma3:4b" />
         </label>
