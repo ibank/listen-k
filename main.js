@@ -427,8 +427,17 @@ ipcMain.handle('tray-cmd', (_e, payload) => {
   }
 });
 
+// Apple bundle IDs are reverse-DNS: letters, digits, dots, dashes,
+// underscores only. Filter anything else so a hostile app can't smuggle
+// metacharacters into the paste-helper command line. execFile doesn't
+// spawn a shell so this is belt-and-suspenders, but cheap.
+const BUNDLE_ID_RE = /^[a-zA-Z0-9._-]{1,255}$/;
+function safeBundleId(id) {
+  return id && BUNDLE_ID_RE.test(id) ? id : null;
+}
+
 async function pasteToFrontmost(text) {
-  const frontmost = await getFrontmostBundleId();
+  const frontmost = safeBundleId(await getFrontmostBundleId());
   const paste = resPath('bin', 'paste-helper');
   if (!fs.existsSync(paste)) throw new Error('paste-helper missing');
   clipboard.writeText(text);
@@ -465,9 +474,10 @@ function getFrontmostBundleId() {
 
 function activateApp(bundleId) {
   const helper = resPath('bin', 'focus-helper');
-  if (!fs.existsSync(helper) || !bundleId) return Promise.resolve(false);
+  const safe = safeBundleId(bundleId);
+  if (!fs.existsSync(helper) || !safe) return Promise.resolve(false);
   return new Promise((resolve) => {
-    execFile(helper, ['activate', bundleId], (err) => resolve(!err));
+    execFile(helper, ['activate', safe], (err) => resolve(!err));
   });
 }
 
@@ -565,7 +575,7 @@ function persistOpenAiKey(raw) {
       ok: false,
       hasKey: Boolean(cfg.openaiKeyEnc || cfg.openaiKey),
       encrypted: false,
-      reason: '이 플랫폼에서는 safeStorage 암호화를 사용할 수 없습니다.',
+      reason: tr('error.encryptionUnavailable'),
     };
   }
 
@@ -1401,6 +1411,8 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (hudDoneTimer) { clearTimeout(hudDoneTimer); hudDoneTimer = null; }
+  if (hudSafetyTimer) { clearTimeout(hudSafetyTimer); hudSafetyTimer = null; }
   if (fnListener) {
     try { fnListener.kill('SIGTERM'); } catch {}
   }
@@ -1655,13 +1667,7 @@ ipcMain.handle('paste-text', async (_e, text) => {
       execFile(pasteHelper, [], (err, stdout, stderr) => {
         console.log('[paste] stdout:', stdout.trim(), '| stderr:', stderr.trim());
         if (err) {
-          reject(
-            new Error(
-              `paste-helper 실패 (손쉬운 사용 권한 필요 — bin/paste-helper 허용): ${
-                stderr || err.message
-              }`
-            )
-          );
+          reject(new Error(tr('error.pasteHelperFail', { detail: stderr || err.message })));
         } else {
           resolve();
         }
@@ -1677,7 +1683,7 @@ ipcMain.handle('paste-text', async (_e, text) => {
           if (err) {
             reject(
               new Error(
-                `paste 실패 (손쉬운 사용 권한 필요): ${stderr || err.message}`
+                tr('error.pasteFail', { detail: stderr || err.message })
               )
             );
           } else {
@@ -1759,6 +1765,12 @@ ipcMain.handle('set-whisper-model', (_e, name) => {
 });
 
 ipcMain.handle('set-engine', (_e, engine) => {
+  // Block engine switches while a recording or post-process is live —
+  // respawnStream() would kill the current stream and race to bring a
+  // new one up, leaving the HUD stuck / audio split across two engines.
+  if (isRecording || isProcessing) {
+    return { ok: false, reason: 'busy', engine: currentEngine() };
+  }
   const cfg = loadConfig();
   const allowed = ['apple', 'whisper.cpp', 'openai', 'whisperkit'];
   cfg.engine = allowed.includes(engine) ? engine : 'whisperkit';

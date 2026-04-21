@@ -2064,7 +2064,15 @@ translateTargetSel?.addEventListener('change', async () => {
 engineSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
   const engine = engineSel.value;
-  await api.setEngine?.(engine);
+  const res = await api.setEngine?.(engine);
+  // Main rejects the switch when a recording is live. Roll the UI back
+  // so the user doesn't see a card marked active that isn't really active.
+  if (res && res.ok === false && res.reason === 'busy') {
+    engineSel.value = res.engine || engine;
+    renderEngineCards(engineSel.value);
+    toast(t('toast.engineBusy'));
+    return;
+  }
   applyEngineVisibility(engine);
   renderEngineCards(engine);
   updateEngineChip(engine);

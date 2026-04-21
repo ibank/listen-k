@@ -34,6 +34,12 @@ echo "[smoke] helper binaries"
 [[ -x bin/transcribe-helper ]] && step "bin/transcribe-helper present" true || step "bin/transcribe-helper missing" false
 
 echo ""
+echo "[smoke] renderer HTML assets"
+[[ -f index.html ]] && step "index.html present" true || step "index.html missing" false
+[[ -f hud.html ]]   && step "hud.html present"   true || step "hud.html missing"   false
+[[ -f tray.html ]]  && step "tray.html present"  true || step "tray.html missing"  false
+
+echo ""
 echo "[smoke] --check on helpers that expose it"
 # --check exits with a specific status code; we tolerate either "granted" (0)
 # or "not granted" (non-zero) — both mean the binary runs to completion. We
