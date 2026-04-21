@@ -391,8 +391,12 @@ async function handleFnPress() {
   if (isProcessing) return;
   if (!mainWindow) return;
 
-  // whisper.cpp is always batch — streaming toggle is ignored for it.
-  const streamingEnabled = currentEngine() !== 'whisper.cpp' && currentStreamingEnabled();
+  // Which pipeline carries the audio is determined by the engine only.
+  // The "실시간 표시" toggle is a pure UI switch that controls whether
+  // partial transcripts get forwarded to the HUD — it must NOT change
+  // the capture path, otherwise Apple/WhisperKit engines end up stranded
+  // on the legacy getUserMedia flow that doesn't exist for them.
+  const streamingEnabled = currentEngine() !== 'whisper.cpp';
   console.log(
     '[fn] press, recording=', isRecording,
     'streamingEnabled=', streamingEnabled,
@@ -617,7 +621,13 @@ function handleStreamEvent(event) {
       break;
     case 'partial':
       if (mainWindow) mainWindow.webContents.send('stream-partial', event.text || '');
-      if (hudWindow && hudWindow.isVisible()) hudWindow.webContents.send('hud-partial', event.text || '');
+      // HUD live-text is gated by the user's "실시간 표시" preference —
+      // when off, we still stream internally (so we can re-transcribe on
+      // stop) but the pill stays on its waveform animation instead of
+      // flashing partial text.
+      if (hudWindow && hudWindow.isVisible() && currentStreamingEnabled()) {
+        hudWindow.webContents.send('hud-partial', event.text || '');
+      }
       break;
     case 'final':
       cancelHudSafetyHide();
