@@ -275,6 +275,11 @@ function currentStreamingEnabled() {
   return cfg.streaming !== false;
 }
 
+function currentEngine() {
+  const cfg = loadConfig();
+  return cfg.engine === 'apple' ? 'apple' : 'whisperkit';
+}
+
 // ---- Transcription history (JSONL on disk) ----
 
 function historyPath() {
@@ -463,16 +468,34 @@ let transcribeStreamRestarts = 0;
 const MAX_STREAM_RESTARTS = 3;
 
 function startTranscribeStream() {
-  const helper = findTranscribeHelper();
-  const model = findWhisperKitModel();
-  if (!helper || !model) {
-    console.warn('[stream] helper or model missing — streaming disabled');
-    return;
+  const engine = currentEngine();
+
+  let helper, args;
+  if (engine === 'apple') {
+    const appleHelper = resPath('bin', 'apple-speech-helper');
+    if (!fs.existsSync(appleHelper)) {
+      console.warn('[stream] apple-speech-helper missing');
+      return;
+    }
+    helper = appleHelper;
+    // SFSpeechRecognizer wants a full locale id (ko-KR, en-US, …).
+    const cfg = loadConfig();
+    const localeId = cfg.language || 'ko-KR';
+    args = ['--stream', '--language', localeId];
+  } else {
+    const wkHelper = findTranscribeHelper();
+    const model = findWhisperKitModel();
+    if (!wkHelper || !model) {
+      console.warn('[stream] helper or model missing — streaming disabled');
+      return;
+    }
+    helper = wkHelper;
+    args = ['--stream', '--model-dir', model, '--language', 'auto'];
   }
 
-  console.log('[stream] spawning transcribe-helper --stream', model);
+  console.log(`[stream] spawning ${engine} engine:`, helper, args.join(' '));
   transcribeStreamBuffer = '';
-  transcribeStream = spawn(helper, ['--stream', '--model-dir', model, '--language', 'auto'], {
+  transcribeStream = spawn(helper, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -644,7 +667,13 @@ async function collectStatus() {
 
   const wkHelper = findTranscribeHelper();
   const wkModel = findWhisperKitModel();
-  const engine = wkHelper && wkModel ? 'whisperkit' : 'none';
+  const appleHelper = resPath('bin', 'apple-speech-helper');
+  const appleHelperExists = fs.existsSync(appleHelper);
+  const selectedEngine = currentEngine();
+  const engine =
+    selectedEngine === 'apple'
+      ? (appleHelperExists ? 'apple' : 'none')
+      : (wkHelper && wkModel ? 'whisperkit' : 'none');
 
   return {
     mic,
@@ -652,6 +681,8 @@ async function collectStatus() {
     accessibility,
     transcribeHelper: wkHelper ? { path: wkHelper } : null,
     whisperKitModel: wkModel ? { path: wkModel } : null,
+    appleSpeechHelper: appleHelperExists ? { path: appleHelper } : null,
+    selectedEngine,
     engine,
     streamReady: transcribeStreamReady,
     ollama,
@@ -1000,16 +1031,28 @@ ipcMain.handle('set-whisper-model', (_e, name) => {
   if (name) cfg.whisperKitModel = name;
   else delete cfg.whisperKitModel;
   saveConfig(cfg);
-  // Bounce the streaming helper so the new model loads immediately.
+  respawnStream();
+  return { ok: true };
+});
+
+ipcMain.handle('set-engine', (_e, engine) => {
+  const cfg = loadConfig();
+  cfg.engine = engine === 'apple' ? 'apple' : 'whisperkit';
+  saveConfig(cfg);
+  respawnStream();
+  return { ok: true, engine: cfg.engine };
+});
+
+ipcMain.handle('get-engine', () => currentEngine());
+
+function respawnStream() {
   if (transcribeStream) {
     try { transcribeStream.kill('SIGTERM'); } catch {}
   }
-  // Reset the restart counter so the user-initiated swap doesn't burn the
-  // crash-recovery budget.
   transcribeStreamRestarts = 0;
+  transcribeStreamReady = false;
   setTimeout(startTranscribeStream, 300);
-  return { ok: true };
-});
+}
 
 ipcMain.handle('get-hotkey', () => currentHotkey());
 

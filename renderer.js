@@ -10,6 +10,7 @@ const modeSel = $('mode');
 const hotkeySel = $('hotkey');
 const streamingSel = $('streaming');
 const whisperModelSel = $('whisperModel');
+const engineSel = $('engine');
 const copyBtn = $('copyBtn');
 const refreshBtn = $('refreshBtn');
 const checkListEl = $('checkList');
@@ -565,47 +566,57 @@ async function renderStatus(statusArg) {
     ].filter(Boolean),
   }));
 
-  const engineOk = s.engine === 'whisperkit';
+  const usingApple = s.selectedEngine === 'apple';
+  const engineOk = s.engine === 'apple' || s.engine === 'whisperkit';
   const streamStatus = s.streamReady
     ? '스트리밍 준비됨'
+    : usingApple
+    ? '스트리밍 준비 중…'
     : '스트리밍 초기화 중… (첫 실행은 Core ML 컴파일로 ~1분)';
+
+  const engineLabel = usingApple
+    ? 'Apple Speech (SFSpeechRecognizer)'
+    : 'WhisperKit (Core ML · Metal GPU)';
+  const enginePath = usingApple ? s.appleSpeechHelper?.path : s.transcribeHelper?.path;
 
   rows.push(buildCheckRow({
     state: engineOk ? 'ok' : 'err',
     glyph: engineOk ? '✓' : '✕',
     title: '전사 엔진',
     desc: engineOk
-      ? `WhisperKit (Core ML · Metal GPU)\n${streamStatus}\n${s.transcribeHelper?.path || ''}`
-      : '전사 엔진을 빌드해주세요: npm run build:transcribe',
+      ? `${engineLabel}\n${streamStatus}\n${enginePath || ''}`
+      : '전사 엔진 바이너리가 없습니다. 빌드: npm run build:helper',
     actions: engineOk ? [] : [
       {
         label: '빌드 명령 복사',
         primary: true,
         onClick: async () => {
-          await copyToClipboard('npm run build:transcribe');
-          toast('"npm run build:transcribe" 복사됨');
+          await copyToClipboard('npm run build:helper');
+          toast('"npm run build:helper" 복사됨');
         },
       },
     ],
   }));
 
-  rows.push(buildCheckRow({
-    state: s.whisperKitModel ? 'ok' : 'err',
-    glyph: s.whisperKitModel ? '✓' : '✕',
-    title: '전사 모델',
-    desc: s.whisperKitModel
-      ? `WhisperKit Core ML\n${s.whisperKitModel.path}`
-      : '모델 파일이 없습니다. 다운로드: npm run model:whisperkit',
-    actions: s.whisperKitModel ? [] : [
-      {
-        label: '다운로드 명령 복사',
-        onClick: async () => {
-          await copyToClipboard('npm run model:whisperkit');
-          toast('"npm run model:whisperkit" 복사됨');
+  if (!usingApple) {
+    rows.push(buildCheckRow({
+      state: s.whisperKitModel ? 'ok' : 'err',
+      glyph: s.whisperKitModel ? '✓' : '✕',
+      title: '전사 모델',
+      desc: s.whisperKitModel
+        ? `WhisperKit Core ML\n${s.whisperKitModel.path}`
+        : '모델 파일이 없습니다. 다운로드: npm run model:whisperkit',
+      actions: s.whisperKitModel ? [] : [
+        {
+          label: '다운로드 명령 복사',
+          onClick: async () => {
+            await copyToClipboard('npm run model:whisperkit');
+            toast('"npm run model:whisperkit" 복사됨');
+          },
         },
-      },
-    ],
-  }));
+      ],
+    }));
+  }
 
   if (currentHotkey === 'fn') {
     rows.push(buildCheckRow({
@@ -845,24 +856,46 @@ streamingSel?.addEventListener('change', async () => {
   toast(`실시간 표시: ${enabled ? '켜짐' : '꺼짐'}`);
 });
 
+function applyEngineVisibility(engine) {
+  document.querySelectorAll('[data-engine-only]').forEach((el) => {
+    el.style.display = el.dataset.engineOnly === engine ? '' : 'none';
+  });
+}
+
 (async () => {
-  if (!whisperModelSel) return;
   try {
-    const info = await window.listenk?.listWhisperModels?.();
-    if (!info) return;
-    // Wipe everything except the leading "auto" sentinel
-    while (whisperModelSel.options.length > 1) whisperModelSel.remove(1);
-    for (const name of info.available) {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      whisperModelSel.appendChild(opt);
+    const engine = await window.listenk?.getEngine?.();
+    if (engine && engineSel) engineSel.value = engine;
+    applyEngineVisibility(engine || 'whisperkit');
+  } catch {}
+
+  if (whisperModelSel) {
+    try {
+      const info = await window.listenk?.listWhisperModels?.();
+      if (info) {
+        while (whisperModelSel.options.length > 1) whisperModelSel.remove(1);
+        for (const name of info.available) {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          whisperModelSel.appendChild(opt);
+        }
+        whisperModelSel.value = info.selected || '';
+      }
+    } catch (err) {
+      console.warn('[whisper-model] list failed', err);
     }
-    whisperModelSel.value = info.selected || '';
-  } catch (err) {
-    console.warn('[whisper-model] list failed', err);
   }
 })();
+
+engineSel?.addEventListener('change', async () => {
+  const engine = engineSel.value;
+  await window.listenk?.setEngine?.(engine);
+  applyEngineVisibility(engine);
+  toast(engine === 'apple' ? '엔진: Apple Speech (재로딩 중)' : '엔진: WhisperKit (재로딩 중)');
+  lastStatusFingerprint = '';
+  setTimeout(refresh, 500);
+});
 
 whisperModelSel?.addEventListener('change', async () => {
   const name = whisperModelSel.value;

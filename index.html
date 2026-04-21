@@ -78,6 +78,13 @@
           </select>
         </label>
         <label>
+          전사 엔진
+          <select id="engine">
+            <option value="apple">Apple Speech (시스템, 빠름)</option>
+            <option value="whisperkit">WhisperKit (로컬 Whisper, 정확)</option>
+          </select>
+        </label>
+        <label data-engine-only="whisperkit">
           전사 모델
           <select id="whisperModel">
             <option value="">자동 (가장 품질 높은 것)</option>

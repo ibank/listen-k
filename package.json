@@ -65,7 +65,7 @@
       ],
       "extendInfo": {
         "NSMicrophoneUsageDescription": "받아쓴 음성을 텍스트로 변환하는 데 마이크를 사용합니다.",
-        "NSSpeechRecognitionUsageDescription": "로컬 Whisper 모델로 음성을 텍스트로 변환합니다. 음성 데이터는 이 기기에서만 처리됩니다.",
+        "NSSpeechRecognitionUsageDescription": "Apple Speech 엔진 사용 시 macOS 음성 인식을 통해 음성을 텍스트로 변환합니다. 시스템 설정에서 온디바이스 모드 선택 가능.",
         "NSAppleEventsUsageDescription": "포커스된 다른 앱의 입력 필드에 정제된 텍스트를 자동으로 붙여넣기 위해 시스템 이벤트를 전송합니다.",
         "LSUIElement": true,
         "LSMinimumSystemVersion": "14.0"

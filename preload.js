@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('listenk', {
   historyClear: () => ipcRenderer.invoke('history-clear'),
   listWhisperModels: () => ipcRenderer.invoke('list-whisper-models'),
   setWhisperModel: (name) => ipcRenderer.invoke('set-whisper-model', name),
+  getEngine: () => ipcRenderer.invoke('get-engine'),
+  setEngine: (engine) => ipcRenderer.invoke('set-engine', engine),
   getHotkey: () => ipcRenderer.invoke('get-hotkey'),
   setHotkey: (mode) => ipcRenderer.invoke('set-hotkey', mode),
   setLanguage: (lang) => ipcRenderer.invoke('set-language', lang),
