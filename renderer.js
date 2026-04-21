@@ -688,6 +688,7 @@ function showFirstRunBanner() {
 
 function hideFirstRunBanner() {
   if (!firstRunBanner) return;
+  if (firstRunBanner.dataset.dismissed === 'true') return;
   console.log('[renderer] hiding first-run banner');
   firstRunBanner.hidden = true;
   firstRunBanner.dataset.dismissed = 'true';

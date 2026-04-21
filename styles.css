@@ -221,6 +221,11 @@ main {
   border: 1px solid rgba(91, 141, 255, 0.28);
   border-radius: var(--r-lg);
 }
+/* Element-specific override for the HTML `hidden` attribute. The generic
+   .banner rule above uses `display: flex`, which has the same specificity
+   as the UA [hidden] selector and, because it's later in the cascade,
+   wins — leaving the banner visible even when we set .hidden=true in JS. */
+.banner[hidden] { display: none; }
 .banner-body { flex: 1; }
 .banner-title {
   font-family: var(--font-display);
