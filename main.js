@@ -775,9 +775,14 @@ function findWhisperKitModel() {
     if (fs.existsSync(explicit)) return explicit;
   }
 
-  // Prefer the highest-quality variant that's actually on disk. Turbo /
-  // large-v3 variants give markedly better Korean accuracy than small.
+  // Default preference order is speed-first — base (74M) is ~5–8× faster
+  // than large-v3 turbo at inference time and matches Phase-1 latency.
+  // Users who want maximum accuracy can override via the in-app model
+  // picker (cfg.whisperKitModel), which is checked above.
   const preferred = [
+    'openai_whisper-base',
+    'openai_whisper-small',
+    'openai_whisper-medium',
     'openai_whisper-large-v3-v20240930_turbo_632MB',
     'openai_whisper-large-v3-v20240930_turbo',
     'openai_whisper-large-v3_turbo_954MB',
@@ -788,9 +793,6 @@ function findWhisperKitModel() {
     'openai_whisper-large-v3',
     'openai_whisper-large-v2_turbo_955MB',
     'openai_whisper-large-v2_turbo',
-    'openai_whisper-medium',
-    'openai_whisper-small',
-    'openai_whisper-base',
     'openai_whisper-tiny',
   ];
   for (const name of preferred) {
