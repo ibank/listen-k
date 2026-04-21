@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('listenk', {
   setOpenAiKey: (key) => ipcRenderer.invoke('set-openai-key', key),
   getOpenAiModel: () => ipcRenderer.invoke('get-openai-model'),
   setOpenAiModel: (name) => ipcRenderer.invoke('set-openai-model', name),
+  getUiLocale: () => ipcRenderer.invoke('get-ui-locale'),
+  setUiLocale: (loc) => ipcRenderer.invoke('set-ui-locale', loc),
   getHotkey: () => ipcRenderer.invoke('get-hotkey'),
   setHotkey: (mode) => ipcRenderer.invoke('set-hotkey', mode),
   setLanguage: (lang) => ipcRenderer.invoke('set-language', lang),

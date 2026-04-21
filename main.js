@@ -15,6 +15,7 @@ const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const i18n = require('./i18n');
 
 let mainWindow;
 let hudWindow;
@@ -282,7 +283,26 @@ function currentEngine() {
   const cfg = loadConfig();
   const e = cfg.engine;
   if (e === 'apple' || e === 'whisper.cpp' || e === 'openai' || e === 'whisperkit') return e;
-  return 'apple';
+  return 'whisperkit';
+}
+
+function currentUiLocale() {
+  const cfg = loadConfig();
+  if (cfg.uiLocale && i18n.LOCALES.includes(cfg.uiLocale)) return cfg.uiLocale;
+  // First launch: follow the system locale. app.getLocale() is safe to call
+  // once the app is ready; the few call sites before ready fall back to 'en'.
+  try {
+    return i18n.detectSystemLocale(app.getLocale());
+  } catch {
+    return i18n.DEFAULT_LOCALE;
+  }
+}
+
+// Translate using the user's current UI locale. For anything sent to the
+// renderer (toasts, thrown error messages that become err.message in the
+// renderer catch block), use this so the user sees their chosen language.
+function tr(key, params) {
+  return i18n.t(key, params, currentUiLocale());
 }
 
 const OPENAI_MODELS = ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'whisper-1'];
@@ -619,11 +639,11 @@ async function handleFnPress() {
   // audio can never be captured by both at once.
   if (streamingEnabled) {
     if (!transcribeStream) {
-      mainWindow.webContents.send('toast', '전사 엔진이 비활성 상태입니다. 앱을 재시작해주세요.');
+      mainWindow.webContents.send('toast', tr('toast.engineInactive'));
       return;
     }
     if (!transcribeStreamReady) {
-      mainWindow.webContents.send('toast', '전사 엔진 초기화 중…');
+      mainWindow.webContents.send('toast', tr('toast.engineInit'));
       return;
     }
     if (!isRecording) {
@@ -789,7 +809,7 @@ function startTranscribeStream() {
       hideHud();
       updateTrayMenu();
       if (mainWindow) {
-        mainWindow.webContents.send('toast', '전사 엔진이 비정상 종료됐습니다 — 재시작 중');
+        mainWindow.webContents.send('toast', tr('toast.engineCrash'));
       }
     }
 
@@ -803,7 +823,7 @@ function startTranscribeStream() {
       if (currentEngine() === 'apple') {
         autoFallbackFromAppleOnCrash();
       } else if (mainWindow) {
-        mainWindow.webContents.send('toast', '전사 엔진이 반복 종료됐습니다. 앱을 재시작해주세요.');
+        mainWindow.webContents.send('toast', tr('toast.engineCrashMax'));
       }
       return;
     }
@@ -826,7 +846,7 @@ function handleStreamEvent(event) {
       transcribeStreamReady = true;
       transcribeStreamRestarts = 0;
       if (mainWindow) {
-        mainWindow.webContents.send('toast', '전사 엔진 준비됨');
+        mainWindow.webContents.send('toast', tr('toast.engineReady'));
         mainWindow.webContents.send('stream-ready');
       }
       break;
@@ -1145,7 +1165,7 @@ function findModel() {
 ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
   const buf = Buffer.from(wavBuffer);
   if (buf.length < 44 + 16000 * 0.2 * 2) {
-    throw new Error('녹음이 너무 짧습니다.');
+    throw new Error(tr('error.recordingTooShort'));
   }
 
   const tmpFile = path.join(os.tmpdir(), `listenk_${Date.now()}.wav`);
@@ -1159,11 +1179,11 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
     const ggmlModel = findGgmlModel();
     if (!whisperBin) {
       fs.unlink(tmpFile, () => {});
-      throw new Error('whisper-cli 바이너리가 없습니다. npm run build:whisper 또는 brew install whisper-cpp');
+      throw new Error(tr('error.whisperCliMissing'));
     }
     if (!ggmlModel) {
       fs.unlink(tmpFile, () => {});
-      throw new Error('ggml 모델이 없습니다. npm run model:ggml:base');
+      throw new Error(tr('error.ggmlMissing'));
     }
     return new Promise((resolve, reject) => {
       execFile(
@@ -1172,7 +1192,7 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
         { maxBuffer: 20 * 1024 * 1024 },
         (err, stdout, stderr) => {
           fs.unlink(tmpFile, () => {});
-          if (err) reject(new Error(`whisper.cpp 실패: ${stderr || err.message}`));
+          if (err) reject(new Error(tr('error.whisperCppFail', { detail: stderr || err.message })));
           else resolve(stdout.trim());
         }
       );
@@ -1185,7 +1205,7 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
     const apiKey = currentOpenAiKey();
     if (!apiKey) {
       fs.unlink(tmpFile, () => {});
-      throw new Error('OpenAI API 키가 없습니다. 엔진 페이지에서 입력하거나 OPENAI_API_KEY 환경변수를 설정하세요.');
+      throw new Error(tr('error.openaiKeyMissing'));
     }
     const model = currentOpenAiModel();
     try {
@@ -1203,7 +1223,7 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
       });
       if (!res.ok) {
         const detail = (await res.text()).slice(0, 500);
-        throw new Error(`OpenAI ${res.status}: ${detail}`);
+        throw new Error(tr('error.openaiStatus', { status: res.status, detail }));
       }
       // response_format=text returns the raw transcript (no JSON envelope).
       const text = (await res.text()).trim();
@@ -1218,7 +1238,7 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
   const wkModel = findWhisperKitModel();
   if (!wkHelper || !wkModel) {
     fs.unlink(tmpFile, () => {});
-    throw new Error('전사 엔진 또는 모델 누락. npm run build:transcribe && npm run model:whisperkit');
+    throw new Error(tr('error.wkMissing'));
   }
   return new Promise((resolve, reject) => {
     execFile(
@@ -1227,7 +1247,7 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
       { maxBuffer: 20 * 1024 * 1024 },
       (err, stdout, stderr) => {
         fs.unlink(tmpFile, () => {});
-        if (err) reject(new Error(`WhisperKit 실패: ${stderr || err.message}`));
+        if (err) reject(new Error(tr('error.wkFail', { detail: stderr || err.message })));
         else resolve(stdout.trim());
       }
     );
@@ -1411,7 +1431,7 @@ ipcMain.handle('set-whisper-model', (_e, name) => {
 ipcMain.handle('set-engine', (_e, engine) => {
   const cfg = loadConfig();
   const allowed = ['apple', 'whisper.cpp', 'openai', 'whisperkit'];
-  cfg.engine = allowed.includes(engine) ? engine : 'apple';
+  cfg.engine = allowed.includes(engine) ? engine : 'whisperkit';
   saveConfig(cfg);
   respawnStream();
   return { ok: true, engine: cfg.engine };
@@ -1436,6 +1456,19 @@ ipcMain.handle('get-openai-key', () => {
 ipcMain.handle('set-openai-key', (_e, key) => persistOpenAiKey(key));
 
 ipcMain.handle('get-openai-model', () => currentOpenAiModel());
+
+ipcMain.handle('get-ui-locale', () => ({
+  locale: currentUiLocale(),
+  supported: i18n.LOCALES,
+  labels: i18n.LOCALE_LABELS,
+}));
+ipcMain.handle('set-ui-locale', (_e, loc) => {
+  const cfg = loadConfig();
+  if (i18n.LOCALES.includes(loc)) cfg.uiLocale = loc;
+  else delete cfg.uiLocale;
+  saveConfig(cfg);
+  return { ok: true, locale: currentUiLocale() };
+});
 ipcMain.handle('set-openai-model', (_e, name) => {
   const cfg = loadConfig();
   if (OPENAI_MODELS.includes(name)) cfg.openaiModel = name;
@@ -1478,7 +1511,7 @@ function autoFallbackFromAppleOnCrash() {
   cfg.engine = 'whisperkit';
   saveConfig(cfg);
   if (mainWindow) {
-    mainWindow.webContents.send('toast', 'Apple Speech 엔진 초기화 실패 — WhisperKit 으로 전환했습니다 (설치된 Listen K.app 에서만 Apple 엔진 정상 동작)');
+    mainWindow.webContents.send('toast', tr('toast.engineAppleFallback'));
   }
   transcribeStreamRestarts = 0;
   setTimeout(startTranscribeStream, 300);

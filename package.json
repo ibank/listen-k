@@ -47,6 +47,7 @@
       "hud.css",
       "renderer.js",
       "hud.js",
+      "i18n.js",
       "package.json"
     ],
     "extraResources": [

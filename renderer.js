@@ -13,6 +13,7 @@ const whisperModelSel = $('whisperModel');
 const engineSel = $('engine');
 const openaiKeyInput = $('openaiKey');
 const openaiModelSel = $('openaiModel');
+const uiLocaleSel = $('uiLocale');
 const translateTargetSel = $('translateTarget');
 const copyBtn = $('copyBtn');
 const refreshBtn = $('refreshBtn');
@@ -20,8 +21,49 @@ const checkListEl = $('checkList');
 const recentCard = $('recentCard');
 const toastEl = $('toast');
 
-rawEl.dataset.placeholder = '전사 결과가 여기에 표시됩니다.';
-cleanEl.dataset.placeholder = '정제된 텍스트가 여기에 표시됩니다.';
+// ---- i18n ----
+// Thin wrapper over window.i18n (loaded from i18n.js before us). Keep the
+// ultra-short name so string-heavy files stay readable. Locale is applied
+// to the whole document on boot + whenever the user picks a new language.
+const t = (key, params) => (window.i18n ? window.i18n.t(key, params) : key);
+
+function applyTranslations(root = document) {
+  if (!window.i18n) return;
+  // Plain text nodes.
+  root.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  // Attribute targets (placeholder / title / aria-label).
+  root.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
+  });
+  root.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+  });
+  // Usage rows contain HTML (<kbd>, <span class="icon-check">) that need to
+  // be interpolated into the translated template. data-i18n-html takes the
+  // kbd hint from data-hotkey (kept in sync by applyHotkeyHint) and injects
+  // icon spans via placeholder tokens.
+  root.querySelectorAll('[data-i18n-html]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-html');
+    const hk = el.getAttribute('data-hotkey') || '⇧⇧';
+    const kbd = `<kbd class="hotkey-hint">${hk}</kbd>`;
+    const step = el.querySelector('.usage-step');
+    const stepHtml = step ? step.outerHTML : '';
+    let raw = t(key, { hotkey: '⟦HOTKEY⟧' });
+    raw = raw
+      .replace(/⟦HOTKEY⟧/g, kbd)
+      .replace(/✓/g, '<span class="icon-check">✓</span>')
+      .replace(/✕/g, '<span class="icon-x">✕</span>')
+      .replace(/⌘⇧Space/g, '<kbd>⌘</kbd><kbd>⇧</kbd><kbd>Space</kbd>');
+    el.innerHTML = stepHtml + ' ' + raw;
+  });
+  // Output placeholders (CSS :empty::before uses data-placeholder attr).
+  if (rawEl) rawEl.dataset.placeholder = t('placeholder.raw');
+  if (cleanEl) cleanEl.dataset.placeholder = t('placeholder.clean');
+  // <html lang> for accessibility + browser speech defaults.
+  document.documentElement.setAttribute('lang', window.i18n.getLocale());
+}
 
 const OLLAMA_URL = 'http://localhost:11434/api/generate';
 
@@ -71,7 +113,7 @@ async function startRecognition() {
     });
   } catch (err) {
     console.error('[renderer] mic permission/capture failed', err);
-    setStatus(`마이크 실패: ${err.name}`, 'error');
+    setStatus(t('status.micFail', { name: err.name }), 'error');
     window.listenk?.setState?.({ recording: false, processing: false });
     return;
   }
@@ -92,7 +134,7 @@ async function startRecognition() {
 
   recording = true;
   markTranscribeStart();
-  setStatus('녹음 중...');
+  setStatus(t('status.recording'));
   window.listenk?.setState?.({ recording: true, processing: false });
 }
 
@@ -107,13 +149,13 @@ async function stopRecognition() {
   } catch {}
 
   if (pcmChunks.length === 0) {
-    setStatus('녹음 데이터 없음', 'error');
+    setStatus(t('status.noRecording'), 'error');
     window.listenk?.setState?.({ recording: false, processing: false });
     return;
   }
 
   window.listenk?.setState?.({ recording: false, processing: true });
-  setStatus('변환 중... (Whisper)');
+  setStatus(t('status.converting'));
 
   const flat = flattenChunks(pcmChunks);
   const samples16k =
@@ -136,12 +178,12 @@ async function stopRecognition() {
     if (finalTranscript.trim()) {
       await postProcessAndPaste(finalTranscript);
     } else {
-      setStatus('음성이 감지되지 않음', 'error');
+      setStatus(t('status.noSpeech'), 'error');
       window.listenk?.setState?.({ recording: false, processing: false });
     }
   } catch (err) {
     console.error('transcribe failed', err);
-    setStatus('Whisper 오류', 'error');
+    setStatus(t('status.whisperError'), 'error');
     showRecent();
     cleanEl.textContent = err.message;
     window.listenk?.setState?.({ recording: false, processing: false });
@@ -169,9 +211,9 @@ async function cancelRecord() {
   } catch {}
 
   pcmChunks = [];
-  setStatus('취소됨');
+  setStatus(t('status.cancelled'));
   window.listenk?.setState?.({ recording: false, processing: false });
-  setTimeout(() => setStatus('대기'), 1200);
+  setTimeout(() => setStatus(t('status.idle')), 1200);
 }
 
 function cleanWhisperOutput(text) {
@@ -261,16 +303,16 @@ function cleanupWithRules(text) {
 
 async function finalizePaste(cleanedText) {
   cleanEl.textContent = cleanedText;
-  setStatus('붙여넣는 중...');
+  setStatus(t('status.pasting'));
   let pasted = true;
   try {
     if (cleanedText && window.listenk?.paste) {
       await window.listenk.paste(cleanedText);
     }
-    setStatus('완료', 'ok');
+    setStatus(t('status.done'), 'ok');
   } catch (pasteErr) {
     pasted = false;
-    setStatus(`붙여넣기 실패: ${pasteErr.message}`, 'error');
+    setStatus(t('status.pasteFail', { message: pasteErr.message }), 'error');
   }
 
   if (cleanedText) {
@@ -288,28 +330,28 @@ async function finalizePaste(cleanedText) {
   }
 
   window.listenk?.setState?.({ recording: false, processing: false });
-  setTimeout(() => setStatus('대기'), 1500);
+  setTimeout(() => setStatus(t('status.idle')), 1500);
 }
 
 async function postProcessAndPaste(raw) {
   const mode = modeSel?.value || 'off';
   if (mode === 'off') {
-    setStatus('붙여넣는 중...');
+    setStatus(t('status.pasting'));
     await finalizePaste(raw.trim());
     return;
   }
   if (mode === 'rules') {
-    setStatus('규칙 정제 중...');
+    setStatus(t('status.rules'));
     await finalizePaste(cleanupWithRules(raw));
     return;
   }
   if (mode === 'translate') {
     const targetLang = translateTargetSel?.value || 'English';
-    setStatus(`Ollama 번역 중… (${targetLang})`);
+    setStatus(t('status.translate', { target: targetLang }));
     await cleanupWithOllama(raw, { task: 'translate', targetLang });
     return;
   }
-  setStatus('Ollama 정제 중...');
+  setStatus(t('status.ollama'));
   await cleanupWithOllama(raw);
 }
 
@@ -404,8 +446,8 @@ async function cleanupWithOllama(raw, opts = {}) {
     }
     await finalizePaste(output.trim());
   } catch (err) {
-    cleanEl.textContent = `Ollama 호출 실패: ${err.message}\n\n  brew install ollama && ollama serve\n  ollama pull ${model}`;
-    setStatus('Ollama 오류', 'error');
+    cleanEl.textContent = t('error.ollamaHint', { message: err.message, model });
+    setStatus(t('status.ollamaError'), 'error');
     window.listenk?.setState?.({ recording: false, processing: false });
   }
 }
@@ -448,10 +490,10 @@ window.listenk?.onCancelRecord?.(() => {
     latestPartial = '';
     transcribeStartMs = null; // don't record cancelled call in stats
     showRecent();
-    rawEl.textContent = '(취소됨)';
-    setStatus('취소됨');
+    rawEl.textContent = t('misc.cancelled');
+    setStatus(t('status.cancelled'));
     window.listenk?.setState?.({ recording: false, processing: false });
-    setTimeout(() => setStatus('대기'), 1200);
+    setTimeout(() => setStatus(t('status.idle')), 1200);
     return;
   }
   cancelRecord();
@@ -461,7 +503,7 @@ window.listenk?.onStreamPartial?.((text) => {
   if (!streamingActive) markTranscribeStart();
   streamingActive = true;
   latestPartial = text || '';
-  setStatus('듣는 중...');
+  setStatus(t('status.listening'));
   showRecent();
   rawEl.textContent = latestPartial;
   // If the helper is producing partials, it's alive — banner is stale.
@@ -480,9 +522,9 @@ window.listenk?.onStreamFinal?.(async (text) => {
   recordTranscribeStats();
 
   if (!finalText) {
-    setStatus('음성이 감지되지 않음', 'error');
+    setStatus(t('status.noSpeech'), 'error');
     window.listenk?.setState?.({ recording: false, processing: false });
-    setTimeout(() => setStatus('대기'), 1200);
+    setTimeout(() => setStatus(t('status.idle')), 1200);
     return;
   }
 
@@ -490,21 +532,20 @@ window.listenk?.onStreamFinal?.(async (text) => {
     await postProcessAndPaste(finalText);
   } catch (err) {
     console.error('[renderer] postProcessAndPaste failed', err);
-    setStatus(`후처리 실패: ${err.message}`, 'error');
+    setStatus(t('status.postFail', { message: err.message }), 'error');
     window.listenk?.setState?.({ recording: false, processing: false });
   }
 });
 
 window.listenk?.onToast?.((msg) => {
-  if (msg) {
-    toast(msg, 2500);
-    if (msg.includes('준비됨')) hideFirstRunBanner();
-  }
+  // The `stream-ready` IPC already hides the banner independently, so we no
+  // longer need to string-match the toast text (which is now localized).
+  if (msg) toast(msg, 2500);
 });
 
 window.listenk?.onStreamError?.((message) => {
   streamingActive = false;
-  setStatus(`스트리밍 오류: ${message}`, 'error');
+  setStatus(t('status.streamError', { message }), 'error');
   cleanEl.textContent = message;
   window.listenk?.setState?.({ recording: false, processing: false });
 });
@@ -513,7 +554,7 @@ copyBtn?.addEventListener('click', async () => {
   const text = cleanEl.textContent.trim() || rawEl.textContent.trim();
   if (!text) return;
   await copyToClipboard(text);
-  toast('복사됨');
+  toast(t('toast.copied'));
 });
 
 // ========== Onboarding dashboard ==========
@@ -556,15 +597,15 @@ function buildCheckRow({ state, title, desc, actions = [] }) {
 function describeMic(status) {
   switch (status) {
     case 'granted':
-      return { state: 'ok', glyph: '✓', desc: '허용됨' };
+      return { state: 'ok', glyph: '✓', desc: t('check.mic.granted') };
     case 'denied':
-      return { state: 'err', glyph: '✕', desc: '거부됨. 시스템 설정에서 허용해주세요.' };
+      return { state: 'err', glyph: '✕', desc: t('check.mic.denied') };
     case 'not-determined':
-      return { state: 'warn', glyph: '!', desc: '아직 허용 요청 전입니다.' };
+      return { state: 'warn', glyph: '!', desc: t('check.mic.notDetermined') };
     case 'restricted':
-      return { state: 'err', glyph: '✕', desc: '기기 정책으로 제한됨.' };
+      return { state: 'err', glyph: '✕', desc: t('check.mic.restricted') };
     default:
-      return { state: 'warn', glyph: '?', desc: String(status) };
+      return { state: 'warn', glyph: '?', desc: t('check.mic.unknown', { status: String(status) }) };
   }
 }
 
@@ -581,12 +622,12 @@ async function renderStatus(statusArg) {
   rows.push(buildCheckRow({
     state: mic.state,
     glyph: mic.glyph,
-    title: '마이크 접근',
+    title: t('check.mic.title'),
     desc: mic.desc,
     actions: s.mic === 'not-determined'
-      ? [{ label: '허용 요청', primary: true, onClick: async () => { await window.listenk.requestMic(); refresh(); } }]
+      ? [{ label: t('check.mic.request'), primary: true, onClick: async () => { await window.listenk.requestMic(); refresh(); } }]
       : s.mic === 'denied' || s.mic === 'restricted'
-      ? [{ label: '시스템 설정 열기', onClick: () => window.listenk.openSettingsPane('mic') }]
+      ? [{ label: t('check.mic.openSettings'), onClick: () => window.listenk.openSettingsPane('mic') }]
       : [],
   }));
 
@@ -598,18 +639,16 @@ async function renderStatus(statusArg) {
   rows.push(buildCheckRow({
     state: s.inputMonitoring ? 'ok' : 'err',
     glyph: s.inputMonitoring ? '✓' : '✕',
-    title: '단축키 감지',
+    title: t('check.hotkey.title'),
     desc: s.inputMonitoring
-      ? (imCoveredByAx
-          ? '허용됨 · 손쉬운 사용 권한에 자동 포함'
-          : '허용됨 · 입력 모니터링')
-      : `시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링 (또는 손쉬운 사용) 에서 ${targetLabel} 을 허용하세요.\n${targetPath || ''}`,
+      ? (imCoveredByAx ? t('check.hotkey.grantedAX') : t('check.hotkey.grantedIM'))
+      : t('check.hotkey.denied', { target: targetLabel, path: targetPath || '' }),
     actions: s.inputMonitoring ? [] : [
-      { label: '시스템 설정 열기', primary: true, onClick: () => window.listenk.openSettingsPane('input-monitoring') },
-      targetPath && { label: 'Finder 에서 보기', onClick: () => window.listenk.showInFinder(targetPath) },
+      { label: t('check.hotkey.openSettings'), primary: true, onClick: () => window.listenk.openSettingsPane('input-monitoring') },
+      targetPath && { label: t('check.hotkey.showFinder'), onClick: () => window.listenk.showInFinder(targetPath) },
       targetPath && {
-        label: '경로 복사',
-        onClick: async () => { await copyToClipboard(targetPath); toast('경로 복사됨'); },
+        label: t('check.hotkey.copyPath'),
+        onClick: async () => { await copyToClipboard(targetPath); toast(t('toast.pathCopied')); },
       },
     ].filter(Boolean),
   }));
@@ -620,16 +659,16 @@ async function renderStatus(statusArg) {
   rows.push(buildCheckRow({
     state: s.accessibility ? 'ok' : 'err',
     glyph: s.accessibility ? '✓' : '✕',
-    title: '자동 붙여넣기',
+    title: t('check.paste.title'),
     desc: s.accessibility
-      ? '허용됨 · 손쉬운 사용'
-      : `시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용에서 ${axTargetLabel} 을 허용하세요.\n${axTargetPath || ''}`,
+      ? t('check.paste.granted')
+      : t('check.paste.denied', { target: axTargetLabel, path: axTargetPath || '' }),
     actions: s.accessibility ? [] : [
-      { label: '시스템 설정 열기', primary: true, onClick: () => window.listenk.openSettingsPane('accessibility') },
-      axTargetPath && { label: 'Finder 에서 보기', onClick: () => window.listenk.showInFinder(axTargetPath) },
+      { label: t('check.hotkey.openSettings'), primary: true, onClick: () => window.listenk.openSettingsPane('accessibility') },
+      axTargetPath && { label: t('check.hotkey.showFinder'), onClick: () => window.listenk.showInFinder(axTargetPath) },
       axTargetPath && {
-        label: '경로 복사',
-        onClick: async () => { await copyToClipboard(axTargetPath); toast('경로 복사됨'); },
+        label: t('check.hotkey.copyPath'),
+        onClick: async () => { await copyToClipboard(axTargetPath); toast(t('toast.pathCopied')); },
       },
     ].filter(Boolean),
   }));
@@ -643,36 +682,34 @@ async function renderStatus(statusArg) {
 
   let engineLabel, enginePath, streamStatus;
   if (usingApple) {
-    engineLabel = 'Apple Speech (SFSpeechRecognizer)';
+    engineLabel = t('check.engine.apple');
     enginePath = s.appleSpeechHelper?.path;
-    streamStatus = s.streamReady ? '스트리밍 준비됨' : '스트리밍 준비 중…';
+    streamStatus = s.streamReady ? t('check.engine.streamReady') : t('check.engine.streamBooting');
   } else if (usingCpp) {
-    engineLabel = 'whisper.cpp (배치 모드)';
+    engineLabel = t('check.engine.cpp');
     enginePath = s.whisperCppBin?.path;
-    streamStatus = '배치 모드 · 녹음 완료 후 변환';
+    streamStatus = t('check.engine.batchMode');
   } else if (usingOAI) {
-    engineLabel = `OpenAI Whisper API · ${s.openai?.model || 'gpt-4o-transcribe'}`;
-    enginePath = s.openai?.fromEnv ? 'OPENAI_API_KEY 환경변수' : '저장된 키';
-    streamStatus = '클라우드 · 네트워크 필요 · $0.006/분';
+    engineLabel = t('check.engine.openai', { model: s.openai?.model || 'gpt-4o-transcribe' });
+    enginePath = s.openai?.fromEnv ? t('check.engine.openaiKeyEnv') : t('check.engine.openaiKeyStored');
+    streamStatus = t('check.engine.openaiDetail');
   } else {
-    engineLabel = 'WhisperKit (Core ML · Metal GPU)';
+    engineLabel = t('check.engine.whisperkit');
     enginePath = s.transcribeHelper?.path;
-    streamStatus = s.streamReady
-      ? '스트리밍 준비됨'
-      : '스트리밍 초기화 중… (첫 실행은 Core ML 컴파일로 ~1분)';
+    streamStatus = s.streamReady ? t('check.engine.streamReady') : t('check.engine.streamInit');
   }
 
   let engineFixLabel = null;
   let engineFixCmd = null;
   if (!engineOk) {
     if (usingCpp) {
-      engineFixLabel = 'whisper.cpp 빌드';
+      engineFixLabel = t('check.engine.buildCpp');
       engineFixCmd = 'npm run build:whisper';
     } else if (usingOAI) {
-      engineFixLabel = 'OpenAI 키 필요';
-      engineFixCmd = '엔진 페이지의 "OpenAI API 키" 입력란에 sk-... 키를 붙여넣으세요';
+      engineFixLabel = t('check.engine.needKey');
+      engineFixCmd = t('check.engine.keyHint');
     } else {
-      engineFixLabel = '헬퍼 빌드';
+      engineFixLabel = t('check.engine.buildHelper');
       engineFixCmd = 'npm run build:helper';
     }
   }
@@ -680,17 +717,17 @@ async function renderStatus(statusArg) {
   rows.push(buildCheckRow({
     state: engineOk ? 'ok' : 'err',
     glyph: engineOk ? '✓' : '✕',
-    title: '전사 엔진',
+    title: t('check.engine.title'),
     desc: engineOk
-      ? `${engineLabel}\n${streamStatus}\n${enginePath || ''}`
-      : `${engineLabel} 바이너리 누락`,
+      ? t('check.engine.detail', { label: engineLabel, detail: streamStatus, path: enginePath || '' })
+      : t('check.engine.missing', { label: engineLabel }),
     actions: engineOk ? [] : [
       {
-        label: '명령 복사',
+        label: t('check.engine.copyCmd'),
         primary: true,
         onClick: async () => {
           await copyToClipboard(engineFixCmd);
-          toast(`"${engineFixCmd}" 복사됨`);
+          toast(t('toast.copiedAs', { text: engineFixCmd }));
         },
       },
     ],
@@ -700,16 +737,16 @@ async function renderStatus(statusArg) {
     rows.push(buildCheckRow({
       state: s.whisperKitModel ? 'ok' : 'err',
       glyph: s.whisperKitModel ? '✓' : '✕',
-      title: '전사 모델',
+      title: t('check.model.title'),
       desc: s.whisperKitModel
-        ? `WhisperKit Core ML\n${s.whisperKitModel.path}`
-        : '모델 파일이 없습니다. 다운로드: npm run model:whisperkit',
+        ? t('check.model.wk', { path: s.whisperKitModel.path })
+        : t('check.model.wkMissing'),
       actions: s.whisperKitModel ? [] : [
         {
-          label: '다운로드 명령 복사',
+          label: t('check.model.wkCmd'),
           onClick: async () => {
             await copyToClipboard('npm run model:whisperkit');
-            toast('"npm run model:whisperkit" 복사됨');
+            toast(t('toast.copiedAs', { text: 'npm run model:whisperkit' }));
           },
         },
       ],
@@ -718,16 +755,16 @@ async function renderStatus(statusArg) {
     rows.push(buildCheckRow({
       state: s.ggmlModel ? 'ok' : 'err',
       glyph: s.ggmlModel ? '✓' : '✕',
-      title: '전사 모델',
+      title: t('check.model.title'),
       desc: s.ggmlModel
-        ? `ggml (whisper.cpp)\n${s.ggmlModel.path}`
-        : 'ggml 모델이 없습니다. 다운로드: npm run model:ggml:base',
+        ? t('check.model.ggml', { path: s.ggmlModel.path })
+        : t('check.model.ggmlMissing'),
       actions: s.ggmlModel ? [] : [
         {
-          label: '다운로드 명령 복사',
+          label: t('check.model.ggmlCmd'),
           onClick: async () => {
             await copyToClipboard('npm run model:ggml:base');
-            toast('"npm run model:ggml:base" 복사됨');
+            toast(t('toast.copiedAs', { text: 'npm run model:ggml:base' }));
           },
         },
       ],
@@ -738,10 +775,10 @@ async function renderStatus(statusArg) {
     rows.push(buildCheckRow({
       state: 'info',
       glyph: 'ⓘ',
-      title: 'macOS fn 키 동작 설정',
-      desc: '시스템 설정 → 키보드 → "🌐/fn 키 누름" 을 "아무 작업 안 함" 으로 설정하세요.',
+      title: t('check.fn.title'),
+      desc: t('check.fn.desc'),
       actions: [
-        { label: '키보드 설정 열기', onClick: () => window.listenk.openSettingsPane('keyboard') },
+        { label: t('check.fn.openKeyboard'), onClick: () => window.listenk.openSettingsPane('keyboard') },
       ],
     }));
   }
@@ -752,26 +789,26 @@ async function renderStatus(statusArg) {
     let ollamaState, ollamaDesc, ollamaActions = [];
     if (!s.ollama?.running) {
       ollamaState = mode === 'ollama' ? 'err' : 'info';
-      ollamaDesc = 'localhost:11434 응답 없음. “ollama serve” 가 실행 중인지 확인하세요.';
+      ollamaDesc = t('check.ollama.notRunning');
       ollamaActions = [{
-        label: '실행 명령 복사',
-        onClick: async () => { await copyToClipboard('brew services start ollama'); toast('복사됨'); },
+        label: t('check.ollama.runCmd'),
+        onClick: async () => { await copyToClipboard('brew services start ollama'); toast(t('toast.copied')); },
       }];
     } else if (!hasGemma) {
       ollamaState = mode === 'ollama' ? 'warn' : 'info';
-      ollamaDesc = `실행 중 · 모델 없음 (${(s.ollama.models || []).join(', ') || '—'})`;
+      ollamaDesc = t('check.ollama.noModels', { models: (s.ollama.models || []).join(', ') || '—' });
       ollamaActions = [{
-        label: 'pull 명령 복사',
-        onClick: async () => { await copyToClipboard('ollama pull gemma3:4b'); toast('복사됨'); },
+        label: t('check.ollama.pullCmd'),
+        onClick: async () => { await copyToClipboard('ollama pull gemma3:4b'); toast(t('toast.copied')); },
       }];
     } else {
       ollamaState = 'ok';
-      ollamaDesc = `실행 중 · ${s.ollama.models.join(', ')}`;
+      ollamaDesc = t('check.ollama.running', { models: s.ollama.models.join(', ') });
     }
     rows.push(buildCheckRow({
       state: ollamaState,
       glyph: ollamaState === 'ok' ? '✓' : ollamaState === 'warn' ? '!' : ollamaState === 'err' ? '✕' : 'ⓘ',
-      title: `Ollama ${mode === 'ollama' ? '(필수)' : '(선택)'}`,
+      title: mode === 'ollama' ? t('check.ollama.titleRequired') : t('check.ollama.titleOptional'),
       desc: ollamaDesc,
       actions: ollamaActions,
     }));
@@ -791,13 +828,13 @@ let bannerTimer = null;
 function updateBannerElapsed() {
   if (!bannerElapsedEl) return;
   const s = Math.round((Date.now() - (bannerStart || Date.now())) / 1000);
-  bannerElapsedEl.textContent = `경과: ${s}초`;
+  bannerElapsedEl.textContent = t('banner.elapsed', { sec: s });
   if (bannerTitleEl) {
     if (s > 120) {
-      bannerTitleEl.textContent = '로딩이 예상보다 오래 걸립니다';
-      bannerElapsedEl.textContent = `경과: ${s}초 · 터미널 로그의 [stream stderr] 줄을 확인해 주세요`;
+      bannerTitleEl.textContent = t('banner.titleVerySlow');
+      bannerElapsedEl.textContent = t('banner.elapsedHint', { sec: s });
     } else if (s > 60) {
-      bannerTitleEl.textContent = '계속 로딩 중…';
+      bannerTitleEl.textContent = t('banner.titleSlow');
     }
   }
 }
@@ -868,7 +905,7 @@ function formatHistoryTimestamp(iso) {
     const same = d.toDateString() === now.toDateString();
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');
-    if (same) return `오늘 ${hh}:${mm}`;
+    if (same) return `${t('history.today')} ${hh}:${mm}`;
     const mo = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${mo}/${dd} ${hh}:${mm}`;
@@ -886,8 +923,8 @@ function buildHistoryRow(entry) {
       <div class="history-meta"></div>
     </div>
     <div class="history-actions">
-      <button class="ghost" data-action="copy">복사</button>
-      <button class="ghost" data-action="paste">붙여넣기</button>
+      <button class="ghost" data-action="copy"></button>
+      <button class="ghost" data-action="paste"></button>
     </div>
   `;
   row.querySelector('.history-text').textContent = entry.clean || entry.raw || '';
@@ -895,22 +932,24 @@ function buildHistoryRow(entry) {
     formatHistoryTimestamp(entry.at),
     entry.mode || '',
     entry.language || '',
-    entry.pasted === false ? '미붙여넣음' : '',
+    entry.pasted === false ? t('history.notPasted') : '',
   ].filter(Boolean).join(' · ');
   row.querySelector('.history-meta').textContent = meta;
+  row.querySelector('[data-action="copy"]').textContent = t('history.copy');
+  row.querySelector('[data-action="paste"]').textContent = t('history.paste');
 
   row.querySelector('[data-action="copy"]').addEventListener('click', async () => {
     await copyToClipboard(entry.clean || entry.raw || '');
-    toast('복사됨');
+    toast(t('toast.copied'));
   });
   row.querySelector('[data-action="paste"]').addEventListener('click', async () => {
     const text = entry.clean || entry.raw || '';
     if (!text) return;
     try {
       await window.listenk.paste(text);
-      toast('다시 붙여넣기 완료');
+      toast(t('toast.rePasted'));
     } catch (err) {
-      toast(`실패: ${err.message}`);
+      toast(t('toast.pasteFail', { message: err.message }));
     }
   });
   return row;
@@ -924,7 +963,7 @@ async function refreshHistory() {
     if (!entries.length) {
       const empty = document.createElement('div');
       empty.className = 'history-empty';
-      empty.textContent = '아직 전사 이력이 없습니다. 단축키로 한 번 받아써 보세요.';
+      empty.textContent = t('page.history.empty');
       historyListEl.appendChild(empty);
       return;
     }
@@ -935,10 +974,10 @@ async function refreshHistory() {
 }
 
 historyClearBtn?.addEventListener('click', async () => {
-  if (!confirm('전사 이력을 모두 삭제할까요?')) return;
+  if (!confirm(t('page.history.confirmClear'))) return;
   await window.listenk.historyClear();
   refreshHistory();
-  toast('이력 삭제됨');
+  toast(t('toast.historyCleared'));
 });
 
 refreshHistory();
@@ -964,12 +1003,12 @@ const ENGINE_LABELS = {
 
 function fmtDuration(totalSec) {
   const s = Math.max(0, Math.round(totalSec || 0));
-  if (s < 60) return `${s}초`;
+  if (s < 60) return t('stats.duration.sec', { sec: s });
   const m = Math.floor(s / 60);
   const rem = s % 60;
-  if (m < 60) return `${m}분 ${rem}초`;
+  if (m < 60) return t('stats.duration.min', { min: m, sec: rem });
   const h = Math.floor(m / 60);
-  return `${h}시간 ${m % 60}분`;
+  return t('stats.duration.hour', { hour: h, min: m % 60 });
 }
 function fmtUSD(n) {
   const v = Number(n) || 0;
@@ -978,7 +1017,8 @@ function fmtUSD(n) {
   return `$${v.toFixed(3)}`;
 }
 function fmtNum(n) {
-  return (Number(n) || 0).toLocaleString('ko-KR');
+  const locale = window.i18n ? window.i18n.getLocale() : 'en';
+  return (Number(n) || 0).toLocaleString(locale);
 }
 
 function buildStatRow(title, value, help) {
@@ -1019,7 +1059,7 @@ async function refreshStats() {
   try { payload = await window.listenk.statsGet(); }
   catch (err) {
     statsContentEl.innerHTML = '';
-    statsContentEl.appendChild(buildStatRow('통계 불러오기 실패', err.message || '알 수 없음'));
+    statsContentEl.appendChild(buildStatRow(t('stats.loadFail'), err.message || ''));
     return;
   }
   const stats = payload?.stats;
@@ -1027,19 +1067,19 @@ async function refreshStats() {
 
   statsContentEl.innerHTML = '';
 
-  // --- 요약 ---
+  // Summary group
   const totalCalls = Object.values(stats.counters.callsByEngine || {}).reduce((a, b) => a + (b || 0), 0);
   const totalSec = Object.values(stats.counters.audioSecByEngine || {}).reduce((a, b) => a + (b || 0), 0);
   const todayCalls = Object.values(stats.today.callsByEngine || {}).reduce((a, b) => a + (b || 0), 0);
   const todaySec = Object.values(stats.today.audioSecByEngine || {}).reduce((a, b) => a + (b || 0), 0);
 
-  statsContentEl.appendChild(buildStatsGroup('요약', [
-    buildStatRow('누적 전사 호출', fmtNum(totalCalls)),
-    buildStatRow('누적 녹음 시간', fmtDuration(totalSec)),
-    buildStatRow('오늘 호출', `${fmtNum(todayCalls)} · ${fmtDuration(todaySec)}`),
+  statsContentEl.appendChild(buildStatsGroup(t('stats.section.summary'), [
+    buildStatRow(t('stats.totalCalls'), fmtNum(totalCalls)),
+    buildStatRow(t('stats.totalDuration'), fmtDuration(totalSec)),
+    buildStatRow(t('stats.todayCalls'), `${fmtNum(todayCalls)} · ${fmtDuration(todaySec)}`),
   ]));
 
-  // --- 엔진별 ---
+  // Per-engine breakdown
   const engines = Array.from(new Set([
     ...Object.keys(stats.counters.callsByEngine || {}),
     ...Object.keys(stats.counters.audioSecByEngine || {}),
@@ -1049,57 +1089,65 @@ async function refreshStats() {
     const sec = stats.counters.audioSecByEngine?.[eng] || 0;
     const isOai = eng === 'openai';
     const cost = isOai ? stats.counters.openaiCost || 0 : null;
-    const label = ENGINE_LABELS[eng] || eng;
+    const label = t(`engineLabel.${eng}`) || eng;
+    const callsStr = t('stats.countCalls', { n: fmtNum(calls) });
     const value = cost != null
-      ? `${fmtNum(calls)}회 · ${fmtDuration(sec)} · ${fmtUSD(cost)}`
-      : `${fmtNum(calls)}회 · ${fmtDuration(sec)}`;
+      ? t('stats.engineLineWithCost', { calls: callsStr, duration: fmtDuration(sec), cost: fmtUSD(cost) })
+      : t('stats.engineLine', { calls: callsStr, duration: fmtDuration(sec) });
     const help = isOai
       ? Object.entries(stats.counters.openaiCallsByModel || {})
-          .map(([m, n]) => `${m}: ${n}회`)
+          .map(([m, n]) => `${m}: ${t('stats.countCalls', { n })}`)
           .join(' · ')
       : '';
     return buildStatRow(label, value, help);
   });
   if (engineRows.length === 0) {
-    engineRows.push(buildStatRow('기록 없음', '아직 전사 호출이 없습니다'));
+    engineRows.push(buildStatRow(t('stats.empty.title'), t('stats.empty.desc')));
   }
-  statsContentEl.appendChild(buildStatsGroup('엔진별', engineRows));
+  statsContentEl.appendChild(buildStatsGroup(t('stats.section.byEngine'), engineRows));
 
-  // --- OpenAI 비용 breakdown ---
+  // OpenAI cost breakdown
   if ((stats.counters.openaiCost || 0) > 0 || (stats.today.openaiCost || 0) > 0) {
     const rates = payload.openaiRatesPerMin || {};
     const ratesText = Object.entries(rates)
-      .map(([m, r]) => `${m}: $${r}/분`)
+      .map(([m, r]) => `${m}: $${r}/min`)
       .join(' · ');
-    statsContentEl.appendChild(buildStatsGroup('OpenAI 비용', [
-      buildStatRow('누적', fmtUSD(stats.counters.openaiCost || 0), ratesText),
-      buildStatRow('오늘', fmtUSD(stats.today.openaiCost || 0)),
+    statsContentEl.appendChild(buildStatsGroup(t('stats.section.openaiCost'), [
+      buildStatRow(t('stats.cumulative'), fmtUSD(stats.counters.openaiCost || 0), ratesText),
+      buildStatRow(t('stats.today'), fmtUSD(stats.today.openaiCost || 0)),
     ]));
   }
 
-  // --- Ollama 토큰 ---
+  // Ollama tokens
   if ((stats.counters.ollamaCalls || 0) > 0) {
-    statsContentEl.appendChild(buildStatsGroup('Ollama 후처리', [
-      buildStatRow('누적 호출', `${fmtNum(stats.counters.ollamaCalls || 0)}회`),
-      buildStatRow('누적 토큰', `입력 ${fmtNum(stats.counters.ollamaPromptTokens || 0)} · 출력 ${fmtNum(stats.counters.ollamaEvalTokens || 0)}`),
-      buildStatRow('오늘 토큰', `입력 ${fmtNum(stats.today.ollamaPromptTokens || 0)} · 출력 ${fmtNum(stats.today.ollamaEvalTokens || 0)}`),
+    statsContentEl.appendChild(buildStatsGroup(t('stats.section.ollama'), [
+      buildStatRow(t('stats.ollamaCalls'), t('stats.countCalls', { n: fmtNum(stats.counters.ollamaCalls || 0) })),
+      buildStatRow(t('stats.tokensCumulative'), t('stats.tokensValue', {
+        in: fmtNum(stats.counters.ollamaPromptTokens || 0),
+        out: fmtNum(stats.counters.ollamaEvalTokens || 0),
+      })),
+      buildStatRow(t('stats.tokensToday'), t('stats.tokensValue', {
+        in: fmtNum(stats.today.ollamaPromptTokens || 0),
+        out: fmtNum(stats.today.ollamaEvalTokens || 0),
+      })),
     ]));
   }
 
   if (stats.firstSeenAt) {
     const foot = document.createElement('div');
     foot.style.cssText = 'margin-top: var(--space-4); font-size: 11px; color: var(--text-4); text-align: center;';
-    const since = new Date(stats.firstSeenAt).toLocaleDateString('ko-KR');
-    foot.textContent = `집계 시작: ${since}`;
+    const locale = window.i18n ? window.i18n.getLocale() : 'en';
+    const since = new Date(stats.firstSeenAt).toLocaleDateString(locale);
+    foot.textContent = t('stats.firstSeen', { date: since });
     statsContentEl.appendChild(foot);
   }
 }
 
 statsClearBtn?.addEventListener('click', async () => {
-  if (!confirm('모든 통계를 초기화할까요?')) return;
+  if (!confirm(t('page.stats.confirmClear'))) return;
   await window.listenk.statsClear();
   refreshStats();
-  toast('통계 초기화됨');
+  toast(t('toast.statsCleared'));
 });
 
 refreshStats();
@@ -1124,7 +1172,7 @@ function populateOllamaModels(models) {
   if (list.length === 0) {
     const opt = document.createElement('option');
     opt.value = '';
-    opt.textContent = 'Ollama 모델 없음 — `ollama pull gemma3:4b`';
+    opt.textContent = t('field.ollamaModel.none');
     opt.disabled = true;
     modelInput.appendChild(opt);
     modelInput.value = '';
@@ -1180,7 +1228,7 @@ async function restoreSettings() {
   if (!api) return;
 
   const safe = async (fn) => { try { return await fn(); } catch { return null; } };
-  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels, openaiKeyInfo, openaiModel] = await Promise.all([
+  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels, openaiKeyInfo, openaiModel, uiLocaleInfo] = await Promise.all([
     safe(() => api.getHotkey?.()),
     safe(() => api.getLanguage?.()),
     safe(() => api.getStreaming?.()),
@@ -1192,7 +1240,16 @@ async function restoreSettings() {
     safe(() => api.listWhisperModels?.()),
     safe(() => api.getOpenAiKey?.()),
     safe(() => api.getOpenAiModel?.()),
+    safe(() => api.getUiLocale?.()),
   ]);
+
+  // Apply UI locale BEFORE painting any translated DOM so the first render
+  // is already in the user's chosen language (no flash of English).
+  if (uiLocaleInfo?.locale && window.i18n) {
+    window.i18n.setLocale(uiLocaleInfo.locale);
+    if (uiLocaleSel) uiLocaleSel.value = uiLocaleInfo.locale;
+  }
+  applyTranslations();
 
   if (hotkey && hotkeySel) hotkeySel.value = hotkey;
   applyHotkeyHint(hotkey || 'rshift-double');
@@ -1202,7 +1259,7 @@ async function restoreSettings() {
   if (streamingSel) streamingSel.value = streaming === false ? 'off' : 'on';
 
   if (engine && engineSel) engineSel.value = engine;
-  applyEngineVisibility(engine || 'apple');
+  applyEngineVisibility(engine || 'whisperkit');
 
   if (mode && modeSel) modeSel.value = mode;
   applyModeVisibility(modeSel?.value || 'off');
@@ -1243,15 +1300,14 @@ function applyOpenAiKeyHint(info) {
     return;
   }
   if (info.fromEnv) {
-    openaiKeyInput.placeholder = 'OPENAI_API_KEY 환경변수 사용 중';
+    openaiKeyInput.placeholder = t('field.openaiKey.placeholderFromEnv');
     openaiKeyInput.disabled = true;
   } else if (info.hasKey) {
-    const suffix = info.encrypted
-      ? '암호화 저장됨 — 바꾸려면 새로 입력'
-      : '저장됨 (평문 — 다음 저장 시 자동 암호화)';
-    openaiKeyInput.placeholder = suffix;
+    openaiKeyInput.placeholder = info.encrypted
+      ? t('field.openaiKey.placeholderEncrypted')
+      : t('field.openaiKey.placeholderPlaintext');
   } else {
-    openaiKeyInput.placeholder = 'sk-...';
+    openaiKeyInput.placeholder = t('field.openaiKey.placeholder');
   }
 }
 
@@ -1273,28 +1329,28 @@ hotkeySel?.addEventListener('change', async () => {
     const res = await api.setHotkey(mode);
     if (res?.ok) {
       const label = hotkeySel.options[hotkeySel.selectedIndex].textContent;
-      toast(`단축키: ${label}`);
+      toast(t('toast.hotkey', { label }));
       applyHotkeyHint(mode);
       setTimeout(refresh, 400);
     } else {
-      toast('단축키 변경 실패');
+      toast(t('toast.hotkeyFail'));
     }
   } catch (err) {
-    toast(`변경 실패: ${err.message}`);
+    toast(t('toast.changeFail', { message: err.message }));
   }
 });
 
 langSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
   await api.setLanguage?.(langSel.value);
-  toast(`언어: ${langSel.options[langSel.selectedIndex].textContent}`);
+  toast(t('toast.lang', { label: langSel.options[langSel.selectedIndex].textContent }));
 });
 
 streamingSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
   const enabled = streamingSel.value === 'on';
   await api.setStreaming?.(enabled);
-  toast(`실시간 표시: ${enabled ? '켜짐' : '꺼짐'}`);
+  toast(t('toast.streaming', { label: enabled ? t('field.streaming.on') : t('field.streaming.off') }));
 });
 
 modeSel?.addEventListener('change', async () => {
@@ -1313,7 +1369,7 @@ toneSel?.addEventListener('change', async () => {
 translateTargetSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
   await api.setTranslateTarget?.(translateTargetSel.value);
-  toast(`번역 대상: ${translateTargetSel.options[translateTargetSel.selectedIndex].textContent}`);
+  toast(t('toast.translateTarget', { label: translateTargetSel.options[translateTargetSel.selectedIndex].textContent }));
 });
 
 engineSel?.addEventListener('change', async () => {
@@ -1325,7 +1381,7 @@ engineSel?.addEventListener('change', async () => {
   // its placeholder to reflect whether a key is currently stored/encrypted.
   if (engine === 'openai') refreshOpenAiKeyHint();
   const label = engineSel.options[engineSel.selectedIndex]?.textContent || engine;
-  toast(`엔진: ${label} (재로딩 중)`);
+  toast(t('toast.engineChange', { label }));
   lastStatusFingerprint = '';
   setTimeout(refresh, 500);
 });
@@ -1344,7 +1400,7 @@ modelInput?.addEventListener('change', async () => {
   if (!modelInput.value) return;
   savedOllamaModel = modelInput.value;
   await api.setOllamaModel?.(savedOllamaModel);
-  toast(`Ollama 모델: ${savedOllamaModel}`);
+  toast(t('toast.ollamaModel', { label: savedOllamaModel }));
 });
 
 openaiKeyInput?.addEventListener('change', async () => {
@@ -1353,12 +1409,14 @@ openaiKeyInput?.addEventListener('change', async () => {
   // Empty value = user wants to clear. Non-empty = save as the new key.
   const res = await api.setOpenAiKey?.(raw);
   if (res?.ok) {
-    toast(raw ? (res.encrypted ? 'OpenAI 키 저장됨 (암호화)' : 'OpenAI 키 저장됨') : 'OpenAI 키 삭제됨');
+    toast(raw
+      ? (res.encrypted ? t('toast.openaiKeySavedEncrypted') : t('toast.openaiKeySaved'))
+      : t('toast.openaiKeyDeleted'));
     await refreshOpenAiKeyHint();
     lastStatusFingerprint = '';
     refresh();
   } else {
-    toast(`OpenAI 키 저장 실패${res?.reason ? `: ${res.reason}` : ''}`);
+    toast(res?.reason ? t('toast.openaiKeyFailReason', { reason: res.reason }) : t('toast.openaiKeyFail'));
   }
 });
 
@@ -1366,7 +1424,23 @@ openaiModelSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
   const model = openaiModelSel.value;
   await api.setOpenAiModel?.(model);
-  toast(`OpenAI 모델: ${model}`);
+  toast(t('toast.openaiModel', { label: model }));
+});
+
+uiLocaleSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  const loc = uiLocaleSel.value;
+  await api.setUiLocale?.(loc);
+  if (window.i18n) window.i18n.setLocale(loc);
+  applyTranslations();
+  // Re-render the dynamic status + stats rows so their strings pick up the
+  // new locale immediately without waiting for the next 4-second poll.
+  lastStatusFingerprint = '';
+  refresh();
+  refreshStats();
+  refreshHistory();
+  const label = window.i18n?.LOCALE_LABELS?.[loc] || loc;
+  toast(t('toast.uiLocale', { label }));
 });
 
 // ---- Sidebar nav: page routing ----
