@@ -102,9 +102,19 @@ function createWindow() {
     }
   });
 
-  if (process.env.LISTENK_DEBUG === '1') {
+  if (process.env.LISTENK_DEBUG === '1' || process.env.TYPELESS_DEBUG === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
+
+  // Mirror renderer console to the terminal so a plain `npm start` surfaces
+  // client-side logs without opening DevTools. Helpful for chasing down
+  // renderer-only issues like the first-run banner state.
+  mainWindow.webContents.on('console-message', (_e, level, message) => {
+    const tag = level === 2 ? 'warn' : level === 3 ? 'error' : 'log';
+    if (message && !message.startsWith('Electron Security Warning')) {
+      console.log(`[renderer.${tag}] ${message}`);
+    }
+  });
 
   mainWindow.on('close', (e) => {
     if (!app.isQuitting) {
