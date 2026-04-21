@@ -277,7 +277,43 @@ function currentStreamingEnabled() {
 
 function currentEngine() {
   const cfg = loadConfig();
-  return cfg.engine === 'apple' ? 'apple' : 'whisperkit';
+  const e = cfg.engine;
+  if (e === 'apple' || e === 'whisper.cpp') return e;
+  return 'whisperkit';
+}
+
+function findWhisperBin() {
+  const bundled = resPath('bin', 'whisper-cli');
+  if (fs.existsSync(bundled)) return bundled;
+  const candidates = ['whisper-cli', 'whisper-cpp', 'whisper'];
+  const pathDirs = (process.env.PATH || '').split(':').concat([
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/usr/bin',
+  ]);
+  for (const name of candidates) {
+    for (const dir of pathDirs) {
+      const full = path.join(dir, name);
+      if (fs.existsSync(full)) return full;
+    }
+  }
+  return null;
+}
+
+function findGgmlModel() {
+  if (process.env.WHISPER_MODEL && fs.existsSync(process.env.WHISPER_MODEL)) {
+    return process.env.WHISPER_MODEL;
+  }
+  const candidates = [
+    resPath('models', 'ggml-base.bin'),
+    resPath('models', 'ggml-small.bin'),
+    resPath('models', 'ggml-tiny.bin'),
+    path.join(os.homedir(), 'models', 'ggml-base.bin'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
 }
 
 // ---- Transcription history (JSONL on disk) ----
@@ -355,7 +391,8 @@ async function handleFnPress() {
   if (isProcessing) return;
   if (!mainWindow) return;
 
-  const streamingEnabled = currentStreamingEnabled();
+  // whisper.cpp is always batch — streaming toggle is ignored for it.
+  const streamingEnabled = currentEngine() !== 'whisper.cpp' && currentStreamingEnabled();
   console.log(
     '[fn] press, recording=', isRecording,
     'streamingEnabled=', streamingEnabled,
@@ -470,6 +507,14 @@ const MAX_STREAM_RESTARTS = 3;
 function startTranscribeStream() {
   const engine = currentEngine();
 
+  // whisper.cpp is batch-only; no persistent streaming process.
+  if (engine === 'whisper.cpp') {
+    console.log('[stream] engine=whisper.cpp → skip streaming helper (batch-only)');
+    transcribeStream = null;
+    transcribeStreamReady = false;
+    return;
+  }
+
   let helper, args;
   if (engine === 'apple') {
     const appleHelper = resPath('bin', 'apple-speech-helper');
@@ -478,7 +523,6 @@ function startTranscribeStream() {
       return;
     }
     helper = appleHelper;
-    // SFSpeechRecognizer wants a full locale id (ko-KR, en-US, …).
     const cfg = loadConfig();
     const localeId = cfg.language || 'ko-KR';
     args = ['--stream', '--language', localeId];
@@ -673,11 +717,17 @@ async function collectStatus() {
   const wkModel = findWhisperKitModel();
   const appleHelper = resPath('bin', 'apple-speech-helper');
   const appleHelperExists = fs.existsSync(appleHelper);
+  const whisperCppBin = findWhisperBin();
+  const ggmlModel = findGgmlModel();
   const selectedEngine = currentEngine();
-  const engine =
-    selectedEngine === 'apple'
-      ? (appleHelperExists ? 'apple' : 'none')
-      : (wkHelper && wkModel ? 'whisperkit' : 'none');
+  let engine = 'none';
+  if (selectedEngine === 'apple') {
+    engine = appleHelperExists ? 'apple' : 'none';
+  } else if (selectedEngine === 'whisper.cpp') {
+    engine = whisperCppBin && ggmlModel ? 'whisper.cpp' : 'none';
+  } else {
+    engine = wkHelper && wkModel ? 'whisperkit' : 'none';
+  }
 
   return {
     mic,
@@ -686,6 +736,8 @@ async function collectStatus() {
     transcribeHelper: wkHelper ? { path: wkHelper } : null,
     whisperKitModel: wkModel ? { path: wkModel } : null,
     appleSpeechHelper: appleHelperExists ? { path: appleHelper } : null,
+    whisperCppBin: whisperCppBin ? { path: whisperCppBin } : null,
+    ggmlModel: ggmlModel ? { path: ggmlModel } : null,
     selectedEngine,
     engine,
     streamReady: transcribeStreamReady,
@@ -849,22 +901,48 @@ function findModel() {
 
 ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
   const buf = Buffer.from(wavBuffer);
-  // Reject absurdly tiny takes outright — WAV header alone is 44 bytes, and
-  // <200ms of audio almost certainly means the user fumbled the hotkey.
   if (buf.length < 44 + 16000 * 0.2 * 2) {
     throw new Error('녹음이 너무 짧습니다.');
-  }
-
-  const wkHelper = findTranscribeHelper();
-  const wkModel = findWhisperKitModel();
-  if (!wkHelper || !wkModel) {
-    throw new Error('전사 엔진 또는 모델 누락. npm run build:transcribe && npm run model:whisperkit');
   }
 
   const tmpFile = path.join(os.tmpdir(), `listenk_${Date.now()}.wav`);
   await fs.promises.writeFile(tmpFile, buf);
   const lang = (language || '').split('-')[0] || 'auto';
+  const engine = currentEngine();
 
+  // whisper.cpp path: whisper-cli + ggml model.
+  if (engine === 'whisper.cpp') {
+    const whisperBin = findWhisperBin();
+    const ggmlModel = findGgmlModel();
+    if (!whisperBin) {
+      fs.unlink(tmpFile, () => {});
+      throw new Error('whisper-cli 바이너리가 없습니다. npm run build:whisper 또는 brew install whisper-cpp');
+    }
+    if (!ggmlModel) {
+      fs.unlink(tmpFile, () => {});
+      throw new Error('ggml 모델이 없습니다. npm run model:ggml:base');
+    }
+    return new Promise((resolve, reject) => {
+      execFile(
+        whisperBin,
+        ['-m', ggmlModel, '-f', tmpFile, '-l', lang, '-nt', '-np'],
+        { maxBuffer: 20 * 1024 * 1024 },
+        (err, stdout, stderr) => {
+          fs.unlink(tmpFile, () => {});
+          if (err) reject(new Error(`whisper.cpp 실패: ${stderr || err.message}`));
+          else resolve(stdout.trim());
+        }
+      );
+    });
+  }
+
+  // Default: WhisperKit batch.
+  const wkHelper = findTranscribeHelper();
+  const wkModel = findWhisperKitModel();
+  if (!wkHelper || !wkModel) {
+    fs.unlink(tmpFile, () => {});
+    throw new Error('전사 엔진 또는 모델 누락. npm run build:transcribe && npm run model:whisperkit');
+  }
   return new Promise((resolve, reject) => {
     execFile(
       wkHelper,

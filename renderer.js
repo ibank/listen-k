@@ -567,17 +567,39 @@ async function renderStatus(statusArg) {
   }));
 
   const usingApple = s.selectedEngine === 'apple';
-  const engineOk = s.engine === 'apple' || s.engine === 'whisperkit';
-  const streamStatus = s.streamReady
-    ? '스트리밍 준비됨'
-    : usingApple
-    ? '스트리밍 준비 중…'
-    : '스트리밍 초기화 중… (첫 실행은 Core ML 컴파일로 ~1분)';
+  const usingCpp = s.selectedEngine === 'whisper.cpp';
+  const usingWK = !usingApple && !usingCpp;
 
-  const engineLabel = usingApple
-    ? 'Apple Speech (SFSpeechRecognizer)'
-    : 'WhisperKit (Core ML · Metal GPU)';
-  const enginePath = usingApple ? s.appleSpeechHelper?.path : s.transcribeHelper?.path;
+  const engineOk = s.engine !== 'none';
+
+  let engineLabel, enginePath, streamStatus;
+  if (usingApple) {
+    engineLabel = 'Apple Speech (SFSpeechRecognizer)';
+    enginePath = s.appleSpeechHelper?.path;
+    streamStatus = s.streamReady ? '스트리밍 준비됨' : '스트리밍 준비 중…';
+  } else if (usingCpp) {
+    engineLabel = 'whisper.cpp (배치 모드)';
+    enginePath = s.whisperCppBin?.path;
+    streamStatus = '배치 모드 · 녹음 완료 후 변환';
+  } else {
+    engineLabel = 'WhisperKit (Core ML · Metal GPU)';
+    enginePath = s.transcribeHelper?.path;
+    streamStatus = s.streamReady
+      ? '스트리밍 준비됨'
+      : '스트리밍 초기화 중… (첫 실행은 Core ML 컴파일로 ~1분)';
+  }
+
+  let engineFixLabel = null;
+  let engineFixCmd = null;
+  if (!engineOk) {
+    if (usingCpp) {
+      engineFixLabel = 'whisper.cpp 빌드';
+      engineFixCmd = 'npm run build:whisper';
+    } else {
+      engineFixLabel = '헬퍼 빌드';
+      engineFixCmd = 'npm run build:helper';
+    }
+  }
 
   rows.push(buildCheckRow({
     state: engineOk ? 'ok' : 'err',
@@ -585,20 +607,20 @@ async function renderStatus(statusArg) {
     title: '전사 엔진',
     desc: engineOk
       ? `${engineLabel}\n${streamStatus}\n${enginePath || ''}`
-      : '전사 엔진 바이너리가 없습니다. 빌드: npm run build:helper',
+      : `${engineLabel} 바이너리 누락`,
     actions: engineOk ? [] : [
       {
-        label: '빌드 명령 복사',
+        label: '명령 복사',
         primary: true,
         onClick: async () => {
-          await copyToClipboard('npm run build:helper');
-          toast('"npm run build:helper" 복사됨');
+          await copyToClipboard(engineFixCmd);
+          toast(`"${engineFixCmd}" 복사됨`);
         },
       },
     ],
   }));
 
-  if (!usingApple) {
+  if (usingWK) {
     rows.push(buildCheckRow({
       state: s.whisperKitModel ? 'ok' : 'err',
       glyph: s.whisperKitModel ? '✓' : '✕',
@@ -612,6 +634,24 @@ async function renderStatus(statusArg) {
           onClick: async () => {
             await copyToClipboard('npm run model:whisperkit');
             toast('"npm run model:whisperkit" 복사됨');
+          },
+        },
+      ],
+    }));
+  } else if (usingCpp) {
+    rows.push(buildCheckRow({
+      state: s.ggmlModel ? 'ok' : 'err',
+      glyph: s.ggmlModel ? '✓' : '✕',
+      title: '전사 모델',
+      desc: s.ggmlModel
+        ? `ggml (whisper.cpp)\n${s.ggmlModel.path}`
+        : 'ggml 모델이 없습니다. 다운로드: npm run model:ggml:base',
+      actions: s.ggmlModel ? [] : [
+        {
+          label: '다운로드 명령 복사',
+          onClick: async () => {
+            await copyToClipboard('npm run model:ggml:base');
+            toast('"npm run model:ggml:base" 복사됨');
           },
         },
       ],
