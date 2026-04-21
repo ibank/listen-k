@@ -872,22 +872,24 @@ function findWhisperKitModel() {
     if (fs.existsSync(explicit)) return explicit;
   }
 
-  // Default preference order is speed-first — base (74M) is ~5–8× faster
-  // than large-v3 turbo at inference time and matches Phase-1 latency.
-  // Users who want maximum accuracy can override via the in-app model
-  // picker (cfg.whisperKitModel), which is checked above.
+  // Default preference: speed-first. Users who want maximum accuracy
+  // override via cfg.whisperKitModel (checked above).
+  //
+  // Within each size tier the non-turbo (full, non-distilled) variant is
+  // ranked above its turbo equivalent — turbo distills decoder layers and
+  // regresses measurably on non-English languages (especially Korean).
   const preferred = [
     'openai_whisper-base',
     'openai_whisper-small',
     'openai_whisper-medium',
-    'openai_whisper-large-v3-v20240930_turbo_632MB',
-    'openai_whisper-large-v3-v20240930_turbo',
-    'openai_whisper-large-v3_turbo_954MB',
-    'openai_whisper-large-v3_turbo',
-    'openai_whisper-large-v3-v20240930_626MB',
+    'openai_whisper-large-v3-v20240930_626MB',      // full, quantised (recommended "accurate")
     'openai_whisper-large-v3-v20240930',
     'openai_whisper-large-v3_947MB',
     'openai_whisper-large-v3',
+    'openai_whisper-large-v3-v20240930_turbo_632MB', // distilled turbo
+    'openai_whisper-large-v3-v20240930_turbo',
+    'openai_whisper-large-v3_turbo_954MB',
+    'openai_whisper-large-v3_turbo',
     'openai_whisper-large-v2_turbo_955MB',
     'openai_whisper-large-v2_turbo',
     'openai_whisper-tiny',

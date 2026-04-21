@@ -14,6 +14,7 @@
     "model:whisperkit:base": "bash scripts/download-whisperkit-model.sh openai_whisper-base",
     "model:whisperkit:small": "bash scripts/download-whisperkit-model.sh openai_whisper-small",
     "model:whisperkit:turbo": "bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_turbo_632MB",
+    "model:whisperkit:accurate": "bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_626MB",
     "model:ggml:tiny": "bash scripts/download-model.sh tiny",
     "model:ggml:base": "bash scripts/download-model.sh base",
     "model:ggml:small": "bash scripts/download-model.sh small",
@@ -59,7 +60,7 @@
         "to": "models/whisperkit",
         "filter": [
           "openai_whisper-base/**",
-          "openai_whisper-large-v3-v20240930_turbo_632MB/**"
+          "openai_whisper-large-v3-v20240930_626MB/**"
         ]
       }
     ],
