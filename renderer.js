@@ -403,6 +403,8 @@ window.listenk?.onStreamPartial?.((text) => {
   setStatus('듣는 중...');
   showRecent();
   rawEl.textContent = latestPartial;
+  // If the helper is producing partials, it's alive — banner is stale.
+  if (firstRunBanner && !firstRunBanner.hidden) hideFirstRunBanner();
 });
 
 window.listenk?.onStreamFinal?.(async (text) => {
@@ -430,7 +432,10 @@ window.listenk?.onStreamFinal?.(async (text) => {
 });
 
 window.listenk?.onToast?.((msg) => {
-  if (msg) toast(msg, 2500);
+  if (msg) {
+    toast(msg, 2500);
+    if (msg.includes('준비됨')) hideFirstRunBanner();
+  }
 });
 
 window.listenk?.onStreamError?.((message) => {
@@ -672,6 +677,7 @@ function updateBannerElapsed() {
 
 function showFirstRunBanner() {
   if (!firstRunBanner) return;
+  if (firstRunBanner.dataset.dismissed === 'true') return;
   if (!firstRunBanner.hidden) return;
   firstRunBanner.hidden = false;
   bannerStart = Date.now();
@@ -682,14 +688,23 @@ function showFirstRunBanner() {
 
 function hideFirstRunBanner() {
   if (!firstRunBanner) return;
+  console.log('[renderer] hiding first-run banner');
   firstRunBanner.hidden = true;
+  firstRunBanner.dataset.dismissed = 'true';
   if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null; }
   bannerStart = null;
 }
 
-// Direct IPC signal from main as soon as the helper reports ready —
-// avoids waiting up to 4 s for the next status poll to catch up.
-window.listenk?.onStreamReady?.(() => hideFirstRunBanner());
+// Multiple hide triggers — any one of these is enough to permanently
+// retire the banner for the rest of the session:
+//   1. explicit stream-ready IPC from main
+//   2. toast "전사 엔진 준비됨"
+//   3. first stream-partial (we'd never get one without ready)
+//   4. any successful stream-final
+window.listenk?.onStreamReady?.(() => {
+  console.log('[renderer] stream-ready IPC received');
+  hideFirstRunBanner();
+});
 
 let lastStatusFingerprint = '';
 async function refresh() {
