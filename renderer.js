@@ -1100,8 +1100,57 @@ modelInput?.addEventListener('change', async () => {
   toast(`Ollama 모델: ${savedOllamaModel}`);
 });
 
+// ---- Sidebar active-section tracking via IntersectionObserver ----
+//
+// Keeps the sidebar's current page in sync with whichever section occupies
+// the centre of the scroll viewport, so navigation stays readable without
+// the user clicking a nav item explicitly.
+function wireSidebarNavigation() {
+  const contentEl = document.getElementById('content');
+  const navItems = Array.from(document.querySelectorAll('.nav-item'));
+  const sections = Array.from(document.querySelectorAll('.content > section[id]'));
+  if (!contentEl || !navItems.length || !sections.length) return;
+
+  const setActive = (id) => {
+    navItems.forEach((a) => a.classList.toggle('active', a.dataset.section === id));
+  };
+
+  // Intersection tracking.
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((e) => e.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+      if (visible.length) setActive(visible[0].target.id);
+    },
+    {
+      root: contentEl,
+      rootMargin: '-40% 0px -50% 0px',
+      threshold: [0, 0.25, 0.5, 0.75, 1],
+    }
+  );
+  sections.forEach((s) => observer.observe(s));
+
+  // Click → smooth scroll.
+  navItems.forEach((a) => {
+    a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href') || '';
+      if (!href.startsWith('#')) return;
+      const target = document.getElementById(href.slice(1));
+      if (!target) return;
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActive(target.id);
+    });
+  });
+
+  // Default active: first nav item.
+  setActive(sections[0].id);
+}
+
 (async () => {
   await restoreSettings();
+  wireSidebarNavigation();
   refresh();
   setInterval(refresh, 4000);
 })();

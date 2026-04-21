@@ -11,157 +11,246 @@
     <div class="status" id="status">대기</div>
   </header>
 
-  <main>
-    <section class="banner" id="firstRunBanner" hidden>
-      <div class="banner-body">
-        <div class="banner-title" id="bannerTitle">전사 엔진 준비 중</div>
-        <div class="banner-desc">
-          WhisperKit 모델을 Core ML 로 컴파일하고 있습니다. 앱 재설치/업데이트 직후에는 <strong>30~90초</strong> 걸릴 수 있고, 이후 실행은 캐시되어 수 초 내에 준비됩니다.
-        </div>
-        <div class="banner-elapsed" id="bannerElapsed">경과: 0초</div>
-      </div>
-      <div class="banner-spinner"></div>
-    </section>
+  <div class="workspace">
+    <nav class="sidebar" aria-label="설정 섹션">
+      <a href="#sec-status" class="nav-item" data-section="sec-status">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/></svg>
+        상태
+      </a>
+      <a href="#sec-engine" class="nav-item" data-section="sec-engine">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="6" y="2" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M4 8c0 2 1.8 3.5 4 3.5S12 10 12 8 M8 11.5v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+        엔진
+      </a>
+      <a href="#sec-input" class="nav-item" data-section="sec-input">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 8h.01M8 8h.01M11 8h.01M4.5 10.5h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        단축키 & 입력
+      </a>
+      <a href="#sec-post" class="nav-item" data-section="sec-post">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        후처리
+      </a>
+      <a href="#sec-history" class="nav-item" data-section="sec-history">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        이력
+      </a>
+      <a href="#sec-usage" class="nav-item" data-section="sec-usage">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 5v3.5M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        사용법
+      </a>
+    </nav>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>설정 상태</h2>
-        <button id="refreshBtn" class="ghost" title="상태 새로고침">새로고침</button>
-      </div>
-      <div id="checkList" class="check-list"></div>
-    </section>
+    <main class="content" id="content">
+      <section class="banner" id="firstRunBanner" hidden>
+        <div class="banner-body">
+          <div class="banner-title" id="bannerTitle">전사 엔진 준비 중</div>
+          <div class="banner-desc">
+            WhisperKit 모델을 Core ML 로 컴파일하고 있습니다. 재설치 직후에는 <strong>30~90초</strong> 걸릴 수 있고, 이후엔 캐시되어 수 초 내에 준비됩니다.
+          </div>
+          <div class="banner-elapsed" id="bannerElapsed">경과: 0초</div>
+        </div>
+        <div class="banner-spinner"></div>
+      </section>
 
-    <section class="card">
-      <h2>사용법</h2>
-      <div class="usage">
-        <div class="usage-row">
-          <span class="usage-step">1</span>
-          텍스트를 입력하고 싶은 곳에 커서를 둡니다
+      <section class="card" id="sec-status">
+        <div class="card-head">
+          <h2>설정 상태</h2>
+          <button id="refreshBtn" class="ghost" title="상태 새로고침">↻ 새로고침</button>
         </div>
-        <div class="usage-row">
-          <span class="usage-step">2</span>
-          <kbd id="hotkeyHint">단축키</kbd> 을 한 번 눌러 녹음을 시작합니다 (하단에 HUD 표시)
-        </div>
-        <div class="usage-row">
-          <span class="usage-step">3</span>
-          말을 마치면 <kbd id="hotkeyHint">단축키</kbd> 또는 HUD 의 <span class="icon-check">✓</span> 로 확정
-        </div>
-        <div class="usage-row">
-          <span class="usage-step">4</span>
-          정제된 텍스트가 자동으로 포커스된 필드에 붙여넣어집니다
-        </div>
-        <div class="usage-row" style="color: var(--text-3);">
-          취소는 HUD 의 <span class="icon-x">✕</span> · 대체 단축키 <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Space</kbd>
-        </div>
-      </div>
-    </section>
+        <div id="checkList" class="check-list"></div>
+      </section>
 
-    <section class="card">
-      <h2>환경설정</h2>
-      <div class="settings">
-        <label>
-          단축키
-          <select id="hotkey">
-            <option value="rshift-double">Right ⇧ 두 번 탭 (권장)</option>
-            <option value="ropt-double">Right ⌥ 두 번 탭</option>
-            <option value="rctl-double">Right ⌃ 두 번 탭</option>
-            <option value="rcmd-double">Right ⌘ 두 번 탭</option>
-            <option value="fn">fn (Globe 키)</option>
-          </select>
-        </label>
-        <label>
-          언어
-          <select id="lang">
-            <option value="ko-KR" selected>한국어</option>
-            <option value="en-US">English (US)</option>
-            <option value="ja-JP">日本語</option>
-          </select>
-        </label>
-        <label>
-          전사 엔진
-          <select id="engine">
-            <option value="apple">Apple Speech (시스템, 빠름)</option>
-            <option value="whisperkit">WhisperKit (로컬 Whisper · 정확)</option>
-            <option value="whisper.cpp">whisper.cpp (로컬 · Phase 1 스타일)</option>
-          </select>
-        </label>
-        <label data-engine-only="whisperkit">
-          전사 모델
-          <select id="whisperModel">
-            <option value="">자동 (가장 품질 높은 것)</option>
-          </select>
-        </label>
-        <label>
-          실시간 표시
-          <select id="streaming">
-            <option value="on" selected>켜짐 (말하는 동안 HUD 표시)</option>
-            <option value="off">꺼짐 (녹음 완료 후 일괄 변환)</option>
-          </select>
-        </label>
-        <label>
-          후처리
-          <select id="mode">
-            <option value="rules" selected>규칙 기반 (필러 제거)</option>
-            <option value="off">끄기 (Whisper 원문)</option>
-            <option value="ollama">Ollama · 정제</option>
-            <option value="translate">Ollama · 번역</option>
-          </select>
-        </label>
-        <label data-mode-only="translate">
-          번역 대상 언어
-          <select id="translateTarget">
-            <option value="English" selected>English (영어)</option>
-            <option value="Japanese">日本語 (일본어)</option>
-            <option value="Chinese (Simplified)">简体中文 (중국어 간체)</option>
-            <option value="Chinese (Traditional)">繁體中文 (중국어 번체)</option>
-            <option value="Spanish">Español (스페인어)</option>
-            <option value="French">Français (프랑스어)</option>
-            <option value="German">Deutsch (독일어)</option>
-            <option value="Vietnamese">Tiếng Việt (베트남어)</option>
-            <option value="Indonesian">Bahasa Indonesia (인도네시아어)</option>
-            <option value="Korean">한국어 (한국어)</option>
-          </select>
-        </label>
-        <label data-mode-only="ollama,translate">
-          Ollama 모델
-          <select id="model">
-            <option value="">불러오는 중…</option>
-          </select>
-        </label>
-        <label>
-          톤 (Ollama용)
-          <select id="tone">
-            <option value="neutral" selected>자연스럽게</option>
-            <option value="formal">격식체</option>
-            <option value="casual">캐주얼</option>
-            <option value="email">이메일</option>
-          </select>
-        </label>
-      </div>
-    </section>
+      <section class="card" id="sec-engine">
+        <div class="card-head"><h2>엔진</h2></div>
+        <div class="fields">
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title">전사 엔진</div>
+              <div class="field-help">Apple Speech 는 빠르고 경량, WhisperKit 은 정확, whisper.cpp 는 배치 전용.</div>
+            </div>
+            <div class="field-control">
+              <select id="engine">
+                <option value="apple">Apple Speech (시스템)</option>
+                <option value="whisperkit">WhisperKit (Core ML)</option>
+                <option value="whisper.cpp">whisper.cpp (배치)</option>
+              </select>
+            </div>
+          </div>
 
-    <section class="card" id="recentCard" hidden>
-      <div class="card-head">
-        <h2>현재 전사</h2>
-        <button id="copyBtn" class="ghost">복사</button>
-      </div>
-      <div id="raw" class="output raw" spellcheck="false"></div>
-      <div id="clean" class="output clean"></div>
-    </section>
+          <div class="field-row" data-engine-only="whisperkit">
+            <div class="field-info">
+              <div class="field-title">전사 모델</div>
+              <div class="field-help">큰 모델일수록 정확하지만 느립니다. 자동은 품질 우선으로 선택됩니다.</div>
+            </div>
+            <div class="field-control">
+              <select id="whisperModel">
+                <option value="">자동 (품질 우선)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>전사 이력</h2>
-        <div class="panel-actions">
+      <section class="card" id="sec-input">
+        <div class="card-head"><h2>단축키 & 입력</h2></div>
+        <div class="fields">
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title">단축키</div>
+              <div class="field-help">전역에서 녹음을 시작·중지하는 키. 더블탭은 380ms 이내.</div>
+            </div>
+            <div class="field-control">
+              <select id="hotkey">
+                <option value="rshift-double">Right ⇧ 두 번 탭 (권장)</option>
+                <option value="ropt-double">Right ⌥ 두 번 탭</option>
+                <option value="rctl-double">Right ⌃ 두 번 탭</option>
+                <option value="rcmd-double">Right ⌘ 두 번 탭</option>
+                <option value="fn">fn (Globe 키)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title">언어</div>
+              <div class="field-help">Whisper 전사 언어 힌트. Apple Speech 는 locale 로 바꿔 적용됩니다.</div>
+            </div>
+            <div class="field-control">
+              <select id="lang">
+                <option value="ko-KR" selected>한국어</option>
+                <option value="en-US">English (US)</option>
+                <option value="ja-JP">日本語</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title">실시간 표시</div>
+              <div class="field-help">HUD 에 말하는 동안 텍스트를 흘릴지. 끄면 완료 후에만 표시.</div>
+            </div>
+            <div class="field-control">
+              <select id="streaming">
+                <option value="on">켜짐</option>
+                <option value="off">꺼짐</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="sec-post">
+        <div class="card-head"><h2>후처리</h2></div>
+        <div class="fields">
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title">후처리 모드</div>
+              <div class="field-help">전사 결과를 정제 / 번역 / 원문 그대로 중 선택.</div>
+            </div>
+            <div class="field-control">
+              <select id="mode">
+                <option value="rules" selected>규칙 기반 (필러 제거)</option>
+                <option value="off">끄기 (원문)</option>
+                <option value="ollama">Ollama · 정제</option>
+                <option value="translate">Ollama · 번역</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row" data-mode-only="translate">
+            <div class="field-info">
+              <div class="field-title">번역 대상 언어</div>
+              <div class="field-help">전사된 텍스트를 이 언어로 번역합니다.</div>
+            </div>
+            <div class="field-control">
+              <select id="translateTarget">
+                <option value="English" selected>English</option>
+                <option value="Japanese">日本語</option>
+                <option value="Chinese (Simplified)">简体中文</option>
+                <option value="Chinese (Traditional)">繁體中文</option>
+                <option value="Spanish">Español</option>
+                <option value="French">Français</option>
+                <option value="German">Deutsch</option>
+                <option value="Vietnamese">Tiếng Việt</option>
+                <option value="Indonesian">Bahasa Indonesia</option>
+                <option value="Korean">한국어</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row" data-mode-only="ollama,translate">
+            <div class="field-info">
+              <div class="field-title">Ollama 모델</div>
+              <div class="field-help">설치된 모델 중 선택. 다른 터미널에서 <code>ollama pull</code> 하면 자동 갱신.</div>
+            </div>
+            <div class="field-control">
+              <select id="model">
+                <option value="">불러오는 중…</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row" data-mode-only="ollama">
+            <div class="field-info">
+              <div class="field-title">톤</div>
+              <div class="field-help">Ollama 정제 시 적용되는 문체.</div>
+            </div>
+            <div class="field-control">
+              <select id="tone">
+                <option value="neutral" selected>자연스럽게</option>
+                <option value="formal">격식체</option>
+                <option value="casual">캐주얼</option>
+                <option value="email">이메일</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="sec-history">
+        <div class="card-head">
+          <h2>전사 이력</h2>
           <button id="historyClearBtn" class="ghost" title="모든 이력 삭제">전체 삭제</button>
         </div>
-      </div>
-      <div id="historyList" class="history-list"></div>
-    </section>
-  </main>
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+      <section class="card" id="recentCard" hidden>
+        <div class="card-head">
+          <h2>현재 전사</h2>
+          <button id="copyBtn" class="ghost">복사</button>
+        </div>
+        <div id="raw" class="output raw" spellcheck="false"></div>
+        <div id="clean" class="output clean"></div>
+      </section>
+
+      <section class="card" id="sec-usage">
+        <div class="card-head"><h2>사용법</h2></div>
+        <div class="usage">
+          <div class="usage-row">
+            <span class="usage-step">1</span>
+            텍스트를 입력할 곳에 커서를 둡니다.
+          </div>
+          <div class="usage-row">
+            <span class="usage-step">2</span>
+            <kbd id="hotkeyHint">⇧⇧</kbd> 한 번 — 녹음 시작 (HUD 표시).
+          </div>
+          <div class="usage-row">
+            <span class="usage-step">3</span>
+            말을 마치면 다시 <kbd id="hotkeyHint">⇧⇧</kbd> 또는 HUD 의 <span class="icon-check">✓</span>.
+          </div>
+          <div class="usage-row">
+            <span class="usage-step">4</span>
+            정제·번역된 텍스트가 포커스된 필드에 자동 붙여넣어집니다.
+          </div>
+          <div class="usage-row usage-row--muted">
+            취소는 HUD 의 <span class="icon-x">✕</span> · 대체 단축키 <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Space</kbd>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <div id="toast" class="toast" hidden></div>
-
   <script src="renderer.js"></script>
 </body>
 </html>
