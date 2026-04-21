@@ -349,7 +349,9 @@ ${raw}
 async function cleanupWithOllama(raw, opts = {}) {
   cleanEl.textContent = '';
   const prompt = buildPrompt(raw, opts);
-  const model = modelInput.value.trim() || 'gemma3:4b';
+  // modelInput is now a <select>; fall back to a sensible default if Ollama
+  // is offline or hasn't been listed yet.
+  const model = (modelInput?.value || '').trim() || 'gemma3:4b';
 
   try {
     const res = await fetch(OLLAMA_URL, {
@@ -527,6 +529,11 @@ function describeMic(status) {
 async function renderStatus(statusArg) {
   const s = statusArg || (await window.listenk.getStatus());
   const rows = [];
+
+  // Keep the Ollama model dropdown in sync with whatever Ollama actually
+  // has installed right now. Cheap to do — populate is no-op if the list
+  // hasn't changed shape.
+  populateOllamaModels(s.ollama?.models || []);
 
   const mic = describeMic(s.mic);
   rows.push(buildCheckRow({
@@ -924,6 +931,50 @@ function applyModeVisibility(mode) {
 
 modeSel?.addEventListener('change', () => applyModeVisibility(modeSel.value));
 applyModeVisibility(modeSel?.value || 'rules');
+
+// ---- Ollama model dropdown population + persistence ----
+
+let savedOllamaModel = '';
+(async () => {
+  try {
+    savedOllamaModel = (await window.listenk?.getOllamaModel?.()) || '';
+  } catch {}
+})();
+
+function populateOllamaModels(models) {
+  if (!modelInput) return;
+  const list = Array.isArray(models) ? models : [];
+  const previousValue = modelInput.value;
+  while (modelInput.options.length > 0) modelInput.remove(0);
+
+  if (list.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Ollama 모델 없음 — `ollama pull gemma3:4b`';
+    opt.disabled = true;
+    modelInput.appendChild(opt);
+    modelInput.value = '';
+    return;
+  }
+
+  for (const name of list) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    modelInput.appendChild(opt);
+  }
+
+  // Restore previous selection if still present, else saved config, else first.
+  const candidate = [previousValue, savedOllamaModel].find((v) => v && list.includes(v));
+  modelInput.value = candidate || list[0];
+}
+
+modelInput?.addEventListener('change', async () => {
+  if (!modelInput.value) return;
+  savedOllamaModel = modelInput.value;
+  try { await window.listenk?.setOllamaModel?.(savedOllamaModel); } catch {}
+  toast(`Ollama 모델: ${savedOllamaModel}`);
+});
 
 function applyEngineVisibility(engine) {
   document.querySelectorAll('[data-engine-only]').forEach((el) => {

@@ -1139,6 +1139,19 @@ ipcMain.handle('set-engine', (_e, engine) => {
 
 ipcMain.handle('get-engine', () => currentEngine());
 
+ipcMain.handle('get-ollama-model', () => {
+  const cfg = loadConfig();
+  return cfg.ollamaModel || 'gemma3:4b';
+});
+
+ipcMain.handle('set-ollama-model', (_e, name) => {
+  const cfg = loadConfig();
+  if (name) cfg.ollamaModel = name;
+  else delete cfg.ollamaModel;
+  saveConfig(cfg);
+  return { ok: true, model: cfg.ollamaModel || null };
+});
+
 function respawnStream() {
   if (transcribeStream) {
     try { transcribeStream.kill('SIGTERM'); } catch {}
