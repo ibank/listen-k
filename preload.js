@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('listenk', {
   setOpenAiModel: (name) => ipcRenderer.invoke('set-openai-model', name),
   getUiLocale: () => ipcRenderer.invoke('get-ui-locale'),
   setUiLocale: (loc) => ipcRenderer.invoke('set-ui-locale', loc),
+  getOnboardingDone: () => ipcRenderer.invoke('get-onboarding-done'),
+  setOnboardingDone: (v) => ipcRenderer.invoke('set-onboarding-done', v),
   getHotkey: () => ipcRenderer.invoke('get-hotkey'),
   setHotkey: (mode) => ipcRenderer.invoke('set-hotkey', mode),
   setLanguage: (lang) => ipcRenderer.invoke('set-language', lang),
@@ -48,4 +50,5 @@ contextBridge.exposeInMainWorld('listenk', {
   onStreamError: (cb) => ipcRenderer.on('stream-error', (_e, msg) => cb(msg)),
   onStreamReady: (cb) => ipcRenderer.on('stream-ready', () => cb()),
   onToast: (cb) => ipcRenderer.on('toast', (_e, msg) => cb(msg)),
+  onNavigatePage: (cb) => ipcRenderer.on('navigate-page', (_e, id) => cb(id)),
 });

@@ -1601,6 +1601,7 @@ async function restoreSettings() {
   if (engine && engineSel) engineSel.value = engine;
   applyEngineVisibility(engine || 'whisperkit');
   renderEngineCards(engine || 'whisperkit');
+  updateEngineChip(engine || 'whisperkit');
 
   if (mode && modeSel) modeSel.value = mode;
   applyModeVisibility(modeSel?.value || 'off');
@@ -1719,6 +1720,7 @@ engineSel?.addEventListener('change', async () => {
   await api.setEngine?.(engine);
   applyEngineVisibility(engine);
   renderEngineCards(engine);
+  updateEngineChip(engine);
   // When coming back to OpenAI, the password input might be stale — refresh
   // its placeholder to reflect whether a key is currently stored/encrypted.
   if (engine === 'openai') refreshOpenAiKeyHint();
@@ -1903,6 +1905,7 @@ function wireSidebarNavigation() {
     navItems.forEach((a) => a.classList.toggle('active', a.dataset.section === id));
     contentEl.scrollTop = 0;
     try { sessionStorage.setItem('listenk:active-page', id); } catch {}
+    updateBrandPage(id);
   };
 
   navItems.forEach((a) => {
@@ -1921,12 +1924,205 @@ function wireSidebarNavigation() {
   showPage(initial);
 }
 
+// ----- Titlebar brand breadcrumb + engine chip -----
+// Centered title reads "Listen K · <current page>". Right-side engine chip
+// shows which transcription engine is active so the user sees at a glance
+// whether they're on local or cloud before recording.
+const brandPageEl = $('brandPage');
+const PAGE_I18N_KEY = {
+  'sec-status': 'sidebar.nav.dashboard',
+  'sec-engine': 'sidebar.nav.engine',
+  'sec-input': 'sidebar.nav.input',
+  'sec-post': 'sidebar.nav.post',
+  'sec-history': 'sidebar.nav.history',
+  'sec-stats': 'sidebar.nav.stats',
+  'sec-usage': 'sidebar.nav.usage',
+};
+function updateBrandPage(sectionId) {
+  if (!brandPageEl) return;
+  const key = PAGE_I18N_KEY[sectionId] || 'sidebar.nav.dashboard';
+  brandPageEl.setAttribute('data-i18n', key);
+  brandPageEl.textContent = t(key);
+}
+
+const engineChipEl = $('engineChip');
+const engineChipNameEl = $('engineChipName');
+const ENGINE_CHIP_LABEL = {
+  apple: 'Apple Speech',
+  whisperkit: 'WhisperKit',
+  'whisper.cpp': 'whisper.cpp',
+  openai: 'OpenAI',
+};
+function updateEngineChip(engine) {
+  if (!engineChipEl || !engineChipNameEl) return;
+  if (!engine) { engineChipEl.hidden = true; return; }
+  engineChipEl.setAttribute('data-engine', engine);
+  engineChipNameEl.textContent = ENGINE_CHIP_LABEL[engine] || engine;
+  engineChipEl.hidden = false;
+}
+
+// ======================== Onboarding overlay ========================
+//
+// Shown once on the first launch of a fresh install (no `onboardingDone`
+// in config). Three steps: welcome → permissions → hotkey. Users can
+// skip via the top-right × button — anything that writes
+// `onboardingDone: true` dismisses it for future launches.
+const onboardEl = $('onboard');
+const onboardSteps = onboardEl?.querySelectorAll('.onboard-step');
+const onboardStepDots = onboardEl?.querySelectorAll('.step-dot');
+let onboardStep = 0;
+
+function onboardShowStep(i) {
+  onboardStep = Math.max(0, Math.min(2, i));
+  onboardSteps?.forEach((el) => {
+    const s = Number(el.getAttribute('data-step'));
+    el.hidden = s !== onboardStep;
+  });
+  onboardStepDots?.forEach((d) => {
+    const s = Number(d.getAttribute('data-step'));
+    d.classList.toggle('active', s === onboardStep);
+    d.classList.toggle('done', s < onboardStep);
+  });
+  if (onboardStep === 1) onboardRenderPermissions();
+  if (onboardStep === 2) onboardRenderHotkeyHint();
+}
+
+async function onboardRenderPermissions() {
+  const listEl = $('onboardPermList');
+  if (!listEl) return;
+  let status = {};
+  try { status = await window.listenk.getStatus(); } catch {}
+
+  const items = [
+    {
+      key: 'mic',
+      titleKey: 'onboard.perm.mic',
+      descKey: 'onboard.perm.micDesc',
+      granted: status.mic === 'granted',
+      action: status.mic === 'granted'
+        ? null
+        : status.mic === 'not-determined'
+          ? { labelKey: 'onboard.perm.request', fn: async () => { await window.listenk.requestMic(); setTimeout(onboardRenderPermissions, 300); } }
+          : { labelKey: 'onboard.perm.openSettings', fn: () => window.listenk.openSettingsPane('mic') },
+      iconSvg: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none"><rect x="6" y="2" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 8c0 2 1.8 3.5 4 3.5S12 10 12 8M8 11.5v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    },
+    {
+      key: 'ax',
+      titleKey: 'onboard.perm.accessibility',
+      descKey: 'onboard.perm.accessibilityDesc',
+      granted: Boolean(status.accessibility),
+      action: status.accessibility
+        ? null
+        : { labelKey: 'onboard.perm.openSettings', fn: () => window.listenk.openSettingsPane('accessibility') },
+      iconSvg: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none"><circle cx="8" cy="4" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 6v4M5 8l3-2 3 2M6 14l2-4 2 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    },
+    {
+      key: 'im',
+      titleKey: 'onboard.perm.inputMonitoring',
+      descKey: 'onboard.perm.inputMonitoringDesc',
+      granted: Boolean(status.inputMonitoring) || Boolean(status.accessibility),
+      action: (status.inputMonitoring || status.accessibility)
+        ? null
+        : { labelKey: 'onboard.perm.openSettings', fn: () => window.listenk.openSettingsPane('input-monitoring') },
+      iconSvg: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M5 8h.01M8 8h.01M11 8h.01M4.5 10.5h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    },
+  ];
+
+  listEl.innerHTML = '';
+  for (const item of items) {
+    const el = document.createElement('div');
+    el.className = 'onboard-perm-item' + (item.granted ? ' granted' : '');
+    el.innerHTML = `
+      <div class="onboard-perm-ico">${item.iconSvg}</div>
+      <div class="onboard-perm-body">
+        <div class="onboard-perm-title"></div>
+        <div class="onboard-perm-desc"></div>
+      </div>
+      <div class="onboard-perm-state"></div>
+    `;
+    el.querySelector('.onboard-perm-title').textContent = t(item.titleKey);
+    el.querySelector('.onboard-perm-desc').textContent = t(item.descKey);
+    const state = el.querySelector('.onboard-perm-state');
+    if (item.granted) {
+      const chip = document.createElement('span');
+      chip.className = 'granted-chip';
+      chip.innerHTML = `<svg viewBox="0 0 16 16" width="11" height="11" fill="none"><path d="M3 8.5 L6.5 12 L13 4.5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      chip.appendChild(document.createTextNode(' ' + t('onboard.perm.granted')));
+      state.appendChild(chip);
+    } else if (item.action) {
+      const btn = document.createElement('button');
+      btn.className = 'btn-hero ghost';
+      btn.type = 'button';
+      btn.textContent = t(item.action.labelKey);
+      btn.addEventListener('click', item.action.fn);
+      state.appendChild(btn);
+    }
+    listEl.appendChild(el);
+  }
+}
+
+function onboardRenderHotkeyHint() {
+  const hintEl = $('onboardHotkeyHint');
+  const sel = $('onboardHotkey');
+  if (!hintEl || !sel) return;
+  const label = HOTKEY_LABELS[sel.value] || '⇧⇧';
+  hintEl.textContent = t('onboard.hotkey.testHint', { label });
+}
+
+async function onboardFinish() {
+  // Persist current onboarding-picked hotkey through the same IPC the
+  // settings page uses, so nothing drifts out of sync.
+  const onboardHotkeySel = $('onboardHotkey');
+  if (onboardHotkeySel && onboardHotkeySel.value) {
+    try { await window.listenk.setHotkey?.(onboardHotkeySel.value); } catch {}
+  }
+  try { await window.listenk.setOnboardingDone?.(true); } catch {}
+  onboardEl.hidden = true;
+}
+
+async function maybeShowOnboarding() {
+  if (!onboardEl || !window.listenk?.getOnboardingDone) return;
+  let done = false;
+  try { done = await window.listenk.getOnboardingDone(); } catch {}
+  if (done) { onboardEl.hidden = true; return; }
+  // Translate static text before revealing.
+  applyTranslations(onboardEl);
+  // Default hotkey selection follows whatever main.js has persisted.
+  try {
+    const hk = await window.listenk.getHotkey?.();
+    const sel = $('onboardHotkey');
+    if (sel && hk) sel.value = hk;
+  } catch {}
+  onboardEl.hidden = false;
+  onboardShowStep(0);
+}
+
+$('onboardStart')?.addEventListener('click', () => onboardShowStep(1));
+$('onboardBack1')?.addEventListener('click', () => onboardShowStep(0));
+$('onboardNext1')?.addEventListener('click', () => onboardShowStep(2));
+$('onboardBack2')?.addEventListener('click', () => onboardShowStep(1));
+$('onboardDone')?.addEventListener('click', () => onboardFinish());
+$('onboardSkip')?.addEventListener('click', () => onboardFinish());
+$('onboardHotkey')?.addEventListener('change', onboardRenderHotkeyHint);
+
+// External navigation requests (from the tray popover's "History" / "Stats"
+// items): just click the matching sidebar link so the same routing logic
+// runs as if the user clicked it themselves.
+window.listenk?.onNavigatePage?.((id) => {
+  const link = document.querySelector(`.nav-item[data-section="${id}"]`);
+  if (link) link.click();
+});
+
 // Wire sidebar nav immediately so clicks respond even if the IPC-based
 // settings restore below is slow on first run.
 wireSidebarNavigation();
 
 (async () => {
   await restoreSettings();
+  // Onboarding dialog runs after settings are restored so it can show the
+  // user's configured hotkey in step 3. It's a no-op if onboardingDone is
+  // already true in config.
+  maybeShowOnboarding();
   refresh();
   refreshNavCounts();
   setInterval(() => {

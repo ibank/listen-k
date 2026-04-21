@@ -210,15 +210,23 @@ function hideHud() {
   cancelHudSafetyHide();
 }
 
+let trayWindow = null;
+let trayNativeMenu = null;
+
 function createTray() {
   const icon = nativeImage
     .createFromNamedImage('NSStatusAvailable', [-1, 0, 1])
     .resize({ width: 16, height: 16 });
   tray = new Tray(icon);
   updateTrayMenu();
-  tray.on('click', () => {
-    if (mainWindow.isVisible()) mainWindow.hide();
-    else showWindowNonIntrusive();
+  // On macOS, `tray.setContextMenu(menu)` hijacks left-click (it opens
+  // the native menu and suppresses the `click` event). So we DO NOT set
+  // a default context menu — instead we store the template and pop it
+  // up only on explicit right-click. Left-click goes straight to the
+  // custom popover.
+  tray.on('click', () => toggleTrayWindow());
+  tray.on('right-click', () => {
+    if (trayNativeMenu) tray.popUpContextMenu(trayNativeMenu);
   });
 }
 
@@ -230,24 +238,138 @@ function updateTrayMenu() {
     ? '⏳ 변환/정제 중'
     : '⚪ 대기';
   tray.setToolTip(`Listen K · ${stateLabel}`);
-  const menu = Menu.buildFromTemplate([
+  // Native fallback menu — right-click only. The primary UI is the
+  // custom popover (see tray.on('click') in createTray()).
+  trayNativeMenu = Menu.buildFromTemplate([
     { label: `Listen K · ${stateLabel}`, enabled: false },
     { type: 'separator' },
-    { label: '창 열기', click: () => showWindowNonIntrusive() },
-    {
-      label: '녹음 토글 (fn)',
-      click: () => handleFnPress(),
-    },
+    { label: '창 열기 / Open window', click: () => showWindowNonIntrusive() },
+    { label: '녹음 토글 / Toggle record', click: () => handleFnPress() },
     { type: 'separator' },
-    {
-      label: '종료',
-      click: () => {
-        app.isQuitting = true;
-        app.quit();
-      },
-    },
+    { label: '종료 / Quit', click: () => { app.isQuitting = true; app.quit(); } },
   ]);
-  tray.setContextMenu(menu);
+  if (trayWindow && trayWindow.isVisible()) sendTraySnapshot();
+}
+
+function createTrayWindow() {
+  trayWindow = new BrowserWindow({
+    width: 320,
+    height: 520,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    fullscreenable: false,
+    minimizable: false,
+    maximizable: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-tray.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  trayWindow.loadFile('tray.html');
+  trayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Hide when user clicks outside (normal popover behaviour on macOS).
+  trayWindow.on('blur', () => {
+    if (trayWindow && trayWindow.isVisible()) trayWindow.hide();
+  });
+}
+
+function positionTrayWindow() {
+  if (!trayWindow || !tray) return;
+  const trayBounds = tray.getBounds();
+  const winBounds = trayWindow.getBounds();
+  // Centre horizontally under the tray icon, pin 6px below the menubar.
+  const x = Math.round(trayBounds.x + (trayBounds.width / 2) - (winBounds.width / 2));
+  const y = Math.round(trayBounds.y + trayBounds.height + 6);
+  trayWindow.setPosition(x, y, false);
+}
+
+function currentTrayState() {
+  if (isRecording) return 'rec';
+  if (isProcessing) return 'processing';
+  if (transcribeStreamReady) return 'ready';
+  return 'idle';
+}
+
+async function sendTraySnapshot() {
+  if (!trayWindow) return;
+  const recents = loadHistory(5);
+  trayWindow.webContents.send('tray-snapshot', {
+    locale: currentUiLocale(),
+    hotkey: currentHotkey(),
+    state: currentTrayState(),
+    recents: recents.map((e) => ({ clean: e.clean, raw: e.raw })),
+  });
+}
+
+function toggleTrayWindow() {
+  if (!trayWindow) createTrayWindow();
+  if (trayWindow.isVisible()) {
+    trayWindow.hide();
+    return;
+  }
+  positionTrayWindow();
+  trayWindow.showInactive();
+  // Give the window's preload a tick to wire up the listener before we
+  // push the first snapshot.
+  setTimeout(() => sendTraySnapshot(), 30);
+}
+
+ipcMain.handle('tray-cmd', (_e, payload) => {
+  const cmd = payload && payload.cmd;
+  if (trayWindow) trayWindow.hide();
+  switch (cmd) {
+    case 'open':
+      showWindowActive();
+      // "Open dashboard" should actually land the user on the dashboard
+      // page even if they were previously looking at History/Stats/etc.
+      mainWindow?.webContents.send('navigate-page', 'sec-status');
+      return { ok: true };
+    case 'record':
+      handleFnPress();
+      return { ok: true };
+    case 'history':
+      showWindowActive();
+      mainWindow?.webContents.send('navigate-page', 'sec-history');
+      return { ok: true };
+    case 'stats':
+      showWindowActive();
+      mainWindow?.webContents.send('navigate-page', 'sec-stats');
+      return { ok: true };
+    case 'paste-recent':
+      if (payload.text) {
+        pasteToFrontmost(payload.text).catch((err) =>
+          console.warn('[tray] paste-recent failed:', err.message)
+        );
+      }
+      return { ok: true };
+    case 'quit':
+      app.isQuitting = true;
+      app.quit();
+      return { ok: true };
+    default:
+      return { ok: false, reason: 'unknown cmd' };
+  }
+});
+
+async function pasteToFrontmost(text) {
+  const frontmost = await getFrontmostBundleId();
+  const paste = resPath('bin', 'paste-helper');
+  if (!fs.existsSync(paste)) throw new Error('paste-helper missing');
+  clipboard.writeText(text);
+  // Give the user's target app a beat to regain focus after the popover
+  // hides, then fire ⌘V via the helper.
+  await new Promise((r) => setTimeout(r, 150));
+  return new Promise((resolve, reject) => {
+    const args = frontmost ? ['--bundle', frontmost] : [];
+    execFile(paste, args, (err) => (err ? reject(err) : resolve()));
+  });
 }
 
 function showWindowNonIntrusive() {
@@ -1067,6 +1189,11 @@ app.whenReady().then(async () => {
   log('hud window created');
   createTray();
   log('tray created');
+  // Create the tray popover window ahead of time — showing it on tray
+  // click is a no-op if the window is already loaded, which feels
+  // snappier than creating on demand.
+  createTrayWindow();
+  log('tray window created');
 
   globalShortcut.register('CommandOrControl+Shift+Space', () => {
     handleFnPress();
@@ -1479,6 +1606,22 @@ ipcMain.handle('get-ui-locale', () => ({
   supported: i18n.LOCALES,
   labels: i18n.LOCALE_LABELS,
 }));
+
+// Onboarding completion flag. Tracked in config.json so it survives DMG
+// re-installs (the config dir is keyed by bundle id, not version). First
+// launch of a fresh install has no config.json, so the key is missing,
+// and the renderer shows the overlay.
+ipcMain.handle('get-onboarding-done', () => {
+  const cfg = loadConfig();
+  return Boolean(cfg.onboardingDone);
+});
+ipcMain.handle('set-onboarding-done', (_e, done) => {
+  const cfg = loadConfig();
+  if (done) cfg.onboardingDone = true;
+  else delete cfg.onboardingDone;
+  saveConfig(cfg);
+  return { ok: true };
+});
 ipcMain.handle('set-ui-locale', (_e, loc) => {
   const cfg = loadConfig();
   if (i18n.LOCALES.includes(loc)) cfg.uiLocale = loc;

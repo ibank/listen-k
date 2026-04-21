@@ -11,22 +11,49 @@
 <body>
   <header class="titlebar">
     <div class="brand">
-      <span class="brand-logo" aria-hidden="true"></span>
-      Listen K
+      <span class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 18 18" width="11" height="11" fill="none">
+          <path d="M6 4v10M9 2v14M12 5v8M3 7v4M15 7v4"
+                stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">Listen K</span>
+      <span class="brand-sep" aria-hidden="true">·</span>
+      <span class="brand-page" id="brandPage" data-i18n="sidebar.nav.dashboard">Dashboard</span>
     </div>
-    <div class="status" id="status">
-      <span class="status-led" aria-hidden="true"></span>
-      <span class="status-text" data-i18n="status.idle">Idle</span>
+    <div class="titlebar-right">
+      <div class="engine-chip" id="engineChip" hidden>
+        <svg class="engine-chip-ico" viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+          <rect x="6" y="2" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <path d="M4 8c0 2 1.8 3.5 4 3.5S12 10 12 8 M8 11.5v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        </svg>
+        <span class="engine-chip-name" id="engineChipName">—</span>
+      </div>
+      <div class="status" id="status">
+        <span class="status-led" aria-hidden="true"></span>
+        <span class="status-text" data-i18n="status.idle">Idle</span>
+      </div>
     </div>
   </header>
 
   <div class="workspace">
     <nav class="sidebar" aria-label="Navigation">
-      <div class="nav-group-label" data-i18n="sidebar.group.settings">Settings</div>
+      <div class="nav-group-label" data-i18n="sidebar.group.main">Main</div>
       <a href="#sec-status" class="nav-item" data-section="sec-status">
-        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/></svg>
-        <span data-i18n="sidebar.nav.status">Status</span>
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 8h6M5 5.5h6M5 10.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.dashboard">Dashboard</span>
       </a>
+      <a href="#sec-history" class="nav-item" data-section="sec-history">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.history">History</span>
+        <span class="nav-count" id="navCountHistory" hidden></span>
+      </a>
+      <a href="#sec-stats" class="nav-item" data-section="sec-stats">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13V9M7 13V5M11 13V7M13 13h-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.stats">Stats</span>
+      </a>
+
+      <div class="nav-group-label" data-i18n="sidebar.group.settings">Settings</div>
       <a href="#sec-engine" class="nav-item" data-section="sec-engine">
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="6" y="2" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M4 8c0 2 1.8 3.5 4 3.5S12 10 12 8 M8 11.5v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
         <span data-i18n="sidebar.nav.engine">Engine</span>
@@ -38,17 +65,6 @@
       <a href="#sec-post" class="nav-item" data-section="sec-post">
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span data-i18n="sidebar.nav.post">Post-processing</span>
-      </a>
-
-      <div class="nav-group-label" data-i18n="sidebar.group.data">Data</div>
-      <a href="#sec-history" class="nav-item" data-section="sec-history">
-        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span data-i18n="sidebar.nav.history">History</span>
-        <span class="nav-count" id="navCountHistory" hidden></span>
-      </a>
-      <a href="#sec-stats" class="nav-item" data-section="sec-stats">
-        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13V9M7 13V5M11 13V7M13 13h-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <span data-i18n="sidebar.nav.stats">Stats</span>
       </a>
 
       <div class="nav-group-label" data-i18n="sidebar.group.help">Help</div>
@@ -403,6 +419,75 @@
   </div>
 
   <div id="toast" class="toast" hidden></div>
+
+  <!-- ============ Onboarding overlay (first-run only) ============ -->
+  <div class="onboard-backdrop" id="onboard" hidden role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <div class="onboard-card">
+      <div class="onboard-steps" id="onboardSteps">
+        <span class="step-dot" data-step="0"></span>
+        <span class="step-dot" data-step="1"></span>
+        <span class="step-dot" data-step="2"></span>
+      </div>
+
+      <!-- Step 0: Welcome -->
+      <section class="onboard-step" data-step="0">
+        <div class="onboard-icon-big" aria-hidden="true">
+          <svg viewBox="0 0 36 36" width="40" height="40" fill="none">
+            <path d="M12 9v18M18 5v26M24 11v14M6 14v8M30 14v8"
+                  stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2 id="onboardTitle" data-i18n="onboard.welcome.title">Welcome to Listen K</h2>
+        <p data-i18n="onboard.welcome.desc">Speak in any app — text appears instantly.</p>
+        <div class="onboard-actions">
+          <button class="btn-hero rec" id="onboardStart" type="button">
+            <span data-i18n="onboard.welcome.cta">Get started</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+        <div class="onboard-hint" data-i18n="onboard.welcome.hint">First launch warms up the model (~40s).</div>
+      </section>
+
+      <!-- Step 1: Permissions -->
+      <section class="onboard-step" data-step="1" hidden>
+        <h2 data-i18n="onboard.perm.title">Two permissions, please</h2>
+        <p data-i18n="onboard.perm.desc">Required to turn your voice into text and paste it.</p>
+        <div class="onboard-perm-list" id="onboardPermList">
+          <!-- Populated by renderer.js from current permission status -->
+        </div>
+        <div class="onboard-actions split">
+          <button class="btn-hero ghost" id="onboardBack1" type="button" data-i18n="onboard.back">Back</button>
+          <button class="btn-hero rec" id="onboardNext1" type="button">
+            <span data-i18n="onboard.next">Next</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Step 2: Hotkey -->
+      <section class="onboard-step" data-step="2" hidden>
+        <h2 data-i18n="onboard.hotkey.title">Pick a hotkey</h2>
+        <p data-i18n="onboard.hotkey.desc">You can change this later in Settings.</p>
+        <div class="onboard-hotkey-row">
+          <select id="onboardHotkey">
+            <option value="rshift-double">Right ⇧⇧</option>
+            <option value="ropt-double">Right ⌥⌥</option>
+            <option value="rctl-double">Right ⌃⌃</option>
+            <option value="rcmd-double">Right ⌘⌘</option>
+            <option value="fn">fn</option>
+          </select>
+        </div>
+        <div class="onboard-hint" id="onboardHotkeyHint"></div>
+        <div class="onboard-actions split">
+          <button class="btn-hero ghost" id="onboardBack2" type="button" data-i18n="onboard.back">Back</button>
+          <button class="btn-hero rec" id="onboardDone" type="button" data-i18n="onboard.done">Done · Start</button>
+        </div>
+      </section>
+
+      <button class="onboard-skip" id="onboardSkip" type="button" data-i18n="onboard.skip">Skip</button>
+    </div>
+  </div>
+
   <script src="i18n.js"></script>
   <script src="renderer.js"></script>
 </body>
