@@ -11,6 +11,8 @@ const hotkeySel = $('hotkey');
 const streamingSel = $('streaming');
 const whisperModelSel = $('whisperModel');
 const engineSel = $('engine');
+const openaiKeyInput = $('openaiKey');
+const openaiModelSel = $('openaiModel');
 const translateTargetSel = $('translateTarget');
 const copyBtn = $('copyBtn');
 const refreshBtn = $('refreshBtn');
@@ -89,6 +91,7 @@ async function startRecognition() {
   processor.connect(audioContext.destination);
 
   recording = true;
+  markTranscribeStart();
   setStatus('녹음 중...');
   window.listenk?.setState?.({ recording: true, processing: false });
 }
@@ -127,6 +130,9 @@ async function stopRecognition() {
     showRecent();
     rawEl.textContent = finalTranscript;
 
+    // Record stats using the exact audio length we just sent.
+    recordTranscribeStats(samples16k.length / 16000);
+
     if (finalTranscript.trim()) {
       await postProcessAndPaste(finalTranscript);
     } else {
@@ -150,6 +156,7 @@ async function stopRecognition() {
 async function cancelRecord() {
   if (!recording) return;
   recording = false;
+  transcribeStartMs = null; // don't record stats for a cancelled call
 
   try {
     processor?.disconnect();
@@ -272,7 +279,7 @@ async function finalizePaste(cleanedText) {
         at: new Date().toISOString(),
         raw: (finalTranscript || '').trim(),
         clean: cleanedText,
-        mode: modeSel?.value || 'rules',
+        mode: modeSel?.value || 'off',
         language: langSel?.value || 'ko-KR',
         pasted,
       });
@@ -285,7 +292,7 @@ async function finalizePaste(cleanedText) {
 }
 
 async function postProcessAndPaste(raw) {
-  const mode = modeSel?.value || 'rules';
+  const mode = modeSel?.value || 'off';
   if (mode === 'off') {
     setStatus('붙여넣는 중...');
     await finalizePaste(raw.trim());
@@ -366,6 +373,9 @@ async function cleanupWithOllama(raw, opts = {}) {
     const decoder = new TextDecoder();
     let buffer = '';
     let output = '';
+    // Ollama reports prompt_eval_count / eval_count only on the final chunk
+    // (`done: true`). Capture both so the stats page can show token spend.
+    let usage = null;
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -380,8 +390,17 @@ async function cleanupWithOllama(raw, opts = {}) {
             output += chunk.response;
             cleanEl.textContent = output;
           }
+          if (chunk.done) {
+            usage = {
+              promptTokens: chunk.prompt_eval_count || 0,
+              evalTokens: chunk.eval_count || 0,
+            };
+          }
         } catch {}
       }
+    }
+    if (usage) {
+      try { await window.listenk?.statsRecordOllama?.(usage); } catch {}
     }
     await finalizePaste(output.trim());
   } catch (err) {
@@ -399,6 +418,24 @@ async function cleanupWithOllama(raw, opts = {}) {
 let streamingActive = false;
 let latestPartial = '';
 
+// Transcription timing — used to estimate audioSec for the streaming path
+// where the renderer doesn't hold the raw WAV buffer. Legacy batch path can
+// override with the exact samples-length value.
+let transcribeStartMs = null;
+function markTranscribeStart() { transcribeStartMs = Date.now(); }
+async function recordTranscribeStats(audioSecOverride) {
+  const start = transcribeStartMs;
+  transcribeStartMs = null;
+  try {
+    const engine = engineSel?.value || 'whisperkit';
+    const model = engine === 'openai' ? (openaiModelSel?.value || '') : null;
+    const audioSec = audioSecOverride != null
+      ? audioSecOverride
+      : start ? (Date.now() - start) / 1000 : 0;
+    await window.listenk?.statsRecordTranscribe?.({ engine, model, audioSec });
+  } catch {}
+}
+
 if (window.listenk?.onToggleRecord) {
   window.listenk.onToggleRecord(() => {
     if (streamingActive) return;  // streaming path handles everything
@@ -409,6 +446,7 @@ window.listenk?.onCancelRecord?.(() => {
   if (streamingActive) {
     streamingActive = false;
     latestPartial = '';
+    transcribeStartMs = null; // don't record cancelled call in stats
     showRecent();
     rawEl.textContent = '(취소됨)';
     setStatus('취소됨');
@@ -420,6 +458,7 @@ window.listenk?.onCancelRecord?.(() => {
 });
 
 window.listenk?.onStreamPartial?.((text) => {
+  if (!streamingActive) markTranscribeStart();
   streamingActive = true;
   latestPartial = text || '';
   setStatus('듣는 중...');
@@ -436,6 +475,9 @@ window.listenk?.onStreamFinal?.(async (text) => {
   latestPartial = '';
   showRecent();
   rawEl.textContent = finalText;
+
+  // Record stats for streaming engines — duration derived from timestamps.
+  recordTranscribeStats();
 
   if (!finalText) {
     setStatus('음성이 감지되지 않음', 'error');
@@ -594,7 +636,8 @@ async function renderStatus(statusArg) {
 
   const usingApple = s.selectedEngine === 'apple';
   const usingCpp = s.selectedEngine === 'whisper.cpp';
-  const usingWK = !usingApple && !usingCpp;
+  const usingOAI = s.selectedEngine === 'openai';
+  const usingWK = !usingApple && !usingCpp && !usingOAI;
 
   const engineOk = s.engine !== 'none';
 
@@ -607,6 +650,10 @@ async function renderStatus(statusArg) {
     engineLabel = 'whisper.cpp (배치 모드)';
     enginePath = s.whisperCppBin?.path;
     streamStatus = '배치 모드 · 녹음 완료 후 변환';
+  } else if (usingOAI) {
+    engineLabel = `OpenAI Whisper API · ${s.openai?.model || 'gpt-4o-transcribe'}`;
+    enginePath = s.openai?.fromEnv ? 'OPENAI_API_KEY 환경변수' : '저장된 키';
+    streamStatus = '클라우드 · 네트워크 필요 · $0.006/분';
   } else {
     engineLabel = 'WhisperKit (Core ML · Metal GPU)';
     enginePath = s.transcribeHelper?.path;
@@ -621,6 +668,9 @@ async function renderStatus(statusArg) {
     if (usingCpp) {
       engineFixLabel = 'whisper.cpp 빌드';
       engineFixCmd = 'npm run build:whisper';
+    } else if (usingOAI) {
+      engineFixLabel = 'OpenAI 키 필요';
+      engineFixCmd = '엔진 페이지의 "OpenAI API 키" 입력란에 sk-... 키를 붙여넣으세요';
     } else {
       engineFixLabel = '헬퍼 빌드';
       engineFixCmd = 'npm run build:helper';
@@ -897,7 +947,162 @@ refreshBtn?.addEventListener('click', () => {
   lastStatusFingerprint = '';  // force redraw on user-initiated refresh
   refresh();
   refreshHistory();
+  refreshStats();
 });
+
+// ========== Usage stats ==========
+
+const statsContentEl = $('statsContent');
+const statsClearBtn = $('statsClearBtn');
+
+const ENGINE_LABELS = {
+  apple: 'Apple Speech',
+  whisperkit: 'WhisperKit',
+  'whisper.cpp': 'whisper.cpp',
+  openai: 'OpenAI Whisper API',
+};
+
+function fmtDuration(totalSec) {
+  const s = Math.max(0, Math.round(totalSec || 0));
+  if (s < 60) return `${s}초`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return `${m}분 ${rem}초`;
+  const h = Math.floor(m / 60);
+  return `${h}시간 ${m % 60}분`;
+}
+function fmtUSD(n) {
+  const v = Number(n) || 0;
+  if (v === 0) return '$0';
+  if (v < 0.01) return `$${v.toFixed(4)}`;
+  return `$${v.toFixed(3)}`;
+}
+function fmtNum(n) {
+  return (Number(n) || 0).toLocaleString('ko-KR');
+}
+
+function buildStatRow(title, value, help) {
+  const row = document.createElement('div');
+  row.className = 'field-row';
+  row.innerHTML = `
+    <div class="field-info">
+      <div class="field-title"></div>
+      ${help ? '<div class="field-help"></div>' : ''}
+    </div>
+    <div class="field-control" style="font-variant-numeric: tabular-nums; font-weight: 500;"></div>
+  `;
+  row.querySelector('.field-title').textContent = title;
+  if (help) row.querySelector('.field-help').textContent = help;
+  row.querySelector('.field-control').textContent = value;
+  return row;
+}
+
+function buildStatsGroup(titleText, rows) {
+  const box = document.createElement('div');
+  box.className = 'fields';
+  box.style.marginBottom = 'var(--space-4)';
+  rows.forEach((r) => box.appendChild(r));
+  const wrap = document.createElement('div');
+  if (titleText) {
+    const h = document.createElement('div');
+    h.textContent = titleText;
+    h.style.cssText = 'font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: 0.8px; text-transform: uppercase; margin: var(--space-4) 0 var(--space-2);';
+    wrap.appendChild(h);
+  }
+  wrap.appendChild(box);
+  return wrap;
+}
+
+async function refreshStats() {
+  if (!statsContentEl || !window.listenk?.statsGet) return;
+  let payload;
+  try { payload = await window.listenk.statsGet(); }
+  catch (err) {
+    statsContentEl.innerHTML = '';
+    statsContentEl.appendChild(buildStatRow('통계 불러오기 실패', err.message || '알 수 없음'));
+    return;
+  }
+  const stats = payload?.stats;
+  if (!stats) return;
+
+  statsContentEl.innerHTML = '';
+
+  // --- 요약 ---
+  const totalCalls = Object.values(stats.counters.callsByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+  const totalSec = Object.values(stats.counters.audioSecByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+  const todayCalls = Object.values(stats.today.callsByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+  const todaySec = Object.values(stats.today.audioSecByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+
+  statsContentEl.appendChild(buildStatsGroup('요약', [
+    buildStatRow('누적 전사 호출', fmtNum(totalCalls)),
+    buildStatRow('누적 녹음 시간', fmtDuration(totalSec)),
+    buildStatRow('오늘 호출', `${fmtNum(todayCalls)} · ${fmtDuration(todaySec)}`),
+  ]));
+
+  // --- 엔진별 ---
+  const engines = Array.from(new Set([
+    ...Object.keys(stats.counters.callsByEngine || {}),
+    ...Object.keys(stats.counters.audioSecByEngine || {}),
+  ])).sort();
+  const engineRows = engines.map((eng) => {
+    const calls = stats.counters.callsByEngine?.[eng] || 0;
+    const sec = stats.counters.audioSecByEngine?.[eng] || 0;
+    const isOai = eng === 'openai';
+    const cost = isOai ? stats.counters.openaiCost || 0 : null;
+    const label = ENGINE_LABELS[eng] || eng;
+    const value = cost != null
+      ? `${fmtNum(calls)}회 · ${fmtDuration(sec)} · ${fmtUSD(cost)}`
+      : `${fmtNum(calls)}회 · ${fmtDuration(sec)}`;
+    const help = isOai
+      ? Object.entries(stats.counters.openaiCallsByModel || {})
+          .map(([m, n]) => `${m}: ${n}회`)
+          .join(' · ')
+      : '';
+    return buildStatRow(label, value, help);
+  });
+  if (engineRows.length === 0) {
+    engineRows.push(buildStatRow('기록 없음', '아직 전사 호출이 없습니다'));
+  }
+  statsContentEl.appendChild(buildStatsGroup('엔진별', engineRows));
+
+  // --- OpenAI 비용 breakdown ---
+  if ((stats.counters.openaiCost || 0) > 0 || (stats.today.openaiCost || 0) > 0) {
+    const rates = payload.openaiRatesPerMin || {};
+    const ratesText = Object.entries(rates)
+      .map(([m, r]) => `${m}: $${r}/분`)
+      .join(' · ');
+    statsContentEl.appendChild(buildStatsGroup('OpenAI 비용', [
+      buildStatRow('누적', fmtUSD(stats.counters.openaiCost || 0), ratesText),
+      buildStatRow('오늘', fmtUSD(stats.today.openaiCost || 0)),
+    ]));
+  }
+
+  // --- Ollama 토큰 ---
+  if ((stats.counters.ollamaCalls || 0) > 0) {
+    statsContentEl.appendChild(buildStatsGroup('Ollama 후처리', [
+      buildStatRow('누적 호출', `${fmtNum(stats.counters.ollamaCalls || 0)}회`),
+      buildStatRow('누적 토큰', `입력 ${fmtNum(stats.counters.ollamaPromptTokens || 0)} · 출력 ${fmtNum(stats.counters.ollamaEvalTokens || 0)}`),
+      buildStatRow('오늘 토큰', `입력 ${fmtNum(stats.today.ollamaPromptTokens || 0)} · 출력 ${fmtNum(stats.today.ollamaEvalTokens || 0)}`),
+    ]));
+  }
+
+  if (stats.firstSeenAt) {
+    const foot = document.createElement('div');
+    foot.style.cssText = 'margin-top: var(--space-4); font-size: 11px; color: var(--text-4); text-align: center;';
+    const since = new Date(stats.firstSeenAt).toLocaleDateString('ko-KR');
+    foot.textContent = `집계 시작: ${since}`;
+    statsContentEl.appendChild(foot);
+  }
+}
+
+statsClearBtn?.addEventListener('click', async () => {
+  if (!confirm('모든 통계를 초기화할까요?')) return;
+  await window.listenk.statsClear();
+  refreshStats();
+  toast('통계 초기화됨');
+});
+
+refreshStats();
 
 function applyModeVisibility(mode) {
   document.querySelectorAll('[data-mode-only]').forEach((el) => {
@@ -956,7 +1161,7 @@ let currentHotkey = 'rshift-double';
 
 function applyHotkeyHint(mode) {
   currentHotkey = mode || 'rshift-double';
-  const hintEls = document.querySelectorAll('#hotkeyHint');
+  const hintEls = document.querySelectorAll('.hotkey-hint, #hotkeyHint');
   const label = HOTKEY_LABELS[currentHotkey] || '⇧⇧';
   hintEls.forEach((el) => { el.textContent = label; });
 }
@@ -975,7 +1180,7 @@ async function restoreSettings() {
   if (!api) return;
 
   const safe = async (fn) => { try { return await fn(); } catch { return null; } };
-  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels] = await Promise.all([
+  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels, openaiKeyInfo, openaiModel] = await Promise.all([
     safe(() => api.getHotkey?.()),
     safe(() => api.getLanguage?.()),
     safe(() => api.getStreaming?.()),
@@ -985,6 +1190,8 @@ async function restoreSettings() {
     safe(() => api.getTranslateTarget?.()),
     safe(() => api.getOllamaModel?.()),
     safe(() => api.listWhisperModels?.()),
+    safe(() => api.getOpenAiKey?.()),
+    safe(() => api.getOpenAiModel?.()),
   ]);
 
   if (hotkey && hotkeySel) hotkeySel.value = hotkey;
@@ -995,10 +1202,10 @@ async function restoreSettings() {
   if (streamingSel) streamingSel.value = streaming === false ? 'off' : 'on';
 
   if (engine && engineSel) engineSel.value = engine;
-  applyEngineVisibility(engine || 'whisperkit');
+  applyEngineVisibility(engine || 'apple');
 
   if (mode && modeSel) modeSel.value = mode;
-  applyModeVisibility(modeSel?.value || 'rules');
+  applyModeVisibility(modeSel?.value || 'off');
 
   if (tone && toneSel) toneSel.value = tone;
 
@@ -1017,7 +1224,43 @@ async function restoreSettings() {
     whisperModelSel.value = wkModels.selected || '';
   }
 
+  applyOpenAiKeyHint(openaiKeyInfo);
+  if (openaiModel && openaiModelSel) openaiModelSel.value = openaiModel;
+
   settingsReady = true;
+}
+
+// Paint the OpenAI key input's placeholder based on current storage state.
+// Called (a) once at boot, and (b) every time the user switches TO the
+// openai engine, so the hint reflects reality instead of going blank.
+function applyOpenAiKeyHint(info) {
+  if (!openaiKeyInput) return;
+  // Always clear the value so the secret isn't sitting in the DOM.
+  openaiKeyInput.value = '';
+  openaiKeyInput.disabled = false;
+  if (!info) {
+    openaiKeyInput.placeholder = 'sk-...';
+    return;
+  }
+  if (info.fromEnv) {
+    openaiKeyInput.placeholder = 'OPENAI_API_KEY 환경변수 사용 중';
+    openaiKeyInput.disabled = true;
+  } else if (info.hasKey) {
+    const suffix = info.encrypted
+      ? '암호화 저장됨 — 바꾸려면 새로 입력'
+      : '저장됨 (평문 — 다음 저장 시 자동 암호화)';
+    openaiKeyInput.placeholder = suffix;
+  } else {
+    openaiKeyInput.placeholder = 'sk-...';
+  }
+}
+
+async function refreshOpenAiKeyHint() {
+  if (!api?.getOpenAiKey) return;
+  try {
+    const info = await api.getOpenAiKey();
+    applyOpenAiKeyHint(info);
+  } catch {}
 }
 
 // Each setter guard: only write once `settingsReady` is true, so the
@@ -1078,7 +1321,11 @@ engineSel?.addEventListener('change', async () => {
   const engine = engineSel.value;
   await api.setEngine?.(engine);
   applyEngineVisibility(engine);
-  toast(engine === 'apple' ? '엔진: Apple Speech (재로딩 중)' : '엔진: WhisperKit (재로딩 중)');
+  // When coming back to OpenAI, the password input might be stale — refresh
+  // its placeholder to reflect whether a key is currently stored/encrypted.
+  if (engine === 'openai') refreshOpenAiKeyHint();
+  const label = engineSel.options[engineSel.selectedIndex]?.textContent || engine;
+  toast(`엔진: ${label} (재로딩 중)`);
   lastStatusFingerprint = '';
   setTimeout(refresh, 500);
 });
@@ -1100,57 +1347,75 @@ modelInput?.addEventListener('change', async () => {
   toast(`Ollama 모델: ${savedOllamaModel}`);
 });
 
-// ---- Sidebar active-section tracking via IntersectionObserver ----
+openaiKeyInput?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  const raw = openaiKeyInput.value.trim();
+  // Empty value = user wants to clear. Non-empty = save as the new key.
+  const res = await api.setOpenAiKey?.(raw);
+  if (res?.ok) {
+    toast(raw ? (res.encrypted ? 'OpenAI 키 저장됨 (암호화)' : 'OpenAI 키 저장됨') : 'OpenAI 키 삭제됨');
+    await refreshOpenAiKeyHint();
+    lastStatusFingerprint = '';
+    refresh();
+  } else {
+    toast(`OpenAI 키 저장 실패${res?.reason ? `: ${res.reason}` : ''}`);
+  }
+});
+
+openaiModelSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  const model = openaiModelSel.value;
+  await api.setOpenAiModel?.(model);
+  toast(`OpenAI 모델: ${model}`);
+});
+
+// ---- Sidebar nav: page routing ----
 //
-// Keeps the sidebar's current page in sync with whichever section occupies
-// the centre of the scroll viewport, so navigation stays readable without
-// the user clicking a nav item explicitly.
+// Each sidebar item maps to exactly one .page section. Clicking shows that
+// page and hides the rest. The non-page sections (firstRunBanner,
+// recentCard) keep their own show/hide logic and stack above the active
+// page when visible.
 function wireSidebarNavigation() {
   const contentEl = document.getElementById('content');
   const navItems = Array.from(document.querySelectorAll('.nav-item'));
-  const sections = Array.from(document.querySelectorAll('.content > section[id]'));
-  if (!contentEl || !navItems.length || !sections.length) return;
+  const pages = Array.from(document.querySelectorAll('.page'));
+  if (!contentEl || !navItems.length || !pages.length) return;
 
-  const setActive = (id) => {
+  const pageIds = new Set(pages.map((p) => p.id));
+
+  const showPage = (id) => {
+    if (!pageIds.has(id)) return;
+    pages.forEach((p) => {
+      if (p.id === id) p.removeAttribute('hidden');
+      else p.setAttribute('hidden', '');
+    });
     navItems.forEach((a) => a.classList.toggle('active', a.dataset.section === id));
+    contentEl.scrollTop = 0;
+    try { sessionStorage.setItem('listenk:active-page', id); } catch {}
   };
 
-  // Intersection tracking.
-  const observer = new IntersectionObserver(
-    (entries) => {
-      const visible = entries
-        .filter((e) => e.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-      if (visible.length) setActive(visible[0].target.id);
-    },
-    {
-      root: contentEl,
-      rootMargin: '-40% 0px -50% 0px',
-      threshold: [0, 0.25, 0.5, 0.75, 1],
-    }
-  );
-  sections.forEach((s) => observer.observe(s));
-
-  // Click → smooth scroll.
   navItems.forEach((a) => {
     a.addEventListener('click', (e) => {
-      const href = a.getAttribute('href') || '';
-      if (!href.startsWith('#')) return;
-      const target = document.getElementById(href.slice(1));
-      if (!target) return;
       e.preventDefault();
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setActive(target.id);
+      const id = a.dataset.section || (a.getAttribute('href') || '').replace(/^#/, '');
+      if (!id) return;
+      showPage(id);
     });
   });
 
-  // Default active: first nav item.
-  setActive(sections[0].id);
+  // Restore last-viewed page across reloads (falls back to first nav item).
+  let initial = '';
+  try { initial = sessionStorage.getItem('listenk:active-page') || ''; } catch {}
+  if (!initial || !pageIds.has(initial)) initial = navItems[0]?.dataset.section || '';
+  showPage(initial);
 }
+
+// Wire sidebar nav immediately so clicks respond even if the IPC-based
+// settings restore below is slow on first run.
+wireSidebarNavigation();
 
 (async () => {
   await restoreSettings();
-  wireSidebarNavigation();
   refresh();
-  setInterval(refresh, 4000);
+  setInterval(() => { refresh(); refreshStats(); }, 4000);
 })();

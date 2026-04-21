@@ -12,7 +12,8 @@
   </header>
 
   <div class="workspace">
-    <nav class="sidebar" aria-label="설정 섹션">
+    <nav class="sidebar" aria-label="내비게이션">
+      <div class="nav-group-label">설정</div>
       <a href="#sec-status" class="nav-item" data-section="sec-status">
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/></svg>
         상태
@@ -29,10 +30,18 @@
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         후처리
       </a>
+
+      <div class="nav-group-label">데이터</div>
       <a href="#sec-history" class="nav-item" data-section="sec-history">
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        이력
+        전사 이력
       </a>
+      <a href="#sec-stats" class="nav-item" data-section="sec-stats">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13V9M7 13V5M11 13V7M13 13h-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        통계
+      </a>
+
+      <div class="nav-group-label">도움말</div>
       <a href="#sec-usage" class="nav-item" data-section="sec-usage">
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 5v3.5M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         사용법
@@ -51,7 +60,7 @@
         <div class="banner-spinner"></div>
       </section>
 
-      <section class="card" id="sec-status">
+      <section class="card page" id="sec-status">
         <div class="card-head">
           <h2>설정 상태</h2>
           <button id="refreshBtn" class="ghost" title="상태 새로고침">↻ 새로고침</button>
@@ -59,7 +68,7 @@
         <div id="checkList" class="check-list"></div>
       </section>
 
-      <section class="card" id="sec-engine">
+      <section class="card page" id="sec-engine" hidden>
         <div class="card-head"><h2>엔진</h2></div>
         <div class="fields">
           <div class="field-row">
@@ -72,6 +81,7 @@
                 <option value="apple">Apple Speech (시스템)</option>
                 <option value="whisperkit">WhisperKit (Core ML)</option>
                 <option value="whisper.cpp">whisper.cpp (배치)</option>
+                <option value="openai">OpenAI Whisper API (클라우드)</option>
               </select>
             </div>
           </div>
@@ -87,10 +97,40 @@
               </select>
             </div>
           </div>
+
+          <div class="field-row" data-engine-only="openai">
+            <div class="field-info">
+              <div class="field-title">OpenAI API 키</div>
+              <div class="field-help">
+                platform.openai.com/api-keys 에서 발급. macOS Keychain 으로 암호화
+                저장됩니다. <code>OPENAI_API_KEY</code> 환경변수가 있으면 그게 우선 적용됩니다.
+              </div>
+            </div>
+            <div class="field-control">
+              <input id="openaiKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="field-row" data-engine-only="openai">
+            <div class="field-info">
+              <div class="field-title">OpenAI 모델</div>
+              <div class="field-help">
+                <code>gpt-4o-transcribe</code> 가 품질 최상 ($0.006/분). <code>mini</code> 는
+                절반 가격·중간 품질. <code>whisper-1</code> 은 구세대 호환용.
+              </div>
+            </div>
+            <div class="field-control">
+              <select id="openaiModel">
+                <option value="gpt-4o-transcribe">gpt-4o-transcribe (권장)</option>
+                <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+                <option value="whisper-1">whisper-1</option>
+              </select>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="card" id="sec-input">
+      <section class="card page" id="sec-input" hidden>
         <div class="card-head"><h2>단축키 & 입력</h2></div>
         <div class="fields">
           <div class="field-row">
@@ -138,7 +178,7 @@
         </div>
       </section>
 
-      <section class="card" id="sec-post">
+      <section class="card page" id="sec-post" hidden>
         <div class="card-head"><h2>후처리</h2></div>
         <div class="fields">
           <div class="field-row">
@@ -148,8 +188,8 @@
             </div>
             <div class="field-control">
               <select id="mode">
-                <option value="rules" selected>규칙 기반 (필러 제거)</option>
-                <option value="off">끄기 (원문)</option>
+                <option value="off" selected>끄기 (원문)</option>
+                <option value="rules">규칙 기반 (필러 제거)</option>
                 <option value="ollama">Ollama · 정제</option>
                 <option value="translate">Ollama · 번역</option>
               </select>
@@ -206,12 +246,20 @@
         </div>
       </section>
 
-      <section class="card" id="sec-history">
+      <section class="card page" id="sec-history" hidden>
         <div class="card-head">
           <h2>전사 이력</h2>
           <button id="historyClearBtn" class="ghost" title="모든 이력 삭제">전체 삭제</button>
         </div>
         <div id="historyList" class="history-list"></div>
+      </section>
+
+      <section class="card page" id="sec-stats" hidden>
+        <div class="card-head">
+          <h2>통계</h2>
+          <button id="statsClearBtn" class="ghost" title="모든 통계 초기화">초기화</button>
+        </div>
+        <div id="statsContent"></div>
       </section>
 
       <section class="card" id="recentCard" hidden>
@@ -223,7 +271,7 @@
         <div id="clean" class="output clean"></div>
       </section>
 
-      <section class="card" id="sec-usage">
+      <section class="card page" id="sec-usage" hidden>
         <div class="card-head"><h2>사용법</h2></div>
         <div class="usage">
           <div class="usage-row">
@@ -232,11 +280,11 @@
           </div>
           <div class="usage-row">
             <span class="usage-step">2</span>
-            <kbd id="hotkeyHint">⇧⇧</kbd> 한 번 — 녹음 시작 (HUD 표시).
+            <kbd class="hotkey-hint">⇧⇧</kbd> 한 번 — 녹음 시작 (HUD 표시).
           </div>
           <div class="usage-row">
             <span class="usage-step">3</span>
-            말을 마치면 다시 <kbd id="hotkeyHint">⇧⇧</kbd> 또는 HUD 의 <span class="icon-check">✓</span>.
+            말을 마치면 다시 <kbd class="hotkey-hint">⇧⇧</kbd> 또는 HUD 의 <span class="icon-check">✓</span>.
           </div>
           <div class="usage-row">
             <span class="usage-step">4</span>

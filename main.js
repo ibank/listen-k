@@ -6,6 +6,7 @@ const {
   systemPreferences,
   ipcMain,
   clipboard,
+  safeStorage,
   Tray,
   nativeImage,
   Menu,
@@ -68,8 +69,10 @@ function resPath(...parts) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 720,
-    height: 640,
+    width: 960,
+    height: 720,
+    minWidth: 780,
+    minHeight: 560,
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#0f0f10',
     show: false,
@@ -278,8 +281,76 @@ function currentStreamingEnabled() {
 function currentEngine() {
   const cfg = loadConfig();
   const e = cfg.engine;
-  if (e === 'apple' || e === 'whisper.cpp') return e;
-  return 'whisperkit';
+  if (e === 'apple' || e === 'whisper.cpp' || e === 'openai' || e === 'whisperkit') return e;
+  return 'apple';
+}
+
+const OPENAI_MODELS = ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe', 'whisper-1'];
+function currentOpenAiModel() {
+  const cfg = loadConfig();
+  return OPENAI_MODELS.includes(cfg.openaiModel) ? cfg.openaiModel : 'gpt-4o-transcribe';
+}
+
+// OpenAI key is stored in config.json as an Electron-safeStorage-encrypted
+// blob (base64 of the ciphertext) under `openaiKeyEnc`. On macOS this is
+// backed by the user's Keychain — config.json alone is useless without
+// the same user's session. If encryption isn't available on this platform
+// (shouldn't happen on macOS), we skip saving rather than write plaintext.
+//
+// Legacy plaintext `openaiKey` from pre-encryption versions is still read
+// once — the next save migrates it to `openaiKeyEnc` and deletes the old
+// plaintext field.
+function encryptionAvailable() {
+  try { return safeStorage.isEncryptionAvailable(); } catch { return false; }
+}
+
+function decryptStoredKey(cfg) {
+  if (cfg.openaiKeyEnc && encryptionAvailable()) {
+    try {
+      const buf = Buffer.from(cfg.openaiKeyEnc, 'base64');
+      return safeStorage.decryptString(buf).trim();
+    } catch (err) {
+      console.warn('[openai] decrypt failed:', err.message);
+      return '';
+    }
+  }
+  if (cfg.openaiKey) return String(cfg.openaiKey).trim();
+  return '';
+}
+
+function currentOpenAiKey() {
+  const fromEnv = (process.env.OPENAI_API_KEY || '').trim();
+  if (fromEnv) return fromEnv;
+  return decryptStoredKey(loadConfig());
+}
+
+function persistOpenAiKey(raw) {
+  const cfg = loadConfig();
+  const key = typeof raw === 'string' ? raw.trim() : '';
+
+  if (!key) {
+    delete cfg.openaiKeyEnc;
+    delete cfg.openaiKey;
+    saveConfig(cfg);
+    return { ok: true, hasKey: false, encrypted: false };
+  }
+
+  if (!encryptionAvailable()) {
+    // Refuse to write plaintext — user asked for encryption. Surface the
+    // failure so the renderer can tell them.
+    return {
+      ok: false,
+      hasKey: Boolean(cfg.openaiKeyEnc || cfg.openaiKey),
+      encrypted: false,
+      reason: '이 플랫폼에서는 safeStorage 암호화를 사용할 수 없습니다.',
+    };
+  }
+
+  const enc = safeStorage.encryptString(key).toString('base64');
+  cfg.openaiKeyEnc = enc;
+  delete cfg.openaiKey; // drop any lingering plaintext from legacy saves
+  saveConfig(cfg);
+  return { ok: true, hasKey: true, encrypted: true };
 }
 
 function findWhisperBin() {
@@ -365,6 +436,145 @@ function clearHistory() {
   try { fs.unlinkSync(historyPath()); } catch {}
 }
 
+// ---- Usage stats (separate file — lifetime + today aggregates) ----
+//
+// Kept separate from history.jsonl because history is size-capped but stats
+// are meant to accumulate forever. Stats are intentionally minimal — just
+// enough to answer "how much did I spend on OpenAI?" and "how many tokens
+// did Ollama chew through?" Fine-grained per-call detail stays in history.
+
+function statsPath() {
+  return path.join(app.getPath('userData'), 'stats.json');
+}
+
+const STATS_TEMPLATE = () => ({
+  counters: {
+    callsByEngine: {}, // { apple: 10, whisperkit: 5, openai: 2, ... }
+    audioSecByEngine: {}, // same keys, seconds totalled
+    openaiCost: 0, // USD, float
+    openaiCallsByModel: {}, // { 'gpt-4o-transcribe': 3 }
+    ollamaPromptTokens: 0,
+    ollamaEvalTokens: 0,
+    ollamaCalls: 0,
+  },
+  today: {
+    date: '',
+    callsByEngine: {},
+    audioSecByEngine: {},
+    openaiCost: 0,
+    ollamaPromptTokens: 0,
+    ollamaEvalTokens: 0,
+    ollamaCalls: 0,
+  },
+  firstSeenAt: null,
+  lastUpdatedAt: null,
+});
+
+function loadStats() {
+  const p = statsPath();
+  try {
+    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    // Merge with template so newly-added fields appear on existing files.
+    const out = STATS_TEMPLATE();
+    Object.assign(out.counters, raw.counters || {});
+    Object.assign(out.today, raw.today || {});
+    out.firstSeenAt = raw.firstSeenAt || null;
+    out.lastUpdatedAt = raw.lastUpdatedAt || null;
+    return out;
+  } catch {
+    return STATS_TEMPLATE();
+  }
+}
+
+function saveStats(stats) {
+  const p = statsPath();
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    const tmp = p + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(stats, null, 2));
+    fs.renameSync(tmp, p);
+  } catch (err) {
+    console.warn('[stats] save failed:', err.message);
+  }
+}
+
+function todayKey() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function ensureTodayBucket(stats) {
+  const today = todayKey();
+  if (stats.today.date !== today) {
+    stats.today = {
+      date: today,
+      callsByEngine: {},
+      audioSecByEngine: {},
+      openaiCost: 0,
+      ollamaPromptTokens: 0,
+      ollamaEvalTokens: 0,
+      ollamaCalls: 0,
+    };
+  }
+}
+
+// OpenAI transcription pricing snapshot. Keep this here (not renderer) so the
+// renderer can't fake cheaper costs by tampering with DOM — but accept that
+// this table drifts over time and treat the "cost" field as best-effort.
+const OPENAI_AUDIO_RATES_PER_MIN = {
+  'gpt-4o-transcribe': 0.006,
+  'gpt-4o-mini-transcribe': 0.003,
+  'whisper-1': 0.006,
+};
+
+function recordTranscribeStat({ engine, model, audioSec }) {
+  if (!engine) return;
+  const stats = loadStats();
+  ensureTodayBucket(stats);
+
+  const sec = Math.max(0, Number(audioSec) || 0);
+  const rate = engine === 'openai' ? (OPENAI_AUDIO_RATES_PER_MIN[model] || 0) : 0;
+  const cost = (sec / 60) * rate;
+
+  const bump = (obj, key, by) => { obj[key] = (obj[key] || 0) + by; };
+
+  bump(stats.counters.callsByEngine, engine, 1);
+  bump(stats.counters.audioSecByEngine, engine, sec);
+  if (engine === 'openai') {
+    stats.counters.openaiCost = (stats.counters.openaiCost || 0) + cost;
+    if (model) bump(stats.counters.openaiCallsByModel, model, 1);
+  }
+
+  bump(stats.today.callsByEngine, engine, 1);
+  bump(stats.today.audioSecByEngine, engine, sec);
+  if (engine === 'openai') stats.today.openaiCost += cost;
+
+  if (!stats.firstSeenAt) stats.firstSeenAt = new Date().toISOString();
+  stats.lastUpdatedAt = new Date().toISOString();
+  saveStats(stats);
+  return stats;
+}
+
+function recordOllamaStat({ promptTokens, evalTokens }) {
+  const stats = loadStats();
+  ensureTodayBucket(stats);
+  const inTok = Math.max(0, Number(promptTokens) || 0);
+  const outTok = Math.max(0, Number(evalTokens) || 0);
+  stats.counters.ollamaPromptTokens += inTok;
+  stats.counters.ollamaEvalTokens += outTok;
+  stats.counters.ollamaCalls = (stats.counters.ollamaCalls || 0) + 1;
+  stats.today.ollamaPromptTokens += inTok;
+  stats.today.ollamaEvalTokens += outTok;
+  stats.today.ollamaCalls = (stats.today.ollamaCalls || 0) + 1;
+  if (!stats.firstSeenAt) stats.firstSeenAt = new Date().toISOString();
+  stats.lastUpdatedAt = new Date().toISOString();
+  saveStats(stats);
+  return stats;
+}
+
 let hudSafetyTimer = null;
 function scheduleHudSafetyHide(ms) {
   if (hudSafetyTimer) clearTimeout(hudSafetyTimer);
@@ -396,7 +606,8 @@ async function handleFnPress() {
   // partial transcripts get forwarded to the HUD — it must NOT change
   // the capture path, otherwise Apple/WhisperKit engines end up stranded
   // on the legacy getUserMedia flow that doesn't exist for them.
-  const streamingEnabled = currentEngine() !== 'whisper.cpp';
+  // whisper.cpp and OpenAI are batch-only — no streaming partials.
+  const streamingEnabled = !['whisper.cpp', 'openai'].includes(currentEngine());
   console.log(
     '[fn] press, recording=', isRecording,
     'streamingEnabled=', streamingEnabled,
@@ -511,9 +722,9 @@ const MAX_STREAM_RESTARTS = 3;
 function startTranscribeStream() {
   const engine = currentEngine();
 
-  // whisper.cpp is batch-only; no persistent streaming process.
-  if (engine === 'whisper.cpp') {
-    console.log('[stream] engine=whisper.cpp → skip streaming helper (batch-only)');
+  // whisper.cpp and OpenAI are batch-only with no persistent process.
+  if (engine === 'whisper.cpp' || engine === 'openai') {
+    console.log(`[stream] engine=${engine} → skip streaming helper (batch-only)`);
     transcribeStream = null;
     transcribeStreamReady = false;
     return;
@@ -729,12 +940,16 @@ async function collectStatus() {
   const appleHelperExists = fs.existsSync(appleHelper);
   const whisperCppBin = findWhisperBin();
   const ggmlModel = findGgmlModel();
+  const openaiKeyPresent = Boolean(currentOpenAiKey());
+  const openaiKeyFromEnv = Boolean((process.env.OPENAI_API_KEY || '').trim());
   const selectedEngine = currentEngine();
   let engine = 'none';
   if (selectedEngine === 'apple') {
     engine = appleHelperExists ? 'apple' : 'none';
   } else if (selectedEngine === 'whisper.cpp') {
     engine = whisperCppBin && ggmlModel ? 'whisper.cpp' : 'none';
+  } else if (selectedEngine === 'openai') {
+    engine = openaiKeyPresent ? 'openai' : 'none';
   } else {
     engine = wkHelper && wkModel ? 'whisperkit' : 'none';
   }
@@ -748,6 +963,11 @@ async function collectStatus() {
     appleSpeechHelper: appleHelperExists ? { path: appleHelper } : null,
     whisperCppBin: whisperCppBin ? { path: whisperCppBin } : null,
     ggmlModel: ggmlModel ? { path: ggmlModel } : null,
+    openai: {
+      hasKey: openaiKeyPresent,
+      fromEnv: openaiKeyFromEnv,
+      model: currentOpenAiModel(),
+    },
     selectedEngine,
     engine,
     streamReady: transcribeStreamReady,
@@ -771,6 +991,18 @@ app.whenReady().then(async () => {
   const log = (msg) => console.log(`[startup +${Date.now() - t0}ms] ${msg}`);
 
   if (process.platform === 'darwin' && app.dock) app.dock.hide();
+
+  // One-time migration: if a pre-encryption build left the OpenAI key as
+  // plaintext in config.json, re-encrypt it now that safeStorage is ready.
+  try {
+    const cfg = loadConfig();
+    if (cfg.openaiKey && !cfg.openaiKeyEnc && encryptionAvailable()) {
+      const res = persistOpenAiKey(cfg.openaiKey);
+      if (res.ok) log('openai key migrated: plaintext → encrypted');
+    }
+  } catch (err) {
+    console.warn('[startup] openai key migration skipped:', err.message);
+  }
 
   // Non-blocking mic permission: only prompt if status is not-determined.
   // askForMediaAccess blocks until the user interacts, so we never await it here.
@@ -842,7 +1074,7 @@ function findTranscribeHelper() {
 
 function postProcessingMode() {
   const cfg = loadConfig();
-  return cfg.mode || 'rules';
+  return cfg.mode || 'off';
 }
 
 function listWhisperKitModels() {
@@ -872,26 +1104,25 @@ function findWhisperKitModel() {
     if (fs.existsSync(explicit)) return explicit;
   }
 
-  // Default preference: speed-first. Users who want maximum accuracy
-  // override via cfg.whisperKitModel (checked above).
-  //
-  // Within each size tier the non-turbo (full, non-distilled) variant is
-  // ranked above its turbo equivalent — turbo distills decoder layers and
-  // regresses measurably on non-English languages (especially Korean).
+  // Default preference: large-v3-turbo first (the bundled default). Turbo
+  // distills decoder layers so it's ~2x faster with minimal accuracy loss
+  // on English; non-English (esp. Korean) is slightly weaker than full
+  // large-v3, so we still fall back to non-turbo if present. Small/base
+  // variants rank last since they exist only as a low-RAM escape hatch.
   const preferred = [
-    'openai_whisper-base',
-    'openai_whisper-small',
-    'openai_whisper-medium',
-    'openai_whisper-large-v3-v20240930_626MB',      // full, quantised (recommended "accurate")
-    'openai_whisper-large-v3-v20240930',
-    'openai_whisper-large-v3_947MB',
-    'openai_whisper-large-v3',
-    'openai_whisper-large-v3-v20240930_turbo_632MB', // distilled turbo
+    'openai_whisper-large-v3-v20240930_turbo_632MB', // bundled default (turbo)
     'openai_whisper-large-v3-v20240930_turbo',
     'openai_whisper-large-v3_turbo_954MB',
     'openai_whisper-large-v3_turbo',
     'openai_whisper-large-v2_turbo_955MB',
     'openai_whisper-large-v2_turbo',
+    'openai_whisper-large-v3-v20240930_626MB',       // full, quantised
+    'openai_whisper-large-v3-v20240930',
+    'openai_whisper-large-v3_947MB',
+    'openai_whisper-large-v3',
+    'openai_whisper-medium',
+    'openai_whisper-small',
+    'openai_whisper-base',
     'openai_whisper-tiny',
   ];
   for (const name of preferred) {
@@ -946,6 +1177,40 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
         }
       );
     });
+  }
+
+  // OpenAI Whisper API — cloud path. Uploads the WAV as multipart/form-data,
+  // receives plain-text transcript. Requires OPENAI_API_KEY in config or env.
+  if (engine === 'openai') {
+    const apiKey = currentOpenAiKey();
+    if (!apiKey) {
+      fs.unlink(tmpFile, () => {});
+      throw new Error('OpenAI API 키가 없습니다. 엔진 페이지에서 입력하거나 OPENAI_API_KEY 환경변수를 설정하세요.');
+    }
+    const model = currentOpenAiModel();
+    try {
+      const wav = await fs.promises.readFile(tmpFile);
+      const form = new FormData();
+      form.append('file', new Blob([wav], { type: 'audio/wav' }), 'audio.wav');
+      form.append('model', model);
+      if (lang && lang !== 'auto') form.append('language', lang);
+      form.append('response_format', 'text');
+
+      const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+      });
+      if (!res.ok) {
+        const detail = (await res.text()).slice(0, 500);
+        throw new Error(`OpenAI ${res.status}: ${detail}`);
+      }
+      // response_format=text returns the raw transcript (no JSON envelope).
+      const text = (await res.text()).trim();
+      return text;
+    } finally {
+      fs.unlink(tmpFile, () => {});
+    }
   }
 
   // Default: WhisperKit batch.
@@ -1111,6 +1376,20 @@ ipcMain.handle('history-list', (_e, limit) => loadHistory(typeof limit === 'numb
 ipcMain.handle('history-append', (_e, entry) => { appendHistory(entry || {}); return true; });
 ipcMain.handle('history-clear', () => { clearHistory(); return true; });
 
+ipcMain.handle('stats-get', () => {
+  const stats = loadStats();
+  ensureTodayBucket(stats);
+  // Expose the OpenAI rate table so the renderer can explain how cost was
+  // derived ("$0.006/min × 32s = $0.0032").
+  return { stats, openaiRatesPerMin: OPENAI_AUDIO_RATES_PER_MIN };
+});
+ipcMain.handle('stats-record-transcribe', (_e, payload) => recordTranscribeStat(payload || {}));
+ipcMain.handle('stats-record-ollama', (_e, payload) => recordOllamaStat(payload || {}));
+ipcMain.handle('stats-clear', () => {
+  try { fs.unlinkSync(statsPath()); } catch {}
+  return true;
+});
+
 ipcMain.handle('list-whisper-models', () => {
   const cfg = loadConfig();
   return {
@@ -1131,10 +1410,38 @@ ipcMain.handle('set-whisper-model', (_e, name) => {
 
 ipcMain.handle('set-engine', (_e, engine) => {
   const cfg = loadConfig();
-  cfg.engine = engine === 'apple' ? 'apple' : 'whisperkit';
+  const allowed = ['apple', 'whisper.cpp', 'openai', 'whisperkit'];
+  cfg.engine = allowed.includes(engine) ? engine : 'apple';
   saveConfig(cfg);
   respawnStream();
   return { ok: true, engine: cfg.engine };
+});
+
+ipcMain.handle('get-openai-key', () => {
+  // Return just a presence/source hint to the renderer, never the secret
+  // itself. The API key is used inside main.js only — exposing its value
+  // over IPC would let any compromised renderer exfiltrate it.
+  const cfg = loadConfig();
+  const fromEnv = Boolean((process.env.OPENAI_API_KEY || '').trim());
+  const hasKey = Boolean(currentOpenAiKey());
+  return {
+    hasKey,
+    fromEnv,
+    encrypted: Boolean(cfg.openaiKeyEnc),
+    legacyPlaintext: Boolean(cfg.openaiKey && !cfg.openaiKeyEnc),
+    encryptionAvailable: encryptionAvailable(),
+  };
+});
+
+ipcMain.handle('set-openai-key', (_e, key) => persistOpenAiKey(key));
+
+ipcMain.handle('get-openai-model', () => currentOpenAiModel());
+ipcMain.handle('set-openai-model', (_e, name) => {
+  const cfg = loadConfig();
+  if (OPENAI_MODELS.includes(name)) cfg.openaiModel = name;
+  else delete cfg.openaiModel;
+  saveConfig(cfg);
+  return { ok: true, model: currentOpenAiModel() };
 });
 
 ipcMain.handle('get-engine', () => currentEngine());
@@ -1193,11 +1500,11 @@ ipcMain.handle('get-language', () => {
 
 ipcMain.handle('get-mode', () => {
   const cfg = loadConfig();
-  return cfg.mode || 'rules';
+  return cfg.mode || 'off';
 });
 ipcMain.handle('set-mode', (_e, mode) => {
   const cfg = loadConfig();
-  cfg.mode = mode || 'rules';
+  cfg.mode = mode || 'off';
   saveConfig(cfg);
   return { ok: true };
 });
