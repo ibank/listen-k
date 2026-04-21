@@ -539,7 +539,11 @@ function startTranscribeStream() {
 
     if (transcribeStreamRestarts >= MAX_STREAM_RESTARTS) {
       console.error('[stream] max restarts reached, giving up');
-      if (mainWindow) {
+      // If the failing engine is Apple Speech (common in dev), fall back
+      // to WhisperKit automatically. Otherwise just tell the user.
+      if (currentEngine() === 'apple') {
+        autoFallbackFromAppleOnCrash();
+      } else if (mainWindow) {
         mainWindow.webContents.send('toast', '전사 엔진이 반복 종료됐습니다. 앱을 재시작해주세요.');
       }
       return;
@@ -1051,6 +1055,22 @@ function respawnStream() {
   }
   transcribeStreamRestarts = 0;
   transcribeStreamReady = false;
+  setTimeout(startTranscribeStream, 300);
+}
+
+function autoFallbackFromAppleOnCrash() {
+  // If Apple Speech engine is selected but its helper won't stay up (common
+  // case: running in dev mode from a parent process whose Info.plist lacks
+  // NSSpeechRecognitionUsageDescription) we silently flip back to
+  // WhisperKit so the user isn't stranded with no working engine.
+  const cfg = loadConfig();
+  if (cfg.engine !== 'apple') return;
+  cfg.engine = 'whisperkit';
+  saveConfig(cfg);
+  if (mainWindow) {
+    mainWindow.webContents.send('toast', 'Apple Speech 엔진 초기화 실패 — WhisperKit 으로 전환했습니다 (설치된 Listen K.app 에서만 Apple 엔진 정상 동작)');
+  }
+  transcribeStreamRestarts = 0;
   setTimeout(startTranscribeStream, 300);
 }
 

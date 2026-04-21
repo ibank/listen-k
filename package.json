@@ -4,6 +4,7 @@
   "description": "Listen K — AI voice dictation for macOS. Local Whisper + optional Ollama post-processing.",
   "main": "main.js",
   "scripts": {
+    "prestart": "bash scripts/patch-dev-electron-plist.sh",
     "start": "electron .",
     "icon": "node scripts/generate-icon.js",
     "build:helper": "bash scripts/build-helper.sh",
