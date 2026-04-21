@@ -66,6 +66,11 @@
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span data-i18n="sidebar.nav.post">Post-processing</span>
       </a>
+      <a href="#sec-ollama" class="nav-item" data-section="sec-ollama">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2C5 2 3.5 4 3.5 6.5c0 1.8 1 2.8 1 4 0 1.3-1 2-1 3 0 .8.7 1 1.5 1h8c.8 0 1.5-.2 1.5-1 0-1-1-1.7-1-3 0-1.2 1-2.2 1-4C12.5 4 11 2 8 2z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="6" cy="7" r="0.8" fill="currentColor"/><circle cx="10" cy="7" r="0.8" fill="currentColor"/></svg>
+        <span data-i18n="sidebar.nav.ollama">Ollama models</span>
+        <span class="nav-count" id="navCountOllama" hidden></span>
+      </a>
 
       <div class="nav-group-label" data-i18n="sidebar.group.help">Help</div>
       <a href="#sec-usage" class="nav-item" data-section="sec-usage">
@@ -349,6 +354,41 @@
               </select>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="card page" id="sec-ollama" hidden>
+        <div class="card-head">
+          <div>
+            <h2 data-i18n="page.ollama.title">Ollama models</h2>
+            <div class="card-head-sub" id="ollamaDiskUsage" data-i18n="page.ollama.sub">Manage post-processing models</div>
+          </div>
+        </div>
+
+        <!-- Status banner when Ollama isn't running -->
+        <div class="ollama-empty" id="ollamaEmpty" hidden>
+          <div class="ollama-empty-title" data-i18n="page.ollama.notRunningTitle">Ollama isn't running</div>
+          <div class="ollama-empty-desc" data-i18n="page.ollama.notRunningDesc">
+            Start it with <code>brew services start ollama</code> or run <code>ollama serve</code>.
+          </div>
+        </div>
+
+        <!-- Installed models list -->
+        <div class="fields" id="ollamaInstalledBox">
+          <div class="fields-head">
+            <h3 data-i18n="page.ollama.installedTitle">Installed</h3>
+            <span class="card-head-sub" id="ollamaInstalledSub"></span>
+          </div>
+          <div id="ollamaInstalledList"></div>
+        </div>
+
+        <!-- Curated recommended list — install in-app -->
+        <div class="fields" id="ollamaRecommendedBox">
+          <div class="fields-head">
+            <h3 data-i18n="page.ollama.recommendedTitle">Recommended</h3>
+            <span class="card-head-sub" data-i18n="page.ollama.recommendedSub">Tuned for post-processing transcripts</span>
+          </div>
+          <div id="ollamaRecommendedList"></div>
         </div>
       </section>
 

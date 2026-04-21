@@ -1138,6 +1138,115 @@ function checkOllama() {
   });
 }
 
+// Full list with size/modified timestamp — used by the model-manager
+// page so we can render disk usage and "last used" hints.
+async function ollamaListDetailed() {
+  try {
+    const res = await fetch('http://localhost:11434/api/tags');
+    if (!res.ok) return { running: false, models: [] };
+    const json = await res.json();
+    const models = (json.models || []).map((m) => ({
+      name: m.name,
+      size: m.size || 0, // bytes
+      modifiedAt: m.modified_at || null,
+      digest: m.digest || null,
+    }));
+    return { running: true, models };
+  } catch {
+    return { running: false, models: [] };
+  }
+}
+
+// Pulls a model, streaming progress updates to the caller. Returns an
+// AbortController-style { cancel } handle so the renderer can abandon a
+// long download without leaking the request. Progress shape mirrors
+// Ollama's JSON lines: { status, completed, total }.
+const activeOllamaPulls = new Map(); // name → AbortController
+async function ollamaPullModel(name, onProgress) {
+  if (!name) throw new Error('name required');
+  const controller = new AbortController();
+  activeOllamaPulls.set(name, controller);
+  let res;
+  try {
+    res = await fetch('http://localhost:11434/api/pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, stream: true }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    activeOllamaPulls.delete(name);
+    throw err;
+  }
+  if (!res.ok) {
+    activeOllamaPulls.delete(name);
+    throw new Error(`ollama pull ${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const chunk = JSON.parse(trimmed);
+          onProgress?.(chunk);
+        } catch {}
+      }
+    }
+    return { ok: true };
+  } finally {
+    activeOllamaPulls.delete(name);
+  }
+}
+
+async function ollamaDeleteModel(name) {
+  const res = await fetch('http://localhost:11434/api/delete', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok && res.status !== 404) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`ollama delete ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  return { ok: true };
+}
+
+ipcMain.handle('ollama-list', () => ollamaListDetailed());
+
+ipcMain.handle('ollama-pull', async (event, name) => {
+  try {
+    await ollamaPullModel(name, (chunk) => {
+      // Stream chunks back to whichever renderer started the pull so it
+      // can paint a progress bar in real time.
+      try { event.sender.send('ollama-pull-progress', { name, chunk }); } catch {}
+    });
+    return { ok: true };
+  } catch (err) {
+    if (err.name === 'AbortError') return { ok: false, aborted: true };
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('ollama-pull-cancel', (_e, name) => {
+  const ctrl = activeOllamaPulls.get(name);
+  if (ctrl) { ctrl.abort(); return { ok: true }; }
+  return { ok: false };
+});
+
+ipcMain.handle('ollama-delete', async (_e, name) => {
+  try { await ollamaDeleteModel(name); return { ok: true }; }
+  catch (err) { return { ok: false, error: err.message }; }
+});
+
 function isSetupComplete(s) {
   const hasEngine = (s.transcribeHelper && s.whisperKitModel) || (s.whisperBin && s.whisperModel);
   return (

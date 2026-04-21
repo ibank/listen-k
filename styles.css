@@ -1152,6 +1152,10 @@ button.primary:hover {
   border-radius: var(--r-lg);
   overflow: hidden;
 }
+/* Pages that stack two field-group boxes back-to-back (Ollama: installed
+   + recommended) need vertical breathing room between them. Targeted
+   sibling selector so single-group pages stay untouched. */
+.fields + .fields { margin-top: var(--space-4); }
 
 .field-row {
   display: flex;
@@ -1251,6 +1255,150 @@ button.primary:hover {
   color: #fff;
 }
 .seg button.active:hover { color: #fff; }
+
+/* ========== Ollama model manager ========== */
+
+.ollama-empty {
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+  background: var(--warn-soft);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-radius: var(--r-md);
+  color: var(--warn);
+}
+.ollama-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ollama-empty-desc {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+.ollama-empty-desc code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  background: var(--bg-3);
+  border-radius: 4px;
+  color: var(--text-1);
+}
+
+.ollama-model {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-hairline);
+}
+.ollama-model:last-child { border-bottom: none; }
+.ollama-model .ico {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, #475569, #334155);
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+.ollama-model[data-kind='gemma'] .ico  { background: linear-gradient(135deg, #5b8dff, #4a6dd8); color: #fff; }
+.ollama-model[data-kind='llama'] .ico  { background: linear-gradient(135deg, #b367ff, #8f4ede); color: #fff; }
+.ollama-model[data-kind='qwen']  .ico  { background: linear-gradient(135deg, #2b7efe, #0a66ff); color: #fff; }
+.ollama-model[data-kind='mistral'] .ico { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
+.ollama-model[data-kind='phi']   .ico  { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+.ollama-model .info { flex: 1; min-width: 0; }
+.ollama-model .n {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.005em;
+}
+.ollama-model .used-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+}
+.ollama-model .meta {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 2px;
+  display: flex;
+  gap: 10px;
+  font-family: var(--font-mono);
+}
+.ollama-model .meta .size { color: var(--text-2); }
+.ollama-model-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.ollama-model-actions .btn-xs {
+  -webkit-app-region: no-drag;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-3);
+  color: var(--text-2);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+.ollama-model-actions .btn-xs:hover {
+  background: var(--bg-4);
+  color: var(--text-1);
+  border-color: var(--border-soft);
+}
+.ollama-model-actions .btn-xs.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+.ollama-model-actions .btn-xs.primary:hover { background: var(--accent-hover); }
+.ollama-model-actions .btn-xs.danger:hover {
+  color: var(--err);
+  border-color: var(--err);
+}
+
+/* Download progress bar — streamed from /api/pull, updated via IPC. */
+.ollama-progress {
+  flex-shrink: 0;
+  width: 120px;
+  height: 5px;
+  background: var(--bg-3);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.ollama-progress .bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #b367ff);
+  border-radius: inherit;
+  transition: width 220ms ease-out;
+}
+.ollama-progress-label {
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  min-width: 48px;
+  text-align: right;
+}
 
 /* ========== Usage page ========== */
 

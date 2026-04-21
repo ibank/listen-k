@@ -84,6 +84,15 @@ function setStatus(text, kind = '') {
   statusEl.dataset.kind = kind;
 }
 
+// Engine readiness — updated on every status poll. When the engine is
+// loaded and idle, the chip reads "준비됨" (Ready) in green instead of
+// the neutral "대기" (Idle) so users see the app is warm at a glance.
+let engineIsReady = false;
+function setStatusIdleOrReady() {
+  if (engineIsReady) setStatus(t('status.ready'), 'ok');
+  else setStatus(t('status.idle'), '');
+}
+
 function toast(msg, ms = 1500) {
   toastEl.textContent = msg;
   toastEl.hidden = false;
@@ -216,7 +225,7 @@ async function cancelRecord() {
   pcmChunks = [];
   setStatus(t('status.cancelled'));
   window.listenk?.setState?.({ recording: false, processing: false });
-  setTimeout(() => setStatus(t('status.idle')), 1200);
+  setTimeout(() => setStatusIdleOrReady(), 1200);
 }
 
 function cleanWhisperOutput(text) {
@@ -335,7 +344,7 @@ async function finalizePaste(cleanedText) {
   // Flash the HUD's "done" state for a beat on success; cancel/error paths
   // just hide via setState without the green checkmark.
   window.listenk?.setState?.({ recording: false, processing: false, pasted });
-  setTimeout(() => setStatus(t('status.idle')), 1500);
+  setTimeout(() => setStatusIdleOrReady(), 1500);
 }
 
 async function postProcessAndPaste(raw) {
@@ -498,7 +507,7 @@ window.listenk?.onCancelRecord?.(() => {
     rawEl.textContent = t('misc.cancelled');
     setStatus(t('status.cancelled'));
     window.listenk?.setState?.({ recording: false, processing: false });
-    setTimeout(() => setStatus(t('status.idle')), 1200);
+    setTimeout(() => setStatusIdleOrReady(), 1200);
     return;
   }
   cancelRecord();
@@ -529,7 +538,7 @@ window.listenk?.onStreamFinal?.(async (text) => {
   if (!finalText) {
     setStatus(t('status.noSpeech'), 'error');
     window.listenk?.setState?.({ recording: false, processing: false });
-    setTimeout(() => setStatus(t('status.idle')), 1200);
+    setTimeout(() => setStatusIdleOrReady(), 1200);
     return;
   }
 
@@ -887,6 +896,22 @@ async function refresh() {
       } else if (status.engine === 'whisperkit' && !firstRunBanner.dataset.dismissed) {
         showFirstRunBanner();
       }
+    }
+
+    // Track engine readiness so the titlebar status chip can flip from
+    // "대기" (grey) to "준비됨" (green) as soon as the stream helper or
+    // the batch engine becomes usable.
+    const batchEngines = ['whisper.cpp', 'openai'];
+    const isBatch = batchEngines.includes(status.selectedEngine);
+    const wasReady = engineIsReady;
+    engineIsReady = status.engine !== 'none' && (Boolean(status.streamReady) || isBatch);
+    // Repaint the chip only when the state actually changed AND we're
+    // currently in an idle/ready state (no recording/processing flash on
+    // screen we'd clobber).
+    const currentKind = statusEl.dataset.kind || '';
+    if (wasReady !== engineIsReady && !recording && !streamingActive
+        && (currentKind === '' || currentKind === 'ok')) {
+      setStatusIdleOrReady();
     }
 
     const fp = JSON.stringify(status);
@@ -1446,6 +1471,279 @@ async function refreshKpiTiles() {
     el.querySelector('.kpi-detail').textContent = tile.detail;
     kpiTilesEl.appendChild(el);
   }
+}
+
+// ======================== Ollama model manager ========================
+//
+// Separate page with an "Installed" list (live from /api/tags) and a
+// curated "Recommended" list the user can install in-app. Pull progress
+// streams over IPC; deletes prompt for confirmation. The existing Ollama
+// dropdown on the post-processing page stays in sync because it reads
+// from the same /api/tags endpoint each refresh cycle.
+
+const OLLAMA_RECOMMENDED = [
+  { name: 'gemma3:4b',    size: '3.2 GB', note: 'noteDefault',     kind: 'gemma' },
+  { name: 'gemma3:12b',   size: '8.1 GB', note: 'noteHighQuality', kind: 'gemma' },
+  { name: 'llama3.2:3b',  size: '2.0 GB', note: 'noteFast',        kind: 'llama' },
+  { name: 'qwen2.5:7b',   size: '4.7 GB', note: 'noteMultilingual',kind: 'qwen' },
+  { name: 'mistral:7b',   size: '4.4 GB', note: 'noteBalanced',    kind: 'mistral' },
+];
+
+function fmtBytes(n) {
+  const v = Number(n) || 0;
+  if (v === 0) return '—';
+  if (v < 1024) return `${v} B`;
+  if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+  if (v < 1024 * 1024 * 1024) return `${(v / 1024 / 1024).toFixed(1)} MB`;
+  return `${(v / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function ollamaKind(name) {
+  const n = String(name || '').toLowerCase();
+  if (n.startsWith('gemma'))  return 'gemma';
+  if (n.startsWith('llama'))  return 'llama';
+  if (n.startsWith('qwen'))   return 'qwen';
+  if (n.startsWith('mistral'))return 'mistral';
+  if (n.startsWith('phi'))    return 'phi';
+  return '';
+}
+
+function ollamaIcoInitials(name) {
+  const n = String(name || '').replace(/:.*$/, '');
+  const m = n.match(/([a-z]+)(\d+)?/i);
+  if (!m) return n.slice(0, 2).toUpperCase();
+  const letter = m[1].slice(0, 1).toUpperCase();
+  const num = m[2] || '';
+  return letter + (num || '').slice(0, 1);
+}
+
+// Tracks in-flight pulls so we can show progress bars and cancel mid-way.
+const ollamaPulling = new Map(); // name → { total, completed, status }
+window.listenk?.onOllamaPullProgress?.((payload) => {
+  if (!payload || !payload.name) return;
+  const prev = ollamaPulling.get(payload.name) || {};
+  const chunk = payload.chunk || {};
+  const next = {
+    status: chunk.status || prev.status || '…',
+    completed: chunk.completed ?? prev.completed ?? 0,
+    total: chunk.total ?? prev.total ?? 0,
+  };
+  ollamaPulling.set(payload.name, next);
+  // Throttle render via RAF so rapid chunks don't thrash layout.
+  if (!ollamaPullingRafPending) {
+    ollamaPullingRafPending = true;
+    requestAnimationFrame(() => {
+      ollamaPullingRafPending = false;
+      refreshOllamaPage({ skipListFetch: true });
+    });
+  }
+});
+let ollamaPullingRafPending = false;
+
+function buildOllamaRow({ name, sizeText, kind, badgeKey, meta, actions, progress }) {
+  const row = document.createElement('div');
+  row.className = 'ollama-model';
+  if (kind) row.setAttribute('data-kind', kind);
+  row.innerHTML = `
+    <div class="ico"></div>
+    <div class="info">
+      <div class="n"></div>
+      <div class="meta"></div>
+    </div>
+  `;
+  row.querySelector('.ico').textContent = ollamaIcoInitials(name);
+  const nameEl = row.querySelector('.n');
+  nameEl.textContent = name;
+  if (badgeKey) {
+    const badge = document.createElement('span');
+    badge.className = 'used-badge';
+    badge.textContent = t(badgeKey);
+    nameEl.appendChild(badge);
+  }
+  const metaEl = row.querySelector('.meta');
+  (meta || []).forEach((m) => {
+    const s = document.createElement('span');
+    if (m.cls) s.className = m.cls;
+    s.textContent = m.text;
+    metaEl.appendChild(s);
+  });
+
+  if (progress) {
+    const barWrap = document.createElement('div');
+    barWrap.className = 'ollama-progress';
+    barWrap.innerHTML = `<div class="bar" style="width: ${Math.max(3, progress.pct)}%"></div>`;
+    row.appendChild(barWrap);
+    const pctLabel = document.createElement('div');
+    pctLabel.className = 'ollama-progress-label';
+    pctLabel.textContent = progress.label;
+    row.appendChild(pctLabel);
+  }
+
+  if (actions && actions.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'ollama-model-actions';
+    actions.forEach((a) => {
+      const btn = document.createElement('button');
+      btn.className = 'btn-xs' + (a.primary ? ' primary' : '') + (a.danger ? ' danger' : '');
+      btn.textContent = a.label;
+      btn.addEventListener('click', a.onClick);
+      wrap.appendChild(btn);
+    });
+    row.appendChild(wrap);
+  }
+  return row;
+}
+
+async function refreshOllamaPage(opts = {}) {
+  const installedList = $('ollamaInstalledList');
+  const recommendedList = $('ollamaRecommendedList');
+  const emptyEl = $('ollamaEmpty');
+  const diskEl = $('ollamaDiskUsage');
+  const installedSubEl = $('ollamaInstalledSub');
+  const installedBox = $('ollamaInstalledBox');
+  const recommendedBox = $('ollamaRecommendedBox');
+  const navCountEl = $('navCountOllama');
+  if (!installedList || !recommendedList) return;
+
+  // Only re-fetch on demand — progress-tick renders reuse the last list.
+  if (!opts.skipListFetch || !refreshOllamaPage._last) {
+    refreshOllamaPage._last = await window.listenk?.ollamaList?.();
+  }
+  const data = refreshOllamaPage._last || { running: false, models: [] };
+  const running = Boolean(data.running);
+  if (emptyEl) emptyEl.hidden = running;
+  if (installedBox) installedBox.hidden = !running;
+
+  const installed = data.models || [];
+  const totalBytes = installed.reduce((s, m) => s + (m.size || 0), 0);
+  const activeModel = modelInput?.value || savedOllamaModel || '';
+
+  if (diskEl) {
+    diskEl.textContent = running
+      ? t('page.ollama.diskUsage', { size: fmtBytes(totalBytes), n: installed.length })
+      : t('page.ollama.sub');
+  }
+  if (installedSubEl) {
+    installedSubEl.textContent = running ? t('page.ollama.installedSub', { n: installed.length }) : '';
+  }
+  if (navCountEl) {
+    if (running && installed.length > 0) {
+      navCountEl.textContent = String(installed.length);
+      navCountEl.hidden = false;
+    } else {
+      navCountEl.hidden = true;
+    }
+  }
+
+  // ── Installed list ──
+  installedList.innerHTML = '';
+  if (running && installed.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'history-empty';
+    empty.textContent = t('page.ollama.emptyInstalled');
+    installedList.appendChild(empty);
+  }
+  installed.forEach((m) => {
+    const isActive = m.name === activeModel;
+    const meta = [
+      { text: fmtBytes(m.size), cls: 'size' },
+    ];
+    if (m.modifiedAt) {
+      const d = new Date(m.modifiedAt);
+      if (!Number.isNaN(d.valueOf())) {
+        meta.push({ text: d.toLocaleDateString() });
+      }
+    }
+    const actions = [];
+    if (!isActive) {
+      actions.push({
+        label: t('page.ollama.switch'),
+        primary: true,
+        onClick: async () => {
+          if (!modelInput) return;
+          savedOllamaModel = m.name;
+          await window.listenk?.setOllamaModel?.(m.name);
+          // Keep the post-processing dropdown in sync so both pages agree.
+          const opt = Array.from(modelInput.options).find((o) => o.value === m.name);
+          if (opt) modelInput.value = m.name;
+          toast(t('toast.ollamaModel', { label: m.name }));
+          refreshOllamaPage();
+        },
+      });
+    }
+    actions.push({
+      label: t('page.ollama.delete'),
+      danger: true,
+      onClick: async () => {
+        if (!confirm(t('page.ollama.confirmDelete', { name: m.name }))) return;
+        const res = await window.listenk?.ollamaDelete?.(m.name);
+        if (res?.ok) {
+          toast(t('page.ollama.deleted', { name: m.name }));
+          refreshOllamaPage();
+        } else {
+          toast(t('page.ollama.deleteFail', { message: res?.error || '?' }));
+        }
+      },
+    });
+
+    installedList.appendChild(buildOllamaRow({
+      name: m.name,
+      kind: ollamaKind(m.name),
+      badgeKey: isActive ? 'page.ollama.inUse' : null,
+      meta,
+      actions,
+    }));
+  });
+
+  // ── Recommended list (filter out already installed) ──
+  recommendedList.innerHTML = '';
+  const installedNames = new Set(installed.map((m) => m.name));
+  const notInstalled = OLLAMA_RECOMMENDED.filter((r) => !installedNames.has(r.name));
+  if (recommendedBox) recommendedBox.hidden = !running || notInstalled.length === 0;
+  notInstalled.forEach((spec) => {
+    const pull = ollamaPulling.get(spec.name);
+    if (pull) {
+      const total = pull.total || 0;
+      const completed = pull.completed || 0;
+      const pct = total > 0 ? Math.min(99, Math.round((completed / total) * 100)) : 3;
+      recommendedList.appendChild(buildOllamaRow({
+        name: spec.name,
+        kind: spec.kind,
+        meta: [
+          { text: spec.size, cls: 'size' },
+          { text: pull.status || '…' },
+        ],
+        progress: { pct, label: total > 0 ? `${pct}%` : '…' },
+        actions: [{
+          label: t('page.ollama.cancel'),
+          onClick: () => window.listenk?.ollamaPullCancel?.(spec.name),
+        }],
+      }));
+      return;
+    }
+    recommendedList.appendChild(buildOllamaRow({
+      name: spec.name,
+      kind: spec.kind,
+      meta: [
+        { text: spec.size, cls: 'size' },
+        { text: t(`page.ollama.${spec.note}`) },
+      ],
+      actions: [{
+        label: t('page.ollama.install'),
+        primary: true,
+        onClick: async () => {
+          ollamaPulling.set(spec.name, { status: t('page.ollama.starting'), total: 0, completed: 0 });
+          refreshOllamaPage({ skipListFetch: true });
+          const res = await window.listenk?.ollamaPull?.(spec.name);
+          ollamaPulling.delete(spec.name);
+          if (res?.ok) toast(t('page.ollama.installed', { name: spec.name }));
+          else if (res?.aborted) toast(t('page.ollama.cancelled'));
+          else toast(t('page.ollama.installFail', { message: res?.error || '?' }));
+          refreshOllamaPage();
+        },
+      }],
+    }));
+  });
 }
 
 // History count badge in the sidebar. Hidden until we have a count to show.
@@ -2208,13 +2506,18 @@ wireSidebarNavigation();
   // user's configured hotkey in step 3. It's a no-op if onboardingDone is
   // already true in config.
   maybeShowOnboarding();
+  // Initial chip paint — refresh() will upgrade it to "준비됨" when the
+  // stream helper reports ready. This just avoids showing a blank chip.
+  setStatusIdleOrReady();
   refresh();
   refreshNavCounts();
+  refreshOllamaPage();
   setInterval(() => {
     refresh();
     refreshStats();
     refreshStatsCharts();
     refreshKpiTiles();
     refreshNavCounts();
+    refreshOllamaPage();
   }, 4000);
 })();
