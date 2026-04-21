@@ -898,29 +898,6 @@ refreshBtn?.addEventListener('click', () => {
   refresh();
   refreshHistory();
 });
-modeSel?.addEventListener('change', () => {
-  lastStatusFingerprint = '';
-  refresh();
-});
-
-langSel?.addEventListener('change', () => {
-  window.listenk?.setLanguage?.(langSel.value);
-  toast(`언어: ${langSel.options[langSel.selectedIndex].textContent}`);
-});
-if (langSel) window.listenk?.setLanguage?.(langSel.value);
-
-(async () => {
-  try {
-    const enabled = await window.listenk?.getStreaming?.();
-    if (streamingSel) streamingSel.value = enabled === false ? 'off' : 'on';
-  } catch {}
-})();
-
-streamingSel?.addEventListener('change', async () => {
-  const enabled = streamingSel.value === 'on';
-  await window.listenk?.setStreaming?.(enabled);
-  toast(`실시간 표시: ${enabled ? '켜짐' : '꺼짐'}`);
-});
 
 function applyModeVisibility(mode) {
   document.querySelectorAll('[data-mode-only]').forEach((el) => {
@@ -929,17 +906,9 @@ function applyModeVisibility(mode) {
   });
 }
 
-modeSel?.addEventListener('change', () => applyModeVisibility(modeSel.value));
-applyModeVisibility(modeSel?.value || 'rules');
-
 // ---- Ollama model dropdown population + persistence ----
 
 let savedOllamaModel = '';
-(async () => {
-  try {
-    savedOllamaModel = (await window.listenk?.getOllamaModel?.()) || '';
-  } catch {}
-})();
 
 function populateOllamaModels(models) {
   if (!modelInput) return;
@@ -969,61 +938,11 @@ function populateOllamaModels(models) {
   modelInput.value = candidate || list[0];
 }
 
-modelInput?.addEventListener('change', async () => {
-  if (!modelInput.value) return;
-  savedOllamaModel = modelInput.value;
-  try { await window.listenk?.setOllamaModel?.(savedOllamaModel); } catch {}
-  toast(`Ollama 모델: ${savedOllamaModel}`);
-});
-
 function applyEngineVisibility(engine) {
   document.querySelectorAll('[data-engine-only]').forEach((el) => {
     el.style.display = el.dataset.engineOnly === engine ? '' : 'none';
   });
 }
-
-(async () => {
-  try {
-    const engine = await window.listenk?.getEngine?.();
-    if (engine && engineSel) engineSel.value = engine;
-    applyEngineVisibility(engine || 'whisperkit');
-  } catch {}
-
-  if (whisperModelSel) {
-    try {
-      const info = await window.listenk?.listWhisperModels?.();
-      if (info) {
-        while (whisperModelSel.options.length > 1) whisperModelSel.remove(1);
-        for (const name of info.available) {
-          const opt = document.createElement('option');
-          opt.value = name;
-          opt.textContent = name;
-          whisperModelSel.appendChild(opt);
-        }
-        whisperModelSel.value = info.selected || '';
-      }
-    } catch (err) {
-      console.warn('[whisper-model] list failed', err);
-    }
-  }
-})();
-
-engineSel?.addEventListener('change', async () => {
-  const engine = engineSel.value;
-  await window.listenk?.setEngine?.(engine);
-  applyEngineVisibility(engine);
-  toast(engine === 'apple' ? '엔진: Apple Speech (재로딩 중)' : '엔진: WhisperKit (재로딩 중)');
-  lastStatusFingerprint = '';
-  setTimeout(refresh, 500);
-});
-
-whisperModelSel?.addEventListener('change', async () => {
-  const name = whisperModelSel.value;
-  await window.listenk?.setWhisperModel?.(name);
-  toast(name ? `모델: ${name} (재로딩 중)` : '자동 선택 (재로딩 중)');
-  lastStatusFingerprint = '';
-  setTimeout(refresh, 500);
-});
 
 const HOTKEY_LABELS = {
   'ropt-double': '⌥⌥',
@@ -1042,20 +961,73 @@ function applyHotkeyHint(mode) {
   hintEls.forEach((el) => { el.textContent = label; });
 }
 
-(async () => {
-  try {
-    const current = await window.listenk.getHotkey();
-    if (current && hotkeySel) hotkeySel.value = current;
-    applyHotkeyHint(current);
-  } catch (err) {
-    console.warn('[hotkey] load failed', err);
+// ---------- Bootstrap ----------
+//
+// Restore every persisted setting BEFORE wiring up change listeners, so
+// the act of painting the default DOM value never races the saved
+// config and overwrites it. Each change listener in turn writes its own
+// field back through an IPC setter.
+
+const api = window.listenk;
+let settingsReady = false;
+
+async function restoreSettings() {
+  if (!api) return;
+
+  const safe = async (fn) => { try { return await fn(); } catch { return null; } };
+  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels] = await Promise.all([
+    safe(() => api.getHotkey?.()),
+    safe(() => api.getLanguage?.()),
+    safe(() => api.getStreaming?.()),
+    safe(() => api.getEngine?.()),
+    safe(() => api.getMode?.()),
+    safe(() => api.getTone?.()),
+    safe(() => api.getTranslateTarget?.()),
+    safe(() => api.getOllamaModel?.()),
+    safe(() => api.listWhisperModels?.()),
+  ]);
+
+  if (hotkey && hotkeySel) hotkeySel.value = hotkey;
+  applyHotkeyHint(hotkey || 'rshift-double');
+
+  if (language && langSel) langSel.value = language;
+
+  if (streamingSel) streamingSel.value = streaming === false ? 'off' : 'on';
+
+  if (engine && engineSel) engineSel.value = engine;
+  applyEngineVisibility(engine || 'whisperkit');
+
+  if (mode && modeSel) modeSel.value = mode;
+  applyModeVisibility(modeSel?.value || 'rules');
+
+  if (tone && toneSel) toneSel.value = tone;
+
+  if (translateTarget && translateTargetSel) translateTargetSel.value = translateTarget;
+
+  if (ollamaModel) savedOllamaModel = ollamaModel;
+
+  if (whisperModelSel && wkModels) {
+    while (whisperModelSel.options.length > 1) whisperModelSel.remove(1);
+    for (const name of wkModels.available || []) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      whisperModelSel.appendChild(opt);
+    }
+    whisperModelSel.value = wkModels.selected || '';
   }
-})();
+
+  settingsReady = true;
+}
+
+// Each setter guard: only write once `settingsReady` is true, so the
+// initial DOM defaults never clobber the restored config values.
 
 hotkeySel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
   const mode = hotkeySel.value;
   try {
-    const res = await window.listenk.setHotkey(mode);
+    const res = await api.setHotkey(mode);
     if (res?.ok) {
       const label = hotkeySel.options[hotkeySel.selectedIndex].textContent;
       toast(`단축키: ${label}`);
@@ -1069,5 +1041,67 @@ hotkeySel?.addEventListener('change', async () => {
   }
 });
 
-refresh();
-setInterval(refresh, 4000);
+langSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  await api.setLanguage?.(langSel.value);
+  toast(`언어: ${langSel.options[langSel.selectedIndex].textContent}`);
+});
+
+streamingSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  const enabled = streamingSel.value === 'on';
+  await api.setStreaming?.(enabled);
+  toast(`실시간 표시: ${enabled ? '켜짐' : '꺼짐'}`);
+});
+
+modeSel?.addEventListener('change', async () => {
+  applyModeVisibility(modeSel.value);
+  if (!settingsReady) return;
+  await api.setMode?.(modeSel.value);
+  lastStatusFingerprint = '';
+  refresh();
+});
+
+toneSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  await api.setTone?.(toneSel.value);
+});
+
+translateTargetSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  await api.setTranslateTarget?.(translateTargetSel.value);
+  toast(`번역 대상: ${translateTargetSel.options[translateTargetSel.selectedIndex].textContent}`);
+});
+
+engineSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  const engine = engineSel.value;
+  await api.setEngine?.(engine);
+  applyEngineVisibility(engine);
+  toast(engine === 'apple' ? '엔진: Apple Speech (재로딩 중)' : '엔진: WhisperKit (재로딩 중)');
+  lastStatusFingerprint = '';
+  setTimeout(refresh, 500);
+});
+
+whisperModelSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  const name = whisperModelSel.value;
+  await api.setWhisperModel?.(name);
+  toast(name ? `모델: ${name} (재로딩 중)` : '자동 선택 (재로딩 중)');
+  lastStatusFingerprint = '';
+  setTimeout(refresh, 500);
+});
+
+modelInput?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  if (!modelInput.value) return;
+  savedOllamaModel = modelInput.value;
+  await api.setOllamaModel?.(savedOllamaModel);
+  toast(`Ollama 모델: ${savedOllamaModel}`);
+});
+
+(async () => {
+  await restoreSettings();
+  refresh();
+  setInterval(refresh, 4000);
+})();

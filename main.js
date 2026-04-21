@@ -1186,6 +1186,44 @@ ipcMain.handle('set-language', (_e, lang) => {
   return { ok: true };
 });
 
+ipcMain.handle('get-language', () => {
+  const cfg = loadConfig();
+  return cfg.language || 'ko-KR';
+});
+
+ipcMain.handle('get-mode', () => {
+  const cfg = loadConfig();
+  return cfg.mode || 'rules';
+});
+ipcMain.handle('set-mode', (_e, mode) => {
+  const cfg = loadConfig();
+  cfg.mode = mode || 'rules';
+  saveConfig(cfg);
+  return { ok: true };
+});
+
+ipcMain.handle('get-tone', () => {
+  const cfg = loadConfig();
+  return cfg.tone || 'neutral';
+});
+ipcMain.handle('set-tone', (_e, tone) => {
+  const cfg = loadConfig();
+  cfg.tone = tone || 'neutral';
+  saveConfig(cfg);
+  return { ok: true };
+});
+
+ipcMain.handle('get-translate-target', () => {
+  const cfg = loadConfig();
+  return cfg.translateTarget || 'English';
+});
+ipcMain.handle('set-translate-target', (_e, target) => {
+  const cfg = loadConfig();
+  cfg.translateTarget = target || 'English';
+  saveConfig(cfg);
+  return { ok: true };
+});
+
 ipcMain.handle('set-streaming', (_e, enabled) => {
   const cfg = loadConfig();
   cfg.streaming = !!enabled;
