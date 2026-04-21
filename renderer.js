@@ -77,7 +77,10 @@ let recording = false;
 let finalTranscript = '';
 
 function setStatus(text, kind = '') {
-  statusEl.textContent = text;
+  // The titlebar status chip has an LED child + a text child — target the
+  // text node specifically so we don't clobber the LED dot.
+  const txt = statusEl.querySelector('.status-text') || statusEl;
+  txt.textContent = text;
   statusEl.dataset.kind = kind;
 }
 
@@ -134,7 +137,7 @@ async function startRecognition() {
 
   recording = true;
   markTranscribeStart();
-  setStatus(t('status.recording'));
+  setStatus(t('status.recording'), 'rec');
   window.listenk?.setState?.({ recording: true, processing: false });
 }
 
@@ -329,7 +332,9 @@ async function finalizePaste(cleanedText) {
     } catch {}
   }
 
-  window.listenk?.setState?.({ recording: false, processing: false });
+  // Flash the HUD's "done" state for a beat on success; cancel/error paths
+  // just hide via setState without the green checkmark.
+  window.listenk?.setState?.({ recording: false, processing: false, pasted });
   setTimeout(() => setStatus(t('status.idle')), 1500);
 }
 
@@ -503,7 +508,7 @@ window.listenk?.onStreamPartial?.((text) => {
   if (!streamingActive) markTranscribeStart();
   streamingActive = true;
   latestPartial = text || '';
-  setStatus(t('status.listening'));
+  setStatus(t('status.listening'), 'rec');
   showRecent();
   rawEl.textContent = latestPartial;
   // If the helper is producing partials, it's alive — banner is stale.
@@ -914,10 +919,14 @@ function formatHistoryTimestamp(iso) {
   }
 }
 
-function buildHistoryRow(entry) {
+function buildHistoryRow(entry, highlightTerm) {
   const row = document.createElement('div');
   row.className = 'history-item';
+  const mode = entry.mode || 'off';
+  const modeLetter = { off: 'R', rules: 'F', ollama: 'O', translate: 'T' }[mode] || mode.charAt(0).toUpperCase();
+  const modeLabel = t(`field.mode.${mode}`) || mode;
   row.innerHTML = `
+    <div class="hist-avatar" data-mode="${mode}">${modeLetter}</div>
     <div class="history-body">
       <div class="history-text"></div>
       <div class="history-meta"></div>
@@ -927,14 +936,28 @@ function buildHistoryRow(entry) {
       <button class="ghost" data-action="paste"></button>
     </div>
   `;
-  row.querySelector('.history-text').textContent = entry.clean || entry.raw || '';
-  const meta = [
-    formatHistoryTimestamp(entry.at),
-    entry.mode || '',
-    entry.language || '',
-    entry.pasted === false ? t('history.notPasted') : '',
-  ].filter(Boolean).join(' · ');
-  row.querySelector('.history-meta').textContent = meta;
+  const text = entry.clean || entry.raw || '';
+  const textEl = row.querySelector('.history-text');
+  if (highlightTerm) {
+    textEl.innerHTML = highlightQuery(text, highlightTerm);
+  } else {
+    textEl.textContent = text;
+  }
+  const metaEl = row.querySelector('.history-meta');
+  metaEl.textContent = '';
+  const timestampSpan = document.createElement('span');
+  timestampSpan.textContent = formatHistoryTimestamp(entry.at);
+  metaEl.appendChild(timestampSpan);
+  const modeChip = document.createElement('span');
+  modeChip.className = 'hist-mode-chip';
+  modeChip.textContent = modeLabel + (entry.language ? ' · ' + entry.language : '');
+  metaEl.appendChild(modeChip);
+  if (entry.pasted === false) {
+    const notPastedSpan = document.createElement('span');
+    notPastedSpan.style.color = 'var(--err)';
+    notPastedSpan.textContent = t('history.notPasted');
+    metaEl.appendChild(notPastedSpan);
+  }
   row.querySelector('[data-action="copy"]').textContent = t('history.copy');
   row.querySelector('[data-action="paste"]').textContent = t('history.paste');
 
@@ -955,19 +978,75 @@ function buildHistoryRow(entry) {
   return row;
 }
 
+// History view state — search query + period filter. Both live entirely in
+// the renderer; the underlying historyList IPC returns the raw set, we
+// filter in-memory.
+let historyQuery = '';
+let historyPeriod = 'all';   // 'all' | 'today' | 'week'
+let historyCache = [];
+
+function matchesHistoryPeriod(entry, period) {
+  if (period === 'all') return true;
+  const ts = Date.parse(entry.at);
+  if (!ts) return false;
+  const now = Date.now();
+  if (period === 'today') {
+    const d = new Date(ts);
+    const n = new Date(now);
+    return d.toDateString() === n.toDateString();
+  }
+  if (period === 'week') return now - ts < 7 * 24 * 60 * 60 * 1000;
+  return true;
+}
+
+function matchesHistoryQuery(entry, q) {
+  if (!q) return true;
+  const hay = `${entry.clean || ''} ${entry.raw || ''}`.toLowerCase();
+  return hay.includes(q.toLowerCase());
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function highlightQuery(text, q) {
+  if (!q) return escapeHtml(text);
+  const needle = q.toLowerCase();
+  const t = String(text);
+  const lo = t.toLowerCase();
+  let out = '';
+  let i = 0;
+  while (i < t.length) {
+    const idx = lo.indexOf(needle, i);
+    if (idx === -1) { out += escapeHtml(t.slice(i)); break; }
+    out += escapeHtml(t.slice(i, idx));
+    out += `<mark class="history-highlight">${escapeHtml(t.slice(idx, idx + needle.length))}</mark>`;
+    i = idx + needle.length;
+  }
+  return out;
+}
+
+function renderHistoryList() {
+  if (!historyListEl) return;
+  const filtered = historyCache.filter((e) =>
+    matchesHistoryPeriod(e, historyPeriod) && matchesHistoryQuery(e, historyQuery));
+  historyListEl.innerHTML = '';
+  if (filtered.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'history-empty';
+    empty.textContent = historyQuery || historyPeriod !== 'all'
+      ? t('history.filterEmpty')
+      : t('page.history.empty');
+    historyListEl.appendChild(empty);
+    return;
+  }
+  filtered.forEach((e) => historyListEl.appendChild(buildHistoryRow(e, historyQuery)));
+}
+
 async function refreshHistory() {
   if (!historyListEl) return;
   try {
-    const entries = await window.listenk.historyList(50);
-    historyListEl.innerHTML = '';
-    if (!entries.length) {
-      const empty = document.createElement('div');
-      empty.className = 'history-empty';
-      empty.textContent = t('page.history.empty');
-      historyListEl.appendChild(empty);
-      return;
-    }
-    entries.forEach((e) => historyListEl.appendChild(buildHistoryRow(e)));
+    historyCache = await window.listenk.historyList(200);
+    renderHistoryList();
   } catch (err) {
     console.warn('[history] refresh failed', err);
   }
@@ -980,6 +1059,21 @@ historyClearBtn?.addEventListener('click', async () => {
   toast(t('toast.historyCleared'));
 });
 
+// History search + period filter — in-memory over the last 200 entries.
+const historySearchEl = $('historySearch');
+historySearchEl?.addEventListener('input', () => {
+  historyQuery = historySearchEl.value.trim();
+  renderHistoryList();
+});
+document.querySelectorAll('.filter-chip[data-filter-period]').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip[data-filter-period]').forEach((c) => c.classList.remove('active'));
+    chip.classList.add('active');
+    historyPeriod = chip.getAttribute('data-filter-period') || 'all';
+    renderHistoryList();
+  });
+});
+
 refreshHistory();
 
 refreshBtn?.addEventListener('click', () => {
@@ -987,6 +1081,8 @@ refreshBtn?.addEventListener('click', () => {
   refresh();
   refreshHistory();
   refreshStats();
+  refreshStatsCharts();
+  refreshKpiTiles();
 });
 
 // ========== Usage stats ==========
@@ -1143,14 +1239,258 @@ async function refreshStats() {
   }
 }
 
+// ----- Stats page: bar chart (14d) + engine donut -----
+//
+// The bar chart is derived from history.jsonl timestamps (already on disk)
+// so we don't need a new daily-bucket schema in stats.json. The donut reads
+// cumulative call counts per engine directly from stats counters.
+
+const statsBarChartEl = $('statsBarChart');
+const statsDonutEl = $('statsDonut');
+const statsDonutLegendEl = $('statsDonutLegend');
+const statsKpiTilesEl = $('statsKpiTiles');
+const ENGINE_COLORS = {
+  whisperkit: '#5b8dff',
+  apple: '#b367ff',
+  openai: '#4ade80',
+  'whisper.cpp': '#fbbf24',
+};
+
+function dayBucketKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+async function refreshStatsCharts() {
+  if (!statsBarChartEl && !statsDonutEl && !statsKpiTilesEl) return;
+  let payload, history = [];
+  try { payload = await window.listenk?.statsGet?.(); } catch {}
+  try { history = await window.listenk?.historyList?.(500) || []; } catch {}
+  const stats = payload?.stats;
+  if (!stats) return;
+
+  // --- KPI tiles on Stats page (mirror dashboard but phrased for stats) ---
+  if (statsKpiTilesEl) {
+    const totalCalls = Object.values(stats.counters.callsByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+    const totalSec = Object.values(stats.counters.audioSecByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+    const todayCalls = Object.values(stats.today.callsByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+    const todaySec = Object.values(stats.today.audioSecByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+    const cost = stats.counters.openaiCost || 0;
+    const unit = t('kpi.unitTimes');
+    const withUnit = (v) => unit ? `${v}<span class="kpi-unit">${unit}</span>` : String(v);
+    const tiles = [
+      { label: t('stats.totalCalls'), valueHtml: withUnit(fmtNum(totalCalls)), detail: fmtDuration(totalSec) },
+      { label: t('stats.todayCalls'), valueHtml: withUnit(fmtNum(todayCalls)), detail: fmtDuration(todaySec), cls: todayCalls > 0 ? 'up' : '' },
+      { label: t('stats.section.openaiCost'), valueHtml: fmtUSD(cost), detail: cost > 0 ? 'OpenAI' : '—', cls: cost > 0 ? 'hint' : '' },
+      { label: t('stats.section.ollama'), valueHtml: withUnit(fmtNum(stats.counters.ollamaCalls || 0)), detail: t('stats.tokensValue', {
+          in: fmtNum(stats.counters.ollamaPromptTokens || 0),
+          out: fmtNum(stats.counters.ollamaEvalTokens || 0),
+        }) },
+    ];
+    statsKpiTilesEl.innerHTML = '';
+    for (const tile of tiles) {
+      const el = document.createElement('div');
+      el.className = 'kpi-tile';
+      const detailClass = 'kpi-detail' + (tile.cls ? ' ' + tile.cls : '');
+      el.innerHTML = `<div class="kpi-label"></div><div class="kpi-value"></div><div class="${detailClass}"></div>`;
+      el.querySelector('.kpi-label').textContent = tile.label;
+      el.querySelector('.kpi-value').innerHTML = tile.valueHtml;
+      el.querySelector('.kpi-detail').textContent = tile.detail;
+      statsKpiTilesEl.appendChild(el);
+    }
+  }
+
+  // --- 14-day bar chart from history timestamps (seconds per day) ---
+  if (statsBarChartEl) {
+    const bucketSec = {};
+    for (const entry of history) {
+      const ts = Date.parse(entry.at);
+      if (!ts) continue;
+      const day = dayBucketKey(new Date(ts));
+      bucketSec[day] = (bucketSec[day] || 0) + 20; // coarse estimate — history entries don't carry audioSec
+    }
+    // Today's audio seconds from stats (more accurate than estimate).
+    const today = new Date();
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      days.push({ date: d, key: dayBucketKey(d) });
+    }
+    const maxSec = Math.max(1, ...days.map((d) => bucketSec[d.key] || 0));
+    const todayKey = dayBucketKey(today);
+    statsBarChartEl.innerHTML = '';
+    days.forEach(({ date, key }) => {
+      const sec = bucketSec[key] || 0;
+      const pct = Math.max(sec / maxSec, 0.015) * 100; // min visible stub
+      const bar = document.createElement('div');
+      bar.className = 'bar' + (key === todayKey ? ' today' : '');
+      bar.style.height = `${pct}%`;
+      bar.setAttribute('data-label', String(date.getDate()));
+      if (sec > 0) bar.setAttribute('data-value', fmtDuration(sec));
+      statsBarChartEl.appendChild(bar);
+    });
+  }
+
+  // --- Donut: engine share of cumulative calls ---
+  if (statsDonutEl && statsDonutLegendEl) {
+    const calls = stats.counters.callsByEngine || {};
+    const total = Object.values(calls).reduce((a, b) => a + (b || 0), 0);
+    statsDonutEl.innerHTML = '';
+    statsDonutLegendEl.innerHTML = '';
+    // SVG ring: circumference = 2π·15.915 ≈ 100 (percentage-friendly).
+    const ns = 'http://www.w3.org/2000/svg';
+    const track = document.createElementNS(ns, 'circle');
+    track.setAttribute('cx', '21'); track.setAttribute('cy', '21');
+    track.setAttribute('r', '15.915'); track.setAttribute('fill', 'none');
+    track.setAttribute('stroke', getComputedStyle(document.documentElement).getPropertyValue('--bg-3').trim() || '#1a1a1f');
+    track.setAttribute('stroke-width', '6');
+    statsDonutEl.appendChild(track);
+
+    const entries = Object.entries(calls)
+      .filter(([, v]) => (v || 0) > 0)
+      .sort((a, b) => b[1] - a[1]);
+    let offset = 0;
+    for (const [engine, count] of entries) {
+      const pct = total > 0 ? (count / total) * 100 : 0;
+      const seg = document.createElementNS(ns, 'circle');
+      seg.setAttribute('cx', '21'); seg.setAttribute('cy', '21');
+      seg.setAttribute('r', '15.915'); seg.setAttribute('fill', 'none');
+      seg.setAttribute('stroke', ENGINE_COLORS[engine] || '#94a3b8');
+      seg.setAttribute('stroke-width', '6');
+      seg.setAttribute('stroke-dasharray', `${pct.toFixed(2)} ${(100 - pct).toFixed(2)}`);
+      seg.setAttribute('stroke-dashoffset', String(25 - offset));
+      seg.setAttribute('transform', 'rotate(-90 21 21)');
+      statsDonutEl.appendChild(seg);
+      offset += pct;
+
+      const legend = document.createElement('div');
+      legend.className = 'legend-row';
+      legend.innerHTML = `
+        <span class="swatch" style="background: ${ENGINE_COLORS[engine] || '#94a3b8'}"></span>
+        <span class="label"></span>
+        <span class="pct"></span>
+      `;
+      legend.querySelector('.label').textContent = t(`engineLabel.${engine}`) || engine;
+      legend.querySelector('.pct').textContent = `${pct.toFixed(0)}%`;
+      statsDonutLegendEl.appendChild(legend);
+    }
+    if (entries.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'legend-row';
+      empty.style.color = 'var(--text-4)';
+      empty.textContent = '—';
+      statsDonutLegendEl.appendChild(empty);
+    }
+  }
+}
+
+// KPI tiles on the Status page — condensed view of the same stats that
+// the dedicated Stats page renders in full. Pulls from the same IPC so
+// today's numbers are always in sync.
+const kpiTilesEl = $('kpiTiles');
+async function refreshKpiTiles() {
+  if (!kpiTilesEl || !window.listenk?.statsGet) return;
+  let payload;
+  try { payload = await window.listenk.statsGet(); } catch { return; }
+  const stats = payload?.stats;
+  if (!stats) return;
+
+  const totalCalls = Object.values(stats.counters.callsByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+  const totalSec = Object.values(stats.counters.audioSecByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+  const todayCalls = Object.values(stats.today.callsByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+  const todaySec = Object.values(stats.today.audioSecByEngine || {}).reduce((a, b) => a + (b || 0), 0);
+  const cost = stats.counters.openaiCost || 0;
+  const unit = t('kpi.unitTimes');
+  const withUnit = (v) => unit ? `${v}<span class="kpi-unit">${unit}</span>` : String(v);
+
+  const tiles = [
+    {
+      label: t('kpi.todayCalls'),
+      valueHtml: withUnit(fmtNum(todayCalls)),
+      detail: t('kpi.detail.trendDuration', { duration: fmtDuration(todaySec) }),
+      detailKind: todayCalls > 0 ? 'up' : '',
+    },
+    {
+      label: t('kpi.totalCalls'),
+      valueHtml: withUnit(fmtNum(totalCalls)),
+      detail: fmtDuration(totalSec),
+    },
+    {
+      label: t('kpi.openaiCost'),
+      valueHtml: fmtUSD(cost),
+      detail: cost > 0 ? 'OpenAI Whisper API' : '—',
+      detailKind: cost > 0 ? 'hint' : '',
+    },
+    {
+      label: t('kpi.ollamaCalls'),
+      valueHtml: withUnit(fmtNum(stats.counters.ollamaCalls || 0)),
+      detail: t('stats.tokensValue', {
+        in: fmtNum(stats.counters.ollamaPromptTokens || 0),
+        out: fmtNum(stats.counters.ollamaEvalTokens || 0),
+      }),
+    },
+  ];
+
+  kpiTilesEl.innerHTML = '';
+  for (const tile of tiles) {
+    const el = document.createElement('div');
+    el.className = 'kpi-tile';
+    const detailClass = 'kpi-detail' + (tile.detailKind ? ' ' + tile.detailKind : '');
+    el.innerHTML = `
+      <div class="kpi-label"></div>
+      <div class="kpi-value"></div>
+      <div class="${detailClass}"></div>
+    `;
+    el.querySelector('.kpi-label').textContent = tile.label;
+    el.querySelector('.kpi-value').innerHTML = tile.valueHtml;
+    el.querySelector('.kpi-detail').textContent = tile.detail;
+    kpiTilesEl.appendChild(el);
+  }
+}
+
+// History count badge in the sidebar. Hidden until we have a count to show.
+const navCountHistoryEl = $('navCountHistory');
+async function refreshNavCounts() {
+  if (!navCountHistoryEl || !window.listenk?.historyList) return;
+  try {
+    const entries = await window.listenk.historyList(1000);
+    const n = entries?.length || 0;
+    if (n > 0) {
+      navCountHistoryEl.textContent = fmtNum(n);
+      navCountHistoryEl.hidden = false;
+    } else {
+      navCountHistoryEl.hidden = true;
+    }
+  } catch {}
+}
+
+// Hero action buttons route to in-app behaviour rather than invent new
+// flows — "Record now" = trigger the same toggle the hotkey fires,
+// "Change hotkey" = switch to the input settings page.
+const heroRecBtn = $('heroRecBtn');
+const heroHotkeyBtn = $('heroHotkeyBtn');
+heroRecBtn?.addEventListener('click', () => {
+  if (streamingActive || recording) return;
+  // If a streaming engine is ready, trigger the same path the hotkey uses;
+  // otherwise fall back to the legacy batch capture.
+  toggleRecord();
+});
+heroHotkeyBtn?.addEventListener('click', () => {
+  const link = document.querySelector('.nav-item[data-section="sec-input"]');
+  if (link) link.click();
+});
+
 statsClearBtn?.addEventListener('click', async () => {
   if (!confirm(t('page.stats.confirmClear'))) return;
   await window.listenk.statsClear();
   refreshStats();
+  refreshStatsCharts();
+  refreshKpiTiles();
   toast(t('toast.statsCleared'));
 });
 
 refreshStats();
+refreshStatsCharts();
 
 function applyModeVisibility(mode) {
   document.querySelectorAll('[data-mode-only]').forEach((el) => {
@@ -1260,6 +1600,7 @@ async function restoreSettings() {
 
   if (engine && engineSel) engineSel.value = engine;
   applyEngineVisibility(engine || 'whisperkit');
+  renderEngineCards(engine || 'whisperkit');
 
   if (mode && modeSel) modeSel.value = mode;
   applyModeVisibility(modeSel?.value || 'off');
@@ -1377,6 +1718,7 @@ engineSel?.addEventListener('change', async () => {
   const engine = engineSel.value;
   await api.setEngine?.(engine);
   applyEngineVisibility(engine);
+  renderEngineCards(engine);
   // When coming back to OpenAI, the password input might be stale — refresh
   // its placeholder to reflect whether a key is currently stored/encrypted.
   if (engine === 'openai') refreshOpenAiKeyHint();
@@ -1385,6 +1727,99 @@ engineSel?.addEventListener('change', async () => {
   lastStatusFingerprint = '';
   setTimeout(refresh, 500);
 });
+
+// ----- Engine card picker -----
+// Replaces the plain <select> with a visual card grid. Cards delegate to
+// the hidden <select> (fire change event) so the existing engine change
+// handler stays the single source of truth.
+const engineGridEl = $('engineGrid');
+const ENGINE_CARDS = [
+  {
+    id: 'whisperkit',
+    name: 'WhisperKit',
+    badge: { cls: 'local', label: 'Local' },
+    descKey: 'engineCard.whisperkit.desc',
+    metrics: [
+      { labelKey: 'engineCard.latency', value: '~0.6s' },
+      { labelKey: 'engineCard.quality', value: '★★★★☆' },
+    ],
+  },
+  {
+    id: 'apple',
+    name: 'Apple Speech',
+    badge: { cls: 'local', label: 'Local' },
+    descKey: 'engineCard.apple.desc',
+    metrics: [
+      { labelKey: 'engineCard.latency', value: '~0.3s' },
+      { labelKey: 'engineCard.quality', value: '★★★☆☆' },
+    ],
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI API',
+    badge: { cls: 'cloud', label: 'Cloud' },
+    descKey: 'engineCard.openai.desc',
+    metrics: [
+      { labelKey: 'engineCard.latency', value: '~1.2s' },
+      { labelKey: 'engineCard.quality', value: '★★★★★' },
+    ],
+  },
+  {
+    id: 'whisper.cpp',
+    name: 'whisper.cpp',
+    badge: { cls: 'experimental', label: 'Batch' },
+    descKey: 'engineCard.cpp.desc',
+    metrics: [
+      { labelKey: 'engineCard.latency', value: 'batch' },
+      { labelKey: 'engineCard.quality', value: '★★★☆☆' },
+    ],
+  },
+];
+
+function renderEngineCards(selectedEngine) {
+  if (!engineGridEl) return;
+  engineGridEl.innerHTML = '';
+  for (const spec of ENGINE_CARDS) {
+    const card = document.createElement('div');
+    card.className = 'engine-card' + (selectedEngine === spec.id ? ' selected' : '');
+    card.setAttribute('data-engine', spec.id);
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.innerHTML = `
+      <div class="top">
+        <span class="name"></span>
+        <span class="badge ${spec.badge.cls}"></span>
+      </div>
+      <div class="desc"></div>
+      <div class="metrics">
+        <div class="metric"><span class="l"></span><b></b></div>
+        <div class="metric"><span class="l"></span><b></b></div>
+      </div>
+      <div class="selected-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="10" height="10"><path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    `;
+    card.querySelector('.name').textContent = spec.name;
+    card.querySelector('.badge').textContent = spec.badge.label;
+    card.querySelector('.desc').textContent = t(spec.descKey);
+    const metricEls = card.querySelectorAll('.metric');
+    spec.metrics.forEach((m, i) => {
+      metricEls[i].querySelector('.l').textContent = t(m.labelKey);
+      metricEls[i].querySelector('b').textContent = m.value;
+    });
+    card.addEventListener('click', () => selectEngineCard(spec.id));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectEngineCard(spec.id); }
+    });
+    engineGridEl.appendChild(card);
+  }
+}
+
+function selectEngineCard(id) {
+  if (!engineSel || engineSel.value === id) return;
+  engineSel.value = id;
+  engineSel.dispatchEvent(new Event('change'));
+}
 
 whisperModelSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
@@ -1438,6 +1873,8 @@ uiLocaleSel?.addEventListener('change', async () => {
   lastStatusFingerprint = '';
   refresh();
   refreshStats();
+  refreshStatsCharts();
+  refreshKpiTiles();
   refreshHistory();
   const label = window.i18n?.LOCALE_LABELS?.[loc] || loc;
   toast(t('toast.uiLocale', { label }));
@@ -1491,5 +1928,12 @@ wireSidebarNavigation();
 (async () => {
   await restoreSettings();
   refresh();
-  setInterval(() => { refresh(); refreshStats(); }, 4000);
+  refreshNavCounts();
+  setInterval(() => {
+    refresh();
+    refreshStats();
+    refreshStatsCharts();
+    refreshKpiTiles();
+    refreshNavCounts();
+  }, 4000);
 })();

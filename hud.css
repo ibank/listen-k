@@ -42,9 +42,30 @@ body {
 
 .pill[data-state='recording'] {
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(248, 113, 113, 0.2),
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 90, 95, 0.32),
+    0 0 40px rgba(255, 90, 95, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.pill[data-state='processing'] {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(91, 141, 255, 0.32),
+    0 0 40px rgba(91, 141, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.pill[data-state='done'] {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(74, 222, 128, 0.4),
+    0 0 40px rgba(74, 222, 128, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+/* Recording-state waveform tints toward red so the "listening" state reads
+   at a glance even at the corner of an eye. */
+.pill[data-state='recording'] .wave span {
+  background: linear-gradient(180deg, #ff7f84 0%, #ff5a5f 100%);
+  box-shadow: 0 0 8px rgba(255, 90, 95, 0.24);
 }
 
 @keyframes pop-in {
@@ -149,6 +170,36 @@ body {
 .pill[data-state='processing'] .spinner { display: block; }
 .pill[data-state='processing'] .btn.confirm { opacity: 0.35; pointer-events: none; }
 .pill[data-state='processing'] .btn.cancel { opacity: 0.7; }
+
+/* "Done" state: hide the wave + confirm button, show a pop-in green
+   checkmark, dim the cancel button. The HUD auto-dismisses ~1s later via
+   hud.js so this is a brief success flash, not a persistent state. */
+.done-check {
+  -webkit-app-region: no-drag;
+  display: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #4ade80;
+  color: #0a0a0c;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pill[data-state='done'] .wave,
+.pill[data-state='done'] .live-text,
+.pill[data-state='done'] .spinner,
+.pill[data-state='done'] .btn.confirm { display: none; }
+.pill[data-state='done'] .btn.cancel { opacity: 0.4; pointer-events: none; }
+.pill[data-state='done'] .done-check {
+  display: flex;
+  animation: done-pop 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes done-pop {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
 
 .live-text {
   display: none;

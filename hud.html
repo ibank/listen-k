@@ -27,6 +27,15 @@
         <path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </button>
+
+    <!-- Green pop-in checkmark shown in the "done" state only. It replaces
+         the confirm button visually while the HUD is briefly flashing
+         success before auto-hiding. -->
+    <div class="done-check" id="doneCheck" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width="14" height="14">
+        <path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
   </div>
 
   <script src="hud.js"></script>

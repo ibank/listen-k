@@ -191,7 +191,19 @@ function showHud(state) {
   if (!hudWindow.isVisible()) hudWindow.showInactive();
 }
 
+// Flash the HUD's "done" state for a beat, then hide. Called after a
+// successful paste so the user gets a green-checkmark confirmation
+// instead of the HUD just vanishing.
+let hudDoneTimer = null;
+function flashHudDone(durationMs = 900) {
+  if (!hudWindow || !hudWindow.isVisible()) { hideHud(); return; }
+  hudWindow.webContents.send('hud-state', 'done');
+  if (hudDoneTimer) clearTimeout(hudDoneTimer);
+  hudDoneTimer = setTimeout(() => { hideHud(); }, durationMs);
+}
+
 function hideHud() {
+  if (hudDoneTimer) { clearTimeout(hudDoneTimer); hudDoneTimer = null; }
   if (!hudWindow) return;
   if (hudWindow.isVisible()) hudWindow.hide();
   hudWindow.webContents.send('hud-reset');
@@ -1254,14 +1266,19 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
   });
 });
 
-ipcMain.handle('set-state', (_e, { recording, processing }) => {
+ipcMain.handle('set-state', (_e, { recording, processing, pasted }) => {
   if (typeof recording === 'boolean') isRecording = recording;
   if (typeof processing === 'boolean') {
     isProcessing = processing;
     if (processing) showHud('processing');
   }
-  console.log('[state] recording=', isRecording, 'processing=', isProcessing);
-  if (!isRecording && !isProcessing) hideHud();
+  console.log('[state] recording=', isRecording, 'processing=', isProcessing, 'pasted=', pasted);
+  if (!isRecording && !isProcessing) {
+    // Successful paste → flash green checkmark before hiding. Everything
+    // else (cancel, error, silent) just hides immediately.
+    if (pasted === true) flashHudDone();
+    else hideHud();
+  }
   updateTrayMenu();
 });
 

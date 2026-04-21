@@ -14,7 +14,7 @@ confirmBtn.addEventListener('click', () => {
 });
 
 api?.onState?.((state) => {
-  if (state === 'recording' || state === 'processing') {
+  if (state === 'recording' || state === 'processing' || state === 'done') {
     pill.dataset.state = state;
     if (state === 'recording') {
       liveText.textContent = '';

@@ -3,12 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <title>Listen K</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="titlebar">
-    <div class="brand">Listen K</div>
-    <div class="status" id="status" data-i18n="status.idle">Idle</div>
+    <div class="brand">
+      <span class="brand-logo" aria-hidden="true"></span>
+      Listen K
+    </div>
+    <div class="status" id="status">
+      <span class="status-led" aria-hidden="true"></span>
+      <span class="status-text" data-i18n="status.idle">Idle</span>
+    </div>
   </header>
 
   <div class="workspace">
@@ -35,6 +44,7 @@
       <a href="#sec-history" class="nav-item" data-section="sec-history">
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span data-i18n="sidebar.nav.history">History</span>
+        <span class="nav-count" id="navCountHistory" hidden></span>
       </a>
       <a href="#sec-stats" class="nav-item" data-section="sec-stats">
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13V9M7 13V5M11 13V7M13 13h-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -60,8 +70,34 @@
         <div class="banner-spinner"></div>
       </section>
 
-      <section class="card page" id="sec-status">
-        <div class="card-head">
+      <section class="page" id="sec-status">
+        <div class="hero">
+          <div class="hero-row">
+            <div class="hero-body">
+              <div class="hero-eyebrow" data-i18n="hero.eyebrow">Ready to listen</div>
+              <h2 class="hero-title" data-i18n="hero.title">Press ⇧⇧ anywhere to dictate</h2>
+              <p class="hero-desc" data-i18n="hero.desc">
+                Double-tap the hotkey anywhere — text streams into the HUD and auto-pastes into the focused app.
+              </p>
+              <div class="hero-actions">
+                <button class="btn-hero rec" id="heroRecBtn" type="button">
+                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>
+                  <span data-i18n="hero.recNow">Record now</span>
+                </button>
+                <button class="btn-hero ghost" id="heroHotkeyBtn" type="button" data-i18n="hero.changeHotkey">Change hotkey</button>
+              </div>
+            </div>
+            <div class="hero-wave" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <div id="kpiTiles" class="kpi-tiles"></div>
+
+        <div class="section-head">
           <h2 data-i18n="page.status.title">Setup status</h2>
           <button id="refreshBtn" class="ghost" data-i18n="page.status.refresh" data-i18n-title="page.status.refreshTitle" title="Refresh status">↻ Refresh</button>
         </div>
@@ -70,8 +106,17 @@
 
       <section class="card page" id="sec-engine" hidden>
         <div class="card-head"><h2 data-i18n="page.engine.title">Engine</h2></div>
+
+        <div class="engine-grid" id="engineGrid">
+          <!-- Cards rendered by renderer.js. Kept in sync with the hidden
+               <select id="engine"> below so existing change-listener code
+               keeps working. -->
+        </div>
+
         <div class="fields">
-          <div class="field-row">
+          <!-- Accessibility / backwards-compat: keep the select in the DOM
+               (hidden) so code that reads engineSel.value still works. -->
+          <div class="field-row" hidden>
             <div class="field-info">
               <div class="field-title" data-i18n="field.engine.title">Transcription engine</div>
               <div class="field-help" data-i18n="field.engine.help">Apple Speech is fast and lightweight, WhisperKit is accurate, whisper.cpp is batch-only.</div>
@@ -278,6 +323,19 @@
           <h2 data-i18n="page.history.title">History</h2>
           <button id="historyClearBtn" class="ghost" data-i18n="page.history.clear" data-i18n-title="page.history.clearTitle" title="Clear all history">Clear all</button>
         </div>
+        <div class="history-bar">
+          <div class="history-search">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8.5 8.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input id="historySearch" type="search" autocomplete="off" spellcheck="false"
+                   placeholder="Search history…" data-i18n-placeholder="history.searchPlaceholder" />
+          </div>
+          <button class="filter-chip active" data-filter-period="all" data-i18n="history.filterAll">All</button>
+          <button class="filter-chip" data-filter-period="today" data-i18n="history.filterToday">Today</button>
+          <button class="filter-chip" data-filter-period="week" data-i18n="history.filterWeek">This week</button>
+        </div>
         <div id="historyList" class="history-list"></div>
       </section>
 
@@ -286,6 +344,25 @@
           <h2 data-i18n="page.stats.title">Stats</h2>
           <button id="statsClearBtn" class="ghost" data-i18n="page.stats.clear" data-i18n-title="page.stats.clearTitle" title="Reset all stats">Reset</button>
         </div>
+
+        <div id="statsKpiTiles" class="kpi-tiles"></div>
+
+        <div class="stats-grid">
+          <div class="chart-card">
+            <h4 data-i18n="chart.weekly.title">Daily usage</h4>
+            <div class="chart-sub" data-i18n="chart.weekly.sub">Last 14 days, minutes per day</div>
+            <div id="statsBarChart" class="chart-bars"></div>
+          </div>
+          <div class="chart-card">
+            <h4 data-i18n="chart.engine.title">Engine share</h4>
+            <div class="chart-sub" data-i18n="chart.engine.sub">Cumulative calls</div>
+            <div class="donut-wrap">
+              <svg id="statsDonut" class="donut" viewBox="0 0 42 42" aria-hidden="true"></svg>
+              <div id="statsDonutLegend" class="donut-legend"></div>
+            </div>
+          </div>
+        </div>
+
         <div id="statsContent"></div>
       </section>
 
