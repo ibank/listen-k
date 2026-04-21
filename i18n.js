@@ -8,6 +8,13 @@
 // Locale is persisted in config.json as `uiLocale`. On boot, main.js
 // detects the user's macOS locale and picks ko/en/ja/zh-CN if the app
 // ships a matching translation, otherwise falls back to English.
+//
+// Wrapped in an IIFE so top-level identifiers (`t`, `strings`, etc.)
+// don't leak into the classic-script scope shared with renderer.js, which
+// declares its own `t` alias over window.i18n.t.
+
+(function () {
+'use strict';
 
 const LOCALES = ['ko', 'en', 'ja', 'zh-CN'];
 const DEFAULT_LOCALE = 'en';
@@ -1069,3 +1076,5 @@ const LOCALE_LABELS = {
 const api = { LOCALES, DEFAULT_LOCALE, LOCALE_LABELS, strings, t, setLocale, getLocale, detectSystemLocale };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.i18n = api;
+
+})();
