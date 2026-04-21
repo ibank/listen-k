@@ -14,6 +14,7 @@ const engineSel = $('engine');
 const openaiKeyInput = $('openaiKey');
 const openaiModelSel = $('openaiModel');
 const uiLocaleSel = $('uiLocale');
+const themeSel = $('theme');
 const translateTargetSel = $('translateTarget');
 const copyBtn = $('copyBtn');
 const refreshBtn = $('refreshBtn');
@@ -1878,7 +1879,7 @@ async function restoreSettings() {
   if (!api) return;
 
   const safe = async (fn) => { try { return await fn(); } catch { return null; } };
-  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels, openaiKeyInfo, openaiModel, uiLocaleInfo] = await Promise.all([
+  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels, openaiKeyInfo, openaiModel, uiLocaleInfo, theme] = await Promise.all([
     safe(() => api.getHotkey?.()),
     safe(() => api.getLanguage?.()),
     safe(() => api.getStreaming?.()),
@@ -1891,6 +1892,7 @@ async function restoreSettings() {
     safe(() => api.getOpenAiKey?.()),
     safe(() => api.getOpenAiModel?.()),
     safe(() => api.getUiLocale?.()),
+    safe(() => api.getTheme?.()),
   ]);
 
   // Apply UI locale BEFORE painting any translated DOM so the first render
@@ -1937,7 +1939,21 @@ async function restoreSettings() {
   applyOpenAiKeyHint(openaiKeyInfo);
   if (openaiModel && openaiModelSel) openaiModelSel.value = openaiModel;
 
+  // Theme — applyTheme paints the class on <html>; 'system' removes any
+  // forced class so CSS @media takes over.
+  const initialTheme = theme && ['system', 'light', 'dark'].includes(theme) ? theme : 'system';
+  if (themeSel) themeSel.value = initialTheme;
+  applyTheme(initialTheme);
+
   settingsReady = true;
+}
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  root.classList.remove('theme-light', 'theme-dark');
+  if (theme === 'light') root.classList.add('theme-light');
+  else if (theme === 'dark') root.classList.add('theme-dark');
+  // 'system' leaves no class so @media (prefers-color-scheme) drives it.
 }
 
 // Paint the OpenAI key input's placeholder based on current storage state.
@@ -2201,6 +2217,15 @@ openaiModelSel?.addEventListener('change', async () => {
   const model = openaiModelSel.value;
   await api.setOpenAiModel?.(model);
   toast(t('toast.openaiModel', { label: model }));
+});
+
+themeSel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  const v = themeSel.value;
+  applyTheme(v);
+  await api.setTheme?.(v);
+  const label = themeSel.options[themeSel.selectedIndex]?.textContent || v;
+  toast(t('toast.theme', { label }));
 });
 
 uiLocaleSel?.addEventListener('change', async () => {

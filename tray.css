@@ -244,3 +244,110 @@ body {
   .tray { animation: none; }
   .tray-status-chip[data-kind='rec'] .status-led { animation: none; }
 }
+
+/* ========== Light mode ==========
+   The tray popover behaves like a macOS menu — it should follow the
+   theme the user chose in the main window. tray.js puts .theme-light
+   on <html> when forced; an @media query covers 'system' preference.
+   Dark stays the default because the renderer leaves no class when
+   the user picks 'dark' or 'system'-in-dark-mode. */
+:root.theme-light .tray,
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) .tray {
+    background: rgba(246, 246, 248, 0.92);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.22),
+      0 0 0 1px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+}
+
+/* Single combined selector version since some rules need to match both
+   the class-forced theme and the @media path. */
+:root.theme-light .tray,
+html:not(.theme-dark):where(*) .tray { /* dummy to allow override below */ }
+
+/* Forced light. */
+:root.theme-light body { color: #0c0c0e; }
+:root.theme-light .tray {
+  background: rgba(246, 246, 248, 0.92);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+:root.theme-light .tray-brand { color: #0c0c0e; }
+:root.theme-light .tray-status-chip { background: rgba(0, 0, 0, 0.05); color: #6c6c72; }
+:root.theme-light .tray-status-chip[data-kind='ok']    { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+:root.theme-light .tray-status-chip[data-kind='rec']   { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+:root.theme-light .tray-status-chip[data-kind='error'] { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+
+:root.theme-light .tray-record {
+  background: linear-gradient(180deg, rgba(10, 102, 255, 0.1), rgba(10, 102, 255, 0.03));
+  border-color: rgba(10, 102, 255, 0.25);
+}
+:root.theme-light .tray-record:hover {
+  background: linear-gradient(180deg, rgba(10, 102, 255, 0.15), rgba(10, 102, 255, 0.05));
+  border-color: rgba(10, 102, 255, 0.4);
+}
+:root.theme-light .tray-record .t { color: #0c0c0e; }
+:root.theme-light .tray-record .d { color: #6c6c72; }
+:root.theme-light .tray-record .kbd-mini {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #0c0c0e;
+}
+
+:root.theme-light .tray-menu-item { color: #35353a; }
+:root.theme-light .tray-menu-item:hover { background: rgba(0, 0, 0, 0.05); color: #0c0c0e; }
+:root.theme-light .tray-menu-item svg { color: #9c9ca2; }
+:root.theme-light .tray-menu-item:hover svg { color: #35353a; }
+:root.theme-light .tray-menu-item .shortcut { color: #9c9ca2; }
+
+:root.theme-light .tray-sep { background: rgba(0, 0, 0, 0.08); }
+
+:root.theme-light .tray-section-label { color: #9c9ca2; }
+:root.theme-light .tray-recent-item { color: #35353a; }
+:root.theme-light .tray-recent-item:hover { background: rgba(0, 0, 0, 0.05); color: #0c0c0e; }
+:root.theme-light .tray-recent-empty { color: #9c9ca2; }
+
+/* System-light (only when user hasn't forced dark). */
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) body { color: #0c0c0e; }
+  :root:not(.theme-dark) .tray {
+    background: rgba(246, 246, 248, 0.92);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.22),
+      0 0 0 1px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+  :root:not(.theme-dark) .tray-brand { color: #0c0c0e; }
+  :root:not(.theme-dark) .tray-status-chip { background: rgba(0, 0, 0, 0.05); color: #6c6c72; }
+  :root:not(.theme-dark) .tray-status-chip[data-kind='ok']    { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+  :root:not(.theme-dark) .tray-status-chip[data-kind='rec']   { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+  :root:not(.theme-dark) .tray-status-chip[data-kind='error'] { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
+  :root:not(.theme-dark) .tray-record {
+    background: linear-gradient(180deg, rgba(10, 102, 255, 0.1), rgba(10, 102, 255, 0.03));
+    border-color: rgba(10, 102, 255, 0.25);
+  }
+  :root:not(.theme-dark) .tray-record .t { color: #0c0c0e; }
+  :root:not(.theme-dark) .tray-record .d { color: #6c6c72; }
+  :root:not(.theme-dark) .tray-record .kbd-mini {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #0c0c0e;
+  }
+  :root:not(.theme-dark) .tray-menu-item { color: #35353a; }
+  :root:not(.theme-dark) .tray-menu-item:hover { background: rgba(0, 0, 0, 0.05); color: #0c0c0e; }
+  :root:not(.theme-dark) .tray-menu-item svg { color: #9c9ca2; }
+  :root:not(.theme-dark) .tray-menu-item:hover svg { color: #35353a; }
+  :root:not(.theme-dark) .tray-menu-item .shortcut { color: #9c9ca2; }
+  :root:not(.theme-dark) .tray-sep { background: rgba(0, 0, 0, 0.08); }
+  :root:not(.theme-dark) .tray-section-label { color: #9c9ca2; }
+  :root:not(.theme-dark) .tray-recent-item { color: #35353a; }
+  :root:not(.theme-dark) .tray-recent-item:hover { background: rgba(0, 0, 0, 0.05); color: #0c0c0e; }
+  :root:not(.theme-dark) .tray-recent-empty { color: #9c9ca2; }
+}

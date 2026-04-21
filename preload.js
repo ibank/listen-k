@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('listenk', {
   setOpenAiModel: (name) => ipcRenderer.invoke('set-openai-model', name),
   getUiLocale: () => ipcRenderer.invoke('get-ui-locale'),
   setUiLocale: (loc) => ipcRenderer.invoke('set-ui-locale', loc),
+  getTheme: () => ipcRenderer.invoke('get-theme'),
+  setTheme: (theme) => ipcRenderer.invoke('set-theme', theme),
   getOnboardingDone: () => ipcRenderer.invoke('get-onboarding-done'),
   setOnboardingDone: (v) => ipcRenderer.invoke('set-onboarding-done', v),
   setOnboardingHotkeyTest: (v) => ipcRenderer.invoke('set-onboarding-hotkey-test', v),

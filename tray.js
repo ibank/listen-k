@@ -109,11 +109,22 @@ document.querySelectorAll('.tray-menu-item[data-cmd]').forEach((btn) => {
   btn.addEventListener('click', () => api?.cmd?.({ cmd: btn.getAttribute('data-cmd') }));
 });
 
+// Paint the theme class on <html> so tray.css's :root.theme-light / .theme-dark
+// overrides take effect. 'system' leaves no class so the @media query
+// reads the OS preference.
+function applyTheme(theme) {
+  const root = document.documentElement;
+  root.classList.remove('theme-light', 'theme-dark');
+  if (theme === 'light') root.classList.add('theme-light');
+  else if (theme === 'dark') root.classList.add('theme-dark');
+}
+
 // Main → tray pushes
 api?.onSnapshot?.((snap) => {
   if (snap.locale) { locale = snap.locale; applyLocaleText(); }
   if (snap.hotkey) setHotkey(snap.hotkey);
   if (snap.state) setStatus(snap.state);
+  if (snap.theme) applyTheme(snap.theme);
   if (Array.isArray(snap.recents)) renderRecents(snap.recents);
 });
 

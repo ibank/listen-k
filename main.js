@@ -366,10 +366,13 @@ function currentTrayState() {
 async function sendTraySnapshot() {
   if (!trayWindow) return;
   const recents = loadHistory(5);
+  const cfg = loadConfig();
+  const theme = ['light', 'dark'].includes(cfg.theme) ? cfg.theme : 'system';
   trayWindow.webContents.send('tray-snapshot', {
     locale: currentUiLocale(),
     hotkey: currentHotkey(),
     state: currentTrayState(),
+    theme,
     recents: recents.map((e) => ({ clean: e.clean, raw: e.raw })),
   });
 }
@@ -1789,6 +1792,22 @@ ipcMain.handle('get-ui-locale', () => ({
   supported: i18n.LOCALES,
   labels: i18n.LOCALE_LABELS,
 }));
+
+// Theme preference — 'system' | 'light' | 'dark'. Stored in config.json
+// so it persists across launches. The renderer applies this via a class
+// on <html>; 'system' leaves no class so CSS @media follows the OS.
+const THEME_OPTIONS = ['system', 'light', 'dark'];
+ipcMain.handle('get-theme', () => {
+  const cfg = loadConfig();
+  return THEME_OPTIONS.includes(cfg.theme) ? cfg.theme : 'system';
+});
+ipcMain.handle('set-theme', (_e, theme) => {
+  const cfg = loadConfig();
+  if (THEME_OPTIONS.includes(theme) && theme !== 'system') cfg.theme = theme;
+  else delete cfg.theme;
+  saveConfig(cfg);
+  return { ok: true, theme: cfg.theme || 'system' };
+});
 
 // Onboarding completion flag. Tracked in config.json so it survives DMG
 // re-installs (the config dir is keyed by bundle id, not version). First
