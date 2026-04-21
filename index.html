@@ -121,7 +121,12 @@
       </section>
 
       <section class="card page" id="sec-engine" hidden>
-        <div class="card-head"><h2 data-i18n="page.engine.title">Engine</h2></div>
+        <div class="card-head">
+          <div>
+            <h2 data-i18n="page.engine.title">Engine</h2>
+            <div class="card-head-sub" data-i18n="page.engine.sub">Speech-to-text pipeline</div>
+          </div>
+        </div>
 
         <div class="engine-grid" id="engineGrid">
           <!-- Cards rendered by renderer.js. Kept in sync with the hidden
@@ -129,7 +134,14 @@
                keeps working. -->
         </div>
 
-        <div class="fields">
+        <!-- Second group, matching the design's "모델 & 최적화" sub-card.
+             The title text + whole group is toggled via data-engine-group
+             so Apple Speech (no extra options) doesn't show an empty box. -->
+        <div class="fields" id="engineOptions" data-engine-group>
+          <div class="fields-head">
+            <h3 id="engineOptionsTitle" data-i18n="page.engine.optionsTitle">Model &amp; Options</h3>
+            <span class="card-head-sub" id="engineOptionsSub"></span>
+          </div>
           <!-- Accessibility / backwards-compat: keep the select in the DOM
                (hidden) so code that reads engineSel.value still works. -->
           <div class="field-row" hidden>
@@ -242,9 +254,15 @@
               <div class="field-help" data-i18n="field.streaming.help">Whether to stream text into the HUD while you speak.</div>
             </div>
             <div class="field-control">
-              <select id="streaming">
-                <option value="on" data-i18n="field.streaming.on">On</option>
-                <option value="off" data-i18n="field.streaming.off">Off</option>
+              <!-- Segmented toggle. The hidden <select> below is the actual
+                   source of truth so existing change-listeners keep working. -->
+              <div class="seg" id="streamingSeg" role="tablist">
+                <button type="button" data-value="on" role="tab" data-i18n="field.streaming.on">On</button>
+                <button type="button" data-value="off" role="tab" data-i18n="field.streaming.off">Off</button>
+              </div>
+              <select id="streaming" hidden>
+                <option value="on">On</option>
+                <option value="off">Off</option>
               </select>
             </div>
           </div>
@@ -476,6 +494,15 @@
             <option value="rcmd-double">Right ⌘⌘</option>
             <option value="fn">fn</option>
           </select>
+        </div>
+        <!-- Live-test box. Highlights green + shows check when the user
+             actually presses the hotkey, so they leave onboarding with
+             confidence that the binding works. -->
+        <div class="onboard-test-box" id="onboardTestBox" data-state="waiting">
+          <div class="onboard-test-kbd" id="onboardTestKbd">⇧⇧</div>
+          <div class="onboard-test-status" id="onboardTestStatus" data-i18n="onboard.hotkey.testPrompt">
+            Tap your hotkey now to confirm it's detected.
+          </div>
         </div>
         <div class="onboard-hint" id="onboardHotkeyHint"></div>
         <div class="onboard-actions split">

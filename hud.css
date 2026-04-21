@@ -13,6 +13,66 @@ body {
   justify-content: center;
   height: 100vh;
   padding: 8px;
+  flex-direction: column;
+  gap: 0;
+}
+
+.hud-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  color: #c7c7cc;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  background: rgba(14, 14, 17, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  animation: ctx-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hud-context[hidden] { display: none; }
+.hud-context-ico {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #5b8dff, #b367ff);
+  flex-shrink: 0;
+}
+.hud-context[data-engine='openai'] .hud-context-ico {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+.hud-context[data-engine='apple'] .hud-context-ico {
+  background: linear-gradient(135deg, #8b7aff, #6d28d9);
+}
+.hud-context[data-engine='whisper.cpp'] .hud-context-ico {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+/* State tint — processing = accent blue, done = ok green. Recording keeps
+   the neutral gray so "which engine + which mode" stays the dominant read. */
+.hud-context[data-state='processing'] {
+  color: #5b8dff;
+  border-color: rgba(91, 141, 255, 0.28);
+}
+.hud-context[data-state='processing'] .hud-context-ico {
+  background: linear-gradient(135deg, #5b8dff, #b367ff);
+  box-shadow: 0 0 8px rgba(91, 141, 255, 0.4);
+}
+.hud-context[data-state='done'] {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.32);
+}
+.hud-context[data-state='done'] .hud-context-ico {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+}
+@keyframes ctx-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .pill {
@@ -187,7 +247,6 @@ body {
   flex-shrink: 0;
 }
 .pill[data-state='done'] .wave,
-.pill[data-state='done'] .live-text,
 .pill[data-state='done'] .spinner,
 .pill[data-state='done'] .btn.confirm { display: none; }
 .pill[data-state='done'] .btn.cancel { opacity: 0.4; pointer-events: none; }
@@ -213,13 +272,43 @@ body {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  align-items: center;
   mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
   animation: text-fade-in 180ms ease-out;
 }
 .pill[data-has-text='true'] .wave { display: none; }
-.pill[data-has-text='true'] .live-text { display: block; }
+.pill[data-has-text='true'] .live-text { display: flex; }
 .pill[data-state='processing'] .live-text { opacity: 0.6; }
+
+/* Blinking cursor at the end of the live-text — mirrors the design's
+   transcription-in-progress cue. Hidden when the pill isn't actively
+   streaming text (recording state with no text, processing, done). */
+.live-text .cursor {
+  display: inline-block;
+  width: 2px;
+  height: 13px;
+  background: #5b8dff;
+  margin-left: 3px;
+  vertical-align: middle;
+  animation: cursor-blink 0.9s step-end infinite;
+  flex-shrink: 0;
+}
+@keyframes cursor-blink { 50% { opacity: 0; } }
+.pill[data-state='processing'] .cursor,
+.pill[data-state='done'] .cursor { display: none; }
+
+/* Done state — live-text becomes the success message line, not hidden. */
+.pill[data-state='done'] .live-text {
+  display: flex !important;
+  color: #4ade80;
+  font-weight: 500;
+  opacity: 1;
+}
+.pill[data-state='done'] .live-text .live-text-body::before {
+  content: '✓ ';
+  margin-right: 2px;
+}
 
 @keyframes text-fade-in {
   from { opacity: 0; transform: translateX(4px); }

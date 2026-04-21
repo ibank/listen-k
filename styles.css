@@ -464,6 +464,40 @@ body {
   line-height: 1.2;
   text-transform: none;
 }
+/* Subtitle under a card-head h2 — matches the design's "음성 → 텍스트
+   변환을 담당" descriptions beneath sub-card headers. */
+.card-head-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+/* Sub-group header inside a .fields row-list box (design's h3 sub-card
+   title pattern — 13px weight 600, with optional caption). The border
+   below separates it from the field rows. */
+.fields-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-hairline);
+}
+.fields-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: -0.005em;
+  text-transform: none;
+}
+.fields-head .card-head-sub { margin-top: 0; }
+
+/* When the engine-options group has no visible children (Apple Speech),
+   hide the whole container so users don't see an empty boxed section. */
+.fields[data-engine-group][hidden] { display: none; }
 .section-head {
   margin-top: var(--space-2);
 }
@@ -862,6 +896,13 @@ body {
   color: var(--text-1);
   letter-spacing: -0.005em;
 }
+.engine-card .engine-card-rec {
+  font-size: 10.5px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0;
+}
 .engine-card .badge {
   font-size: 10px;
   padding: 2px 7px;
@@ -885,6 +926,9 @@ body {
 .engine-card .metrics {
   display: flex;
   gap: var(--space-4);
+  /* Leave room in the bottom-right for the .selected-mark circle so the
+     last metric's value doesn't slide under it when the card is active. */
+  padding-right: 32px;
 }
 .engine-card .metric {
   font-size: 10.5px;
@@ -902,10 +946,10 @@ body {
 }
 .engine-card .selected-mark {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   right: 12px;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
@@ -913,8 +957,14 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow: 0 0 0 3px rgba(91, 141, 255, 0.22);
+  animation: card-check-pop 260ms var(--ease-out);
 }
 .engine-card.selected .selected-mark { display: flex; }
+@keyframes card-check-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
 
 /* The .card class now just marks a page-level grouping — no visual chrome.
    Rounded subgroups can add .card-boxed explicitly. */
@@ -1171,6 +1221,36 @@ button.primary:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
+
+/* Segmented toggle — used in place of <select> when there are only 2-3
+   mutually exclusive options (e.g. streaming on/off). Accent highlight
+   on the active segment. */
+.seg {
+  display: inline-flex;
+  background: var(--bg-3);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--r-sm);
+  padding: 2px;
+}
+.seg button {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: -0.005em;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.seg button:hover { color: var(--text-1); }
+.seg button.active {
+  background: var(--accent);
+  color: #fff;
+}
+.seg button.active:hover { color: #fff; }
 
 /* ========== Usage page ========== */
 
@@ -1585,6 +1665,61 @@ kbd {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* Hotkey live-test box for step 3. Goes green when the real hotkey fires. */
+.onboard-test-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--r-md);
+  margin-bottom: var(--space-4);
+  transition: border-color var(--dur-med), background var(--dur-med);
+}
+.onboard-test-box[data-state='detected'] {
+  border-style: solid;
+  border-color: var(--ok);
+  background: var(--ok-soft);
+}
+.onboard-test-kbd {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 18px;
+  background: var(--bg-3);
+  border: 1px solid var(--border-medium);
+  border-bottom-width: 2px;
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--text-1);
+  font-weight: 500;
+  letter-spacing: 1px;
+  transition: background var(--dur-med), border-color var(--dur-med), transform var(--dur-fast);
+}
+.onboard-test-box[data-state='detected'] .onboard-test-kbd {
+  background: rgba(74, 222, 128, 0.2);
+  border-color: var(--ok);
+  color: var(--ok);
+  animation: test-pop 0.32s var(--ease-out);
+}
+@keyframes test-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.onboard-test-status {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  text-align: center;
+}
+.onboard-test-box[data-state='detected'] .onboard-test-status {
+  color: var(--ok);
+  font-weight: 500;
 }
 
 .onboard-skip {

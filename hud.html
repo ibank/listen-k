@@ -5,6 +5,14 @@
   <link rel="stylesheet" href="hud.css" />
 </head>
 <body>
+  <!-- Small context pill floating above the HUD showing which engine is
+       active + current post-processing mode. Hidden until main sends
+       context via `hud-context` IPC. -->
+  <div class="hud-context" id="hudContext" hidden>
+    <span class="hud-context-ico" aria-hidden="true"></span>
+    <span class="hud-context-text"></span>
+  </div>
+
   <div class="pill" id="pill" data-state="recording">
     <button class="btn cancel" id="cancelBtn" aria-label="취소">
       <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
@@ -19,7 +27,9 @@
         <span></span>
       </div>
       <div class="spinner" id="spinner" aria-hidden="true"></div>
-      <div class="live-text" id="liveText"></div>
+      <div class="live-text" id="liveText">
+        <span class="live-text-body" id="liveTextBody"></span><span class="cursor" aria-hidden="true"></span>
+      </div>
     </div>
 
     <button class="btn confirm" id="confirmBtn" aria-label="확정">

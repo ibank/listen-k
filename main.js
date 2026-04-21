@@ -129,7 +129,10 @@ function createWindow() {
 }
 
 const HUD_WIDTH = 260;
-const HUD_HEIGHT = 64;
+// Window needs to accommodate the 50px pill + ~26px context bar (pill on
+// top) + 8px padding top/bottom. 100px gives a bit of breathing room for
+// glow shadows so nothing clips at the edges.
+const HUD_HEIGHT = 100;
 
 function positionHudOnActiveScreen() {
   if (!hudWindow) return;
@@ -180,6 +183,66 @@ function createHudWindow() {
   hudWindow.loadFile('hud.html');
 }
 
+const ENGINE_LABELS_HUD = {
+  apple: 'Apple Speech',
+  whisperkit: 'WhisperKit',
+  'whisper.cpp': 'whisper.cpp',
+  openai: 'OpenAI API',
+};
+const MODE_LABELS_HUD = {
+  off: { ko: '원문', en: 'Raw', ja: '生', 'zh-CN': '原文' },
+  rules: { ko: '규칙 정제', en: 'Rules', ja: 'ルール', 'zh-CN': '规则' },
+  ollama: { ko: 'Ollama 정제', en: 'Ollama clean', ja: 'Ollama 整形', 'zh-CN': 'Ollama 整理' },
+  translate: { ko: 'Ollama 번역', en: 'Translate', ja: '翻訳', 'zh-CN': '翻译' },
+};
+const STATE_CONTEXT = {
+  processing: {
+    ko: '다듬는 중…', en: 'Polishing…', ja: '整形中…', 'zh-CN': '整理中…',
+  },
+  processingOllama: {
+    ko: 'Ollama 로 다듬는 중…', en: 'Ollama polishing…', ja: 'Ollama で整形中…', 'zh-CN': 'Ollama 整理中…',
+  },
+  processingTranslate: {
+    ko: 'Ollama 번역 중…', en: 'Ollama translating…', ja: 'Ollama 翻訳中…', 'zh-CN': 'Ollama 翻译中…',
+  },
+  done: {
+    ko: '붙여넣기 완료', en: 'Pasted · done', ja: '貼り付け完了', 'zh-CN': '粘贴完成',
+  },
+};
+
+// `state` is optional — when omitted, the context bar just shows
+// "[engine] · [mode]". When present, the label reflects the current
+// pipeline phase so the user sees progress text match the coloured halo.
+function sendHudContext(state) {
+  if (!hudWindow) return;
+  const engine = currentEngine();
+  const loc = currentUiLocale();
+  const cfg = loadConfig();
+  const mode = ['off', 'rules', 'ollama', 'translate'].includes(cfg.mode) ? cfg.mode : 'off';
+  const engineLabel = ENGINE_LABELS_HUD[engine] || engine;
+
+  let modeLabel = MODE_LABELS_HUD[mode]?.[loc] || MODE_LABELS_HUD[mode]?.en || '';
+
+  // Overlay state-aware messaging on top of the neutral engine/mode combo.
+  if (state === 'processing') {
+    const key = mode === 'translate' ? 'processingTranslate'
+              : mode === 'ollama'   ? 'processingOllama'
+              : 'processing';
+    modeLabel = STATE_CONTEXT[key][loc] || STATE_CONTEXT[key].en;
+  } else if (state === 'done') {
+    modeLabel = STATE_CONTEXT.done[loc] || STATE_CONTEXT.done.en;
+  }
+
+  hudWindow.webContents.send('hud-context', {
+    engine,
+    engineLabel,
+    mode,
+    modeLabel,
+    locale: loc,
+    state: state || 'recording',
+  });
+}
+
 function showHud(state) {
   if (!hudWindow) return;
   // Re-anchor to the screen containing the cursor every time the HUD is
@@ -187,7 +250,9 @@ function showHud(state) {
   // always appear on the primary display regardless of where the user is
   // looking.
   positionHudOnActiveScreen();
-  hudWindow.webContents.send('hud-state', state || 'recording');
+  const s = state || 'recording';
+  hudWindow.webContents.send('hud-state', s);
+  sendHudContext(s);
   if (!hudWindow.isVisible()) hudWindow.showInactive();
 }
 
@@ -198,6 +263,7 @@ let hudDoneTimer = null;
 function flashHudDone(durationMs = 900) {
   if (!hudWindow || !hudWindow.isVisible()) { hideHud(); return; }
   hudWindow.webContents.send('hud-state', 'done');
+  sendHudContext('done');
   if (hudDoneTimer) clearTimeout(hudDoneTimer);
   hudDoneTimer = setTimeout(() => { hideHud(); }, durationMs);
 }
@@ -752,6 +818,14 @@ function cancelHudSafetyHide() {
 }
 
 async function handleFnPress() {
+  // During onboarding step 3 we're just confirming the user's hotkey
+  // works — no actual recording should start. Emit a dedicated event to
+  // the renderer so the overlay can show "✓ detected".
+  if (onboardingHotkeyTest) {
+    mainWindow?.webContents.send('onboarding-hotkey-fired');
+    return;
+  }
+
   if (isProcessing) return;
   if (!mainWindow) return;
 
@@ -1620,6 +1694,15 @@ ipcMain.handle('set-onboarding-done', (_e, done) => {
   if (done) cfg.onboardingDone = true;
   else delete cfg.onboardingDone;
   saveConfig(cfg);
+  return { ok: true };
+});
+
+// Onboarding step 3 "tap your hotkey" test: renderer puts main into a
+// suppressed mode where handleFnPress does NOT start a recording. We just
+// forward the detection event so the onboarding UI can show "✓ detected".
+let onboardingHotkeyTest = false;
+ipcMain.handle('set-onboarding-hotkey-test', (_e, enabled) => {
+  onboardingHotkeyTest = Boolean(enabled);
   return { ok: true };
 });
 ipcMain.handle('set-ui-locale', (_e, loc) => {

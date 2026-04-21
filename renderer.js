@@ -1535,6 +1535,18 @@ function applyEngineVisibility(engine) {
   document.querySelectorAll('[data-engine-only]').forEach((el) => {
     el.style.display = el.dataset.engineOnly === engine ? '' : 'none';
   });
+  // Hide the whole engine-options group when the selected engine has no
+  // configurable options (Apple Speech · whisper.cpp) — otherwise users
+  // see an empty framed box below the engine cards.
+  const group = document.getElementById('engineOptions');
+  const hasFields = engine === 'whisperkit' || engine === 'openai';
+  if (group) group.hidden = !hasFields;
+
+  const subEl = document.getElementById('engineOptionsSub');
+  if (subEl) {
+    const key = `page.engine.optionsSub.${engine}`;
+    subEl.textContent = hasFields ? t(key) : '';
+  }
 }
 
 const HOTKEY_LABELS = {
@@ -1597,6 +1609,7 @@ async function restoreSettings() {
   if (language && langSel) langSel.value = language;
 
   if (streamingSel) streamingSel.value = streaming === false ? 'off' : 'on';
+  syncStreamingSeg();
 
   if (engine && engineSel) engineSel.value = engine;
   applyEngineVisibility(engine || 'whisperkit');
@@ -1691,8 +1704,28 @@ langSel?.addEventListener('change', async () => {
 streamingSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
   const enabled = streamingSel.value === 'on';
+  syncStreamingSeg();
   await api.setStreaming?.(enabled);
   toast(t('toast.streaming', { label: enabled ? t('field.streaming.on') : t('field.streaming.off') }));
+});
+
+// Segmented-toggle UI: buttons drive the hidden <select>, fire its change
+// event so the listener above runs exactly once regardless of which one
+// the user clicked.
+const streamingSegEl = $('streamingSeg');
+function syncStreamingSeg() {
+  if (!streamingSegEl || !streamingSel) return;
+  streamingSegEl.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('active', b.getAttribute('data-value') === streamingSel.value);
+  });
+}
+streamingSegEl?.querySelectorAll('button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const v = btn.getAttribute('data-value');
+    if (!streamingSel || streamingSel.value === v) return;
+    streamingSel.value = v;
+    streamingSel.dispatchEvent(new Event('change'));
+  });
 });
 
 modeSel?.addEventListener('change', async () => {
@@ -1739,41 +1772,42 @@ const ENGINE_CARDS = [
   {
     id: 'whisperkit',
     name: 'WhisperKit',
-    badge: { cls: 'local', label: 'Local' },
+    recommended: true,
+    badge: { cls: 'local', label: 'Local · Core ML · 632MB' },
     descKey: 'engineCard.whisperkit.desc',
     metrics: [
-      { labelKey: 'engineCard.latency', value: '~0.6s' },
-      { labelKey: 'engineCard.quality', value: '★★★★☆' },
+      { labelKey: 'engineCard.latency', value: '~0.4s' },
+      { labelKey: 'engineCard.quality', value: '★★★★★' },
     ],
   },
   {
     id: 'apple',
     name: 'Apple Speech',
-    badge: { cls: 'local', label: 'Local' },
+    badge: { cls: 'local', label: 'Local · 0MB' },
     descKey: 'engineCard.apple.desc',
     metrics: [
-      { labelKey: 'engineCard.latency', value: '~0.3s' },
+      { labelKey: 'engineCard.latency', value: '~0.2s' },
       { labelKey: 'engineCard.quality', value: '★★★☆☆' },
     ],
   },
   {
     id: 'openai',
     name: 'OpenAI API',
-    badge: { cls: 'cloud', label: 'Cloud' },
+    badge: { cls: 'cloud', label: 'Cloud · $0.006/min' },
     descKey: 'engineCard.openai.desc',
     metrics: [
-      { labelKey: 'engineCard.latency', value: '~1.2s' },
+      { labelKey: 'engineCard.latency', value: 'network' },
       { labelKey: 'engineCard.quality', value: '★★★★★' },
     ],
   },
   {
     id: 'whisper.cpp',
     name: 'whisper.cpp',
-    badge: { cls: 'experimental', label: 'Batch' },
+    badge: { cls: 'experimental', label: 'Local · GGML' },
     descKey: 'engineCard.cpp.desc',
     metrics: [
       { labelKey: 'engineCard.latency', value: 'batch' },
-      { labelKey: 'engineCard.quality', value: '★★★☆☆' },
+      { labelKey: 'engineCard.quality', value: '★★★★☆' },
     ],
   },
 ];
@@ -1801,7 +1835,14 @@ function renderEngineCards(selectedEngine) {
         <svg viewBox="0 0 16 16" width="10" height="10"><path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     `;
-    card.querySelector('.name').textContent = spec.name;
+    const nameEl = card.querySelector('.name');
+    nameEl.textContent = spec.name;
+    if (spec.recommended) {
+      const rec = document.createElement('span');
+      rec.className = 'engine-card-rec';
+      rec.textContent = ' · ' + t('engineCard.recommended');
+      nameEl.appendChild(rec);
+    }
     card.querySelector('.badge').textContent = spec.badge.label;
     card.querySelector('.desc').textContent = t(spec.descKey);
     const metricEls = card.querySelectorAll('.metric');
@@ -1878,6 +1919,12 @@ uiLocaleSel?.addEventListener('change', async () => {
   refreshStatsCharts();
   refreshKpiTiles();
   refreshHistory();
+  // Engine cards + options sub-head both contain JS-assigned strings
+  // that don't pick up data-i18n walks — re-run them explicitly.
+  if (engineSel) {
+    renderEngineCards(engineSel.value);
+    applyEngineVisibility(engineSel.value);
+  }
   const label = window.i18n?.LOCALE_LABELS?.[loc] || loc;
   toast(t('toast.uiLocale', { label }));
 });
@@ -1984,7 +2031,14 @@ function onboardShowStep(i) {
     d.classList.toggle('done', s < onboardStep);
   });
   if (onboardStep === 1) onboardRenderPermissions();
-  if (onboardStep === 2) onboardRenderHotkeyHint();
+  if (onboardStep === 2) {
+    onboardSyncHotkey();
+    onboardRenderHotkeyHint();
+  }
+  // Intercept real hotkey presses only while the test step is active so
+  // we don't accidentally start a recording during onboarding.
+  const inTest = onboardStep === 2;
+  try { window.listenk?.setOnboardingHotkeyTest?.(inTest); } catch {}
 }
 
 async function onboardRenderPermissions() {
@@ -2067,7 +2121,33 @@ function onboardRenderHotkeyHint() {
   if (!hintEl || !sel) return;
   const label = HOTKEY_LABELS[sel.value] || '⇧⇧';
   hintEl.textContent = t('onboard.hotkey.testHint', { label });
+
+  // Reset the live-test box + apply the chosen hotkey glyph to the kbd.
+  const testBox = $('onboardTestBox');
+  const testKbd = $('onboardTestKbd');
+  const testStatus = $('onboardTestStatus');
+  if (testKbd) testKbd.textContent = label;
+  if (testBox) testBox.setAttribute('data-state', 'waiting');
+  if (testStatus) testStatus.textContent = t('onboard.hotkey.testPrompt');
 }
+
+// Apply the selected hotkey to fn-listener the moment the user picks it,
+// so the step-3 test actually exercises the chosen binding (not whatever
+// was set before the overlay opened).
+async function onboardSyncHotkey() {
+  const sel = $('onboardHotkey');
+  if (!sel || !sel.value) return;
+  try { await window.listenk?.setHotkey?.(sel.value); } catch {}
+}
+
+// Wire once: when fn-listener fires during the test, main emits a
+// dedicated event so we don't trigger a real recording.
+window.listenk?.onOnboardingHotkeyFired?.(() => {
+  const testBox = $('onboardTestBox');
+  const testStatus = $('onboardTestStatus');
+  if (testBox) testBox.setAttribute('data-state', 'detected');
+  if (testStatus) testStatus.textContent = t('onboard.hotkey.testDetected');
+});
 
 async function onboardFinish() {
   // Persist current onboarding-picked hotkey through the same IPC the
@@ -2077,6 +2157,8 @@ async function onboardFinish() {
     try { await window.listenk.setHotkey?.(onboardHotkeySel.value); } catch {}
   }
   try { await window.listenk.setOnboardingDone?.(true); } catch {}
+  // Re-enable normal hotkey behaviour before the overlay goes away.
+  try { await window.listenk.setOnboardingHotkeyTest?.(false); } catch {}
   onboardEl.hidden = true;
 }
 
@@ -2103,7 +2185,10 @@ $('onboardNext1')?.addEventListener('click', () => onboardShowStep(2));
 $('onboardBack2')?.addEventListener('click', () => onboardShowStep(1));
 $('onboardDone')?.addEventListener('click', () => onboardFinish());
 $('onboardSkip')?.addEventListener('click', () => onboardFinish());
-$('onboardHotkey')?.addEventListener('change', onboardRenderHotkeyHint);
+$('onboardHotkey')?.addEventListener('change', () => {
+  onboardSyncHotkey();
+  onboardRenderHotkeyHint();
+});
 
 // External navigation requests (from the tray popover's "History" / "Stats"
 // items): just click the matching sidebar link so the same routing logic

@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('listenk', {
   setUiLocale: (loc) => ipcRenderer.invoke('set-ui-locale', loc),
   getOnboardingDone: () => ipcRenderer.invoke('get-onboarding-done'),
   setOnboardingDone: (v) => ipcRenderer.invoke('set-onboarding-done', v),
+  setOnboardingHotkeyTest: (v) => ipcRenderer.invoke('set-onboarding-hotkey-test', v),
+  onOnboardingHotkeyFired: (cb) => ipcRenderer.on('onboarding-hotkey-fired', () => cb()),
   getHotkey: () => ipcRenderer.invoke('get-hotkey'),
   setHotkey: (mode) => ipcRenderer.invoke('set-hotkey', mode),
   setLanguage: (lang) => ipcRenderer.invoke('set-language', lang),

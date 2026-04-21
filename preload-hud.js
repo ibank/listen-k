@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('listenkHud', {
   onState: (cb) => ipcRenderer.on('hud-state', (_e, state) => cb(state)),
   onPartial: (cb) => ipcRenderer.on('hud-partial', (_e, text) => cb(text)),
   onReset: (cb) => ipcRenderer.on('hud-reset', () => cb()),
+  onContext: (cb) => ipcRenderer.on('hud-context', (_e, ctx) => cb(ctx)),
 });
