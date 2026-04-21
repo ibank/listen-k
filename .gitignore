@@ -6,5 +6,7 @@ models/
 .whisper-cpp-version
 native/transcribe-helper/.build/
 native/transcribe-helper/Package.resolved
+native/translate-helper/.build/
+native/translate-helper/Package.resolved
 *.log
 .DS_Store
