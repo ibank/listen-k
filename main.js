@@ -1863,6 +1863,14 @@ ipcMain.handle('request-mic', async () => {
 // a future feature needs to open an external link, add a purpose-specific
 // IPC that hard-codes the URL (see `open-settings-pane` for the pattern).
 
+// Purpose-specific handler for the Ollama empty-state banner's "Download
+// Ollama" button. URL is hardcoded so a compromised renderer can't pivot
+// this into an arbitrary-URL primitive.
+ipcMain.handle('open-ollama-download', () => {
+  require('electron').shell.openExternal('https://ollama.com/download');
+  return true;
+});
+
 // `show-in-finder` is the only place we surface a filesystem path in Finder
 // for the user, and the renderer-side callers (`showInFinder(targetPath)`
 // in renderer.js) always hand it a path returned from `collectStatus()` —

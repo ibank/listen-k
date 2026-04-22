@@ -2688,6 +2688,19 @@ async function runUpdateCheck() {
 
 $('aboutUpdateBtn')?.addEventListener('click', runUpdateCheck);
 
+// ── Ollama empty-state banner action buttons ─────────────────────────
+// Both the button and the inline link open the same Ollama download page
+// via a dedicated purpose-specific IPC (no arbitrary URL exposure).
+function openOllamaDownloadPage(event) {
+  event?.preventDefault?.();
+  window.listenk?.openOllamaDownload?.();
+}
+$('ollamaOpenDownloadBtn')?.addEventListener('click', openOllamaDownloadPage);
+$('ollamaOpenDownload')?.addEventListener('click', openOllamaDownloadPage);
+$('ollamaRefreshBtn')?.addEventListener('click', () => {
+  refreshOllamaPage();
+});
+
 (async () => {
   await restoreSettings();
   loadAppVersion();

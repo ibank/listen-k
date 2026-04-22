@@ -391,11 +391,31 @@
           </div>
         </div>
 
-        <!-- Status banner when Ollama isn't running -->
+        <!-- Status banner when Ollama isn't running. Shows two scenarios
+             (install vs. start) so users who have never used Ollama and
+             users whose daemon simply isn't running both get a next step. -->
         <div class="ollama-empty" id="ollamaEmpty" hidden>
           <div class="ollama-empty-title" data-i18n="page.ollama.notRunningTitle">Ollama isn't running</div>
           <div class="ollama-empty-desc" data-i18n="page.ollama.notRunningDesc">
-            Start it with <code>brew services start ollama</code> or run <code>ollama serve</code>.
+            Install or start Ollama to enable AI post-processing.
+          </div>
+          <ol class="ollama-empty-steps">
+            <li>
+              <span class="ollama-empty-step-label" data-i18n="page.ollama.stepInstallTitle">Not installed yet?</span>
+              <code>brew install ollama</code>
+              <span class="ollama-empty-step-or" data-i18n="page.ollama.orLabel">or</span>
+              <a href="#" id="ollamaOpenDownload" data-i18n="page.ollama.downloadLink">ollama.com/download</a>
+            </li>
+            <li>
+              <span class="ollama-empty-step-label" data-i18n="page.ollama.stepStartTitle">Already installed?</span>
+              <code>brew services start ollama</code>
+              <span class="ollama-empty-step-or" data-i18n="page.ollama.orLabel">or</span>
+              <code>ollama serve</code>
+            </li>
+          </ol>
+          <div class="ollama-empty-actions">
+            <button type="button" class="ghost" id="ollamaOpenDownloadBtn" data-i18n="page.ollama.openDownload">Open Ollama download page</button>
+            <button type="button" class="ghost" id="ollamaRefreshBtn" data-i18n="page.ollama.refresh">Refresh</button>
           </div>
         </div>
 

@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('listenk', {
   setOnboardingDone: (v) => ipcRenderer.invoke('set-onboarding-done', v),
   setOnboardingHotkeyTest: (v) => ipcRenderer.invoke('set-onboarding-hotkey-test', v),
   onOnboardingHotkeyFired: (cb) => ipcRenderer.on('onboarding-hotkey-fired', () => cb()),
+  openOllamaDownload: () => ipcRenderer.invoke('open-ollama-download'),
   ollamaList: () => ipcRenderer.invoke('ollama-list'),
   ollamaPull: (name) => ipcRenderer.invoke('ollama-pull', name),
   ollamaPullCancel: (name) => ipcRenderer.invoke('ollama-pull-cancel', name),
