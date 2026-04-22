@@ -12,6 +12,46 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.6.2] — 2026-04-23
+
+### Added
+- **App version is now visible in the UI.** The sidebar footer carries
+  a persistent `Listen K vX.Y.Z` line so the build running is always
+  discoverable without touching the terminal or the About menu, and
+  the Usage page has a new "About" card with a **Check for updates**
+  button that drives the same `electron-updater` feed that auto-update
+  uses (via the existing `check-for-updates` IPC, extended to return
+  `currentVersion` / `latestVersion` so the renderer can show a
+  specific "update available · vX.Y.Z" line instead of a generic
+  toast). i18n for `usage.about.*` added across ko / en / ja / zh-CN.
+- New IPC `get-app-version` (exposed as `window.listenk.getAppVersion`)
+  so renderer code can display the current build without piping it
+  through config.
+
+### Changed
+- **Ollama-not-running banner is now a real help surface.** The
+  previous terse one-liner ("터미널에서 실행하세요" / "Start it from a
+  terminal") is replaced by a two-scenario layout: an "Not installed
+  yet?" row with `brew install ollama` and a link to
+  `ollama.com/download`, and an "Already installed?" row with
+  `brew services start ollama` / `ollama serve`. Two action buttons
+  ("Open Ollama download page" + "Refresh") let the user finish the
+  fix without leaving the app. The download button goes through a new
+  purpose-specific IPC `open-ollama-download` that hardcodes the URL
+  (same hardening pattern as `open-settings-pane`). i18n keys added
+  across all four locales.
+- **Recommended Ollama models refreshed for 2026-04.** The list on
+  the Ollama page now reads `gemma4:e4b` (new default, replacing
+  `gemma3:4b`), `qwen3.5:4b` (multilingual), `gemma3:12b` (higher
+  quality), `llama3.2:3b` (lightweight), `qwen2.5:7b` (balanced), and
+  `phi4-mini:3.8b` (multilingual alternative). `mistral:7b` is
+  dropped — no longer a clear win over qwen2.5:7b for post-processing
+  transcripts. `qwen3.6` is intentionally excluded because Ollama
+  only ships it at 35B today. Existing users' persisted
+  `ollamaDefault` selection is untouched — only the unselected
+  fallback moves to `gemma4:e4b`. The "copy pull command" action row
+  and the `hasGemma` status check were updated to the new default.
+
 ## [0.6.1] — 2026-04-23
 
 ### Changed
@@ -424,7 +464,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/ibank/listen-k/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/ibank/listen-k/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/ibank/listen-k/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/ibank/listen-k/compare/v0.5.5...v0.5.6
