@@ -84,6 +84,11 @@
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 5v3.5M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span data-i18n="sidebar.nav.usage">Usage</span>
       </a>
+
+      <div class="sidebar-foot" id="sidebarFoot">
+        <span class="sidebar-foot-brand" data-i18n="app.name">Listen K</span>
+        <span class="sidebar-foot-version" id="sidebarVersion"></span>
+      </div>
     </nav>
 
     <main class="content" id="content">
@@ -492,6 +497,21 @@
           <div class="usage-row usage-row--muted" data-i18n-html="usage.cancel">
             Cancel via <span class="icon-x">✕</span> on the HUD · alternate hotkey <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Space</kbd>
           </div>
+        </div>
+
+        <div class="fields about-block">
+          <div class="fields-head">
+            <h3 data-i18n="usage.about.title">About</h3>
+            <span class="card-head-sub" data-i18n="usage.about.sub">Version and updates</span>
+          </div>
+          <div class="about-row">
+            <div class="about-info">
+              <div class="about-brand" data-i18n="app.name">Listen K</div>
+              <div class="about-version" id="aboutVersion">—</div>
+            </div>
+            <button class="ghost" id="aboutUpdateBtn" type="button" data-i18n="usage.about.check">Check for updates</button>
+          </div>
+          <div class="about-status" id="aboutUpdateStatus" data-state="idle"></div>
         </div>
       </section>
     </main>

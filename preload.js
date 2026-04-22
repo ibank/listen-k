@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('listenk', {
   openSettingsPane: (pane) => ipcRenderer.invoke('open-settings-pane', pane),
   requestMic: () => ipcRenderer.invoke('request-mic'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   showInFinder: (p) => ipcRenderer.invoke('show-in-finder', p),
   clipboardWrite: (text) => ipcRenderer.invoke('clipboard-write', text),
   historyList: (limit) => ipcRenderer.invoke('history-list', limit),

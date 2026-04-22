@@ -368,6 +368,26 @@ body {
   gap: 2px;
 }
 
+.sidebar-foot {
+  margin-top: auto;
+  padding: 10px 12px 4px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--text-4);
+  font-size: 11px;
+  user-select: none;
+}
+.sidebar-foot-brand {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.sidebar-foot-version {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
 .nav-group-label {
   font-size: 10.5px;
   font-weight: 600;
@@ -1498,6 +1518,36 @@ kbd {
 }
 .icon-check { color: var(--ok); font-weight: 600; }
 .icon-x { color: var(--err); font-weight: 600; }
+
+/* About / version card on the Usage page. Reuses .fields shell so the
+   card inherits border, radius, and backdrop from the existing design
+   system; only the internal layout and tonal colours are local. */
+.about-block { margin-top: var(--space-4); }
+.about-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.about-info { display: flex; flex-direction: column; gap: 2px; }
+.about-brand { font-weight: 600; color: var(--text-1); font-size: 13px; }
+.about-version {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1px;
+}
+.about-status {
+  padding: 0 var(--space-4) var(--space-4);
+  font-size: 12px;
+  min-height: 1em;
+}
+.about-status[data-state="idle"]    { color: var(--text-3); }
+.about-status[data-state="checking"]{ color: var(--text-3); }
+.about-status[data-state="ok"]      { color: var(--ok); }
+.about-status[data-state="update"]  { color: var(--accent, var(--text-1)); font-weight: 500; }
+.about-status[data-state="error"]   { color: var(--err); }
 
 /* ========== History list (이력 page) ========== */
 

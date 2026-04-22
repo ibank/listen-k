@@ -238,6 +238,15 @@ const strings = {
     'usage.step4': '정제·번역된 텍스트가 포커스된 필드에 자동 붙여넣어집니다.',
     'usage.cancel': '취소는 HUD 의 ✕ · 대체 단축키 ⌘⇧Space',
 
+    'usage.about.title': '정보',
+    'usage.about.sub': '버전 및 업데이트',
+    'usage.about.check': '업데이트 확인',
+    'usage.about.checking': '확인 중…',
+    'usage.about.upToDate': '최신 버전입니다 (v{version}).',
+    'usage.about.updateAvailable': '업데이트 사용 가능 · v{version} — 앱 종료 시 자동 설치됩니다.',
+    'usage.about.checkFailed': '확인 실패: {reason}',
+    'usage.about.devBuild': '개발 빌드 — 업데이트 확인 비활성',
+
     // ── Status-page check rows ────────────────────────────────────────
     'check.mic.title': '마이크 접근',
     'check.mic.granted': '허용됨',
@@ -605,6 +614,15 @@ const strings = {
     'usage.step4': 'The cleaned/translated text is auto-pasted into the focused field.',
     'usage.cancel': 'Cancel via ✕ on the HUD · alternate hotkey ⌘⇧Space',
 
+    'usage.about.title': 'About',
+    'usage.about.sub': 'Version and updates',
+    'usage.about.check': 'Check for updates',
+    'usage.about.checking': 'Checking…',
+    'usage.about.upToDate': "You're on the latest version (v{version}).",
+    'usage.about.updateAvailable': 'Update available · v{version} — will install automatically the next time you quit.',
+    'usage.about.checkFailed': 'Check failed: {reason}',
+    'usage.about.devBuild': 'Development build — update check disabled',
+
     'check.mic.title': 'Microphone access',
     'check.mic.granted': 'Granted',
     'check.mic.denied': 'Denied. Enable in System Settings.',
@@ -966,6 +984,15 @@ const strings = {
     'usage.step4': '整形・翻訳されたテキストがフォーカス中のフィールドに自動貼り付けされます。',
     'usage.cancel': 'キャンセルは HUD の ✕ · 代替ショートカット ⌘⇧Space',
 
+    'usage.about.title': '情報',
+    'usage.about.sub': 'バージョンとアップデート',
+    'usage.about.check': 'アップデートを確認',
+    'usage.about.checking': '確認中…',
+    'usage.about.upToDate': '最新バージョンです (v{version})。',
+    'usage.about.updateAvailable': 'アップデート利用可能 · v{version} — 次回終了時に自動でインストールされます。',
+    'usage.about.checkFailed': '確認失敗: {reason}',
+    'usage.about.devBuild': '開発ビルド — アップデート確認は無効',
+
     'check.mic.title': 'マイクアクセス',
     'check.mic.granted': '許可済み',
     'check.mic.denied': '拒否されました。システム設定で許可してください。',
@@ -1326,6 +1353,15 @@ const strings = {
     'usage.step3': '说完后再按 {hotkey} 或点击 HUD 上的 ✓。',
     'usage.step4': '整理/翻译后的文字将自动粘贴到聚焦的输入框中。',
     'usage.cancel': '通过 HUD 的 ✕ 取消 · 备用快捷键 ⌘⇧Space',
+
+    'usage.about.title': '关于',
+    'usage.about.sub': '版本与更新',
+    'usage.about.check': '检查更新',
+    'usage.about.checking': '检查中…',
+    'usage.about.upToDate': '已是最新版本 (v{version})。',
+    'usage.about.updateAvailable': '有新版本 · v{version} — 下次退出时自动安装。',
+    'usage.about.checkFailed': '检查失败: {reason}',
+    'usage.about.devBuild': '开发版本 — 更新检查已禁用',
 
     'check.mic.title': '麦克风访问',
     'check.mic.granted': '已允许',

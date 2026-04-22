@@ -1522,14 +1522,23 @@ function setupAutoUpdater() {
 // Renderer can invoke this from a Settings "Check for updates" button.
 // Returns the UpdateCheckResult from electron-updater or null on failure.
 ipcMain.handle('check-for-updates', async () => {
-  if (!app.isPackaged) return { ok: false, reason: 'dev' };
+  const currentVersion = app.getVersion();
+  if (!app.isPackaged) return { ok: false, reason: 'dev', currentVersion };
   try {
     const res = await autoUpdater.checkForUpdates();
-    return { ok: true, updateAvailable: Boolean(res && res.updateInfo && res.updateInfo.version && res.updateInfo.version !== app.getVersion()) };
+    const latestVersion = res && res.updateInfo && res.updateInfo.version;
+    return {
+      ok: true,
+      currentVersion,
+      latestVersion: latestVersion || currentVersion,
+      updateAvailable: Boolean(latestVersion && latestVersion !== currentVersion),
+    };
   } catch (err) {
-    return { ok: false, reason: (err && err.message) || 'unknown' };
+    return { ok: false, reason: (err && err.message) || 'unknown', currentVersion };
   }
 });
+
+ipcMain.handle('get-app-version', () => app.getVersion());
 
 app.on('window-all-closed', (e) => {
   e.preventDefault?.();

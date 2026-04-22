@@ -2637,8 +2637,60 @@ window.listenk?.onNavigatePage?.((id) => {
 // settings restore below is slow on first run.
 wireSidebarNavigation();
 
+// ── About card (Usage page) + sidebar version chip ────────────────
+// Populated once on boot. The sidebar chip stays static; the update-check
+// button rebuilds the status line on every click.
+async function loadAppVersion() {
+  try {
+    const v = await window.listenk?.getAppVersion?.();
+    if (!v) return;
+    const sidebarEl = $('sidebarVersion');
+    const aboutEl = $('aboutVersion');
+    if (sidebarEl) sidebarEl.textContent = `v${v}`;
+    if (aboutEl) aboutEl.textContent = `v${v}`;
+  } catch {}
+}
+
+async function runUpdateCheck() {
+  const btn = $('aboutUpdateBtn');
+  const status = $('aboutUpdateStatus');
+  if (!btn || !status) return;
+  btn.disabled = true;
+  status.dataset.state = 'checking';
+  status.textContent = t('usage.about.checking');
+  try {
+    const res = await window.listenk?.checkForUpdates?.();
+    if (!res) throw new Error('ipc unavailable');
+    if (!res.ok) {
+      if (res.reason === 'dev') {
+        status.dataset.state = 'idle';
+        status.textContent = t('usage.about.devBuild');
+      } else {
+        status.dataset.state = 'error';
+        status.textContent = t('usage.about.checkFailed', { reason: res.reason || '?' });
+      }
+      return;
+    }
+    if (res.updateAvailable) {
+      status.dataset.state = 'update';
+      status.textContent = t('usage.about.updateAvailable', { version: res.latestVersion });
+    } else {
+      status.dataset.state = 'ok';
+      status.textContent = t('usage.about.upToDate', { version: res.currentVersion });
+    }
+  } catch (err) {
+    status.dataset.state = 'error';
+    status.textContent = t('usage.about.checkFailed', { reason: err.message || '?' });
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('aboutUpdateBtn')?.addEventListener('click', runUpdateCheck);
+
 (async () => {
   await restoreSettings();
+  loadAppVersion();
   // Onboarding dialog runs after settings are restored so it can show the
   // user's configured hotkey in step 3. It's a no-op if onboardingDone is
   // already true in config.
