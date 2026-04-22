@@ -1,6 +1,6 @@
 {
   "name": "listen-k",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Listen K — AI voice dictation for macOS. Local Whisper + optional Ollama post-processing.",
   "author": "ibank <hello@listenk.com>",
   "license": "MIT",
@@ -123,7 +123,9 @@
         "LSUIElement": true,
         "LSMinimumSystemVersion": "14.0"
       },
-      "hardenedRuntime": true
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "dmg": {
       "title": "Listen K ${version}",

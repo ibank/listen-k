@@ -7,6 +7,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [0.4.1] — 2026-04-22
+
+### Fixed
+- Transcription engine is no longer stuck in the "preparing" state and the
+  microphone permission prompt now actually appears on first launch of a
+  Developer ID signed build. Under hardened runtime, TCC silently denies
+  any microphone request from a binary that does not declare
+  `com.apple.security.device.audio-input`; electron-builder's default
+  entitlements only include the Electron runtime keys (`allow-jit`,
+  `allow-unsigned-executable-memory`, `disable-library-validation`), so
+  `transcribe-helper` and `apple-speech-helper` were blocked without any
+  user-visible prompt. Ship a custom `build/entitlements.mac.plist` that
+  adds `com.apple.security.device.audio-input` and
+  `com.apple.security.automation.apple-events`, and wire it up via
+  `mac.entitlements` + `mac.entitlementsInherit`.
+
+## [0.4.0] — 2026-04-22
+
+### Added
 - Theme switcher: System / Light / Dark, applied to the main window and the
   tray popover.
 - Ollama model manager page with a "Ready" state in the title bar.
@@ -74,7 +98,9 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/ListenK/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ibank/ListenK/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/ibank/ListenK/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/ibank/ListenK/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ibank/ListenK/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ibank/ListenK/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ibank/ListenK/releases/tag/v0.1.0
