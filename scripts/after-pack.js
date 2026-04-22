@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const path = require('path');
 
 // After electron-builder finishes packing the .app bundle, either:
@@ -7,6 +7,10 @@ const path = require('path');
 //      break notarisation.
 //   b) no identity was available (local dev builds, fresh checkouts) — apply
 //      an ad-hoc signature so the bundle at least launches locally.
+//
+// execFileSync is used (not execSync with a shell-interpolated string) so
+// that a pathological productFilename containing shell metacharacters can
+// never escape into the command line.
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return;
 
@@ -15,10 +19,16 @@ exports.default = async function afterPack(context) {
 
   let hasDeveloperId = false;
   try {
-    const out = execSync(`codesign -dv "${appPath}" 2>&1`, { encoding: 'utf8' });
+    const out = execFileSync('codesign', ['-dv', appPath], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     hasDeveloperId = /Authority=Developer ID Application/.test(out);
-  } catch {
-    // codesign -dv fails on unsigned bundles; treat as no real signature
+  } catch (err) {
+    // codesign -dv fails on unsigned bundles; inspect stderr too since it
+    // writes everything there. Treat absence of a real Authority as unsigned.
+    const combined = String((err && err.stderr) || '') + String((err && err.stdout) || '');
+    hasDeveloperId = /Authority=Developer ID Application/.test(combined);
   }
 
   if (hasDeveloperId) {
@@ -27,7 +37,7 @@ exports.default = async function afterPack(context) {
   }
 
   console.log('[after-pack] ad-hoc signing app bundle:', appPath);
-  execSync(`codesign --force --deep --sign - "${appPath}"`, { stdio: 'inherit' });
-  execSync(`codesign --verify --verbose=2 "${appPath}"`, { stdio: 'inherit' });
+  execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], { stdio: 'inherit' });
+  execFileSync('codesign', ['--verify', '--verbose=2', appPath], { stdio: 'inherit' });
   console.log('[after-pack] ad-hoc signing done');
 };

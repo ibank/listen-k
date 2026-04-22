@@ -983,9 +983,8 @@ function hideFirstRunBanner() {
 // Multiple hide triggers — any one of these is enough to permanently
 // retire the banner for the rest of the session:
 //   1. explicit stream-ready IPC from main
-//   2. toast "전사 엔진 준비됨"
-//   3. first stream-partial (we'd never get one without ready)
-//   4. any successful stream-final
+//   2. first stream-partial (we'd never get one without ready)
+//   3. any successful stream-final
 window.listenk?.onStreamReady?.(() => {
   console.log('[renderer] stream-ready IPC received');
   hideFirstRunBanner();

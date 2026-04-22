@@ -495,7 +495,7 @@ const strings = {
     'kpi.totalCalls': 'Cumulative',
     'kpi.openaiCost': 'OpenAI cost',
     'kpi.ollamaCalls': 'Ollama calls',
-    'kpi.unitTimes': '',
+    'kpi.unitTimes': '', // English has no count classifier; withUnit() hides the span when empty.
     'kpi.detail.trendDuration': '{duration} captured',
     'chart.weekly.title': 'Daily usage',
     'chart.weekly.sub': 'Last 14 days · minutes per day',

@@ -24,7 +24,8 @@ let fnListener = null;
 let isRecording = false;
 let isProcessing = false;
 let savedFrontmostBundleId = null;
-let fnListenerReady = false;
+// fnListenerReady was tracked here previously but never read downstream;
+// removed in v0.5.6.
 let transcribeStream = null;
 let transcribeStreamReady = false;
 let transcribeStreamBuffer = '';
@@ -490,7 +491,11 @@ function safeBundleId(id) {
 }
 
 async function pasteToFrontmost(text) {
-  const frontmost = safeBundleId(await getFrontmostBundleId());
+  // Bundle-id argument used to be passed as `['--bundle', frontmost]` for
+  // eventual frontmost verification, but paste-helper never actually read
+  // it — the helper just pastes into whatever app holds focus at the time
+  // it posts the ⌘V event. focus-helper has already restored the correct
+  // frontmost by the time we get here, so the flag was pure noise.
   const paste = resPath('bin', 'paste-helper');
   if (!fs.existsSync(paste)) throw new Error('paste-helper missing');
   clipboard.writeText(text);
@@ -498,8 +503,7 @@ async function pasteToFrontmost(text) {
   // hides, then fire ⌘V via the helper.
   await new Promise((r) => setTimeout(r, 150));
   return new Promise((resolve, reject) => {
-    const args = frontmost ? ['--bundle', frontmost] : [];
-    execFile(paste, args, (err) => (err ? reject(err) : resolve()));
+    execFile(paste, [], (err) => (err ? reject(err) : resolve()));
   });
 }
 
@@ -816,8 +820,13 @@ const OPENAI_AUDIO_RATES_PER_MIN = {
   'whisper-1': 0.006,
 };
 
+// Engines accepted by the stats ledger. Anything else from the renderer is
+// dropped — prevents a compromised renderer from writing arbitrary keys
+// (including `__proto__` / `constructor`) into the counters map.
+const STAT_ENGINES = new Set(['apple', 'whisper.cpp', 'openai', 'whisperkit']);
+
 function recordTranscribeStat({ engine, model, audioSec }) {
-  if (!engine) return;
+  if (!engine || !STAT_ENGINES.has(engine)) return;
   const stats = loadStats();
   ensureTodayBucket(stats);
 
@@ -927,7 +936,6 @@ async function handleFnPress() {
       showHud('recording');
       cancelHudSafetyHide();
       sendStreamCmd({ cmd: 'start', language: currentLanguage() });
-      safeSend(mainWindow,'stream-started');
     } else {
       isRecording = false;
       // Close the race window: flip to processing immediately rather than
@@ -941,7 +949,6 @@ async function handleFnPress() {
       isProcessing = true;
       showHud('processing');
       sendStreamCmd({ cmd: 'stop' });
-      safeSend(mainWindow,'stream-stopping');
       scheduleHudSafetyHide();
     }
     updateTrayMenu();
@@ -991,11 +998,7 @@ function startFnListener() {
         console.log('[fn-listener] FN_DOWN received → toggle');
         handleFnPress();
       } else if (t.startsWith('READY')) {
-        // fn-listener emits `READY mode=<hotkey>` — match the prefix, not
-        // the whole line. (The exact-match check was silently a no-op on
-        // every launch, though `fnListenerReady` is currently read-only
-        // downstream so it had no visible effect.)
-        fnListenerReady = true;
+        // fn-listener emits `READY mode=<hotkey>` — match the prefix.
         console.log('[fn-listener] READY');
       } else if (t) {
         console.log('[fn-listener] stdout:', t);
@@ -1010,7 +1013,6 @@ function startFnListener() {
   fnListener.on('exit', (code, signal) => {
     console.error('[fn-listener] exited code=', code, 'signal=', signal);
     fnListener = null;
-    fnListenerReady = false;
   });
 }
 
@@ -1019,7 +1021,6 @@ function restartFnListener() {
     try { fnListener.kill('SIGTERM'); } catch {}
     fnListener = null;
   }
-  fnListenerReady = false;
   startFnListener();
 }
 
@@ -1573,7 +1574,10 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
     throw new Error(tr('error.recordingTooShort'));
   }
 
-  const tmpFile = path.join(os.tmpdir(), `listenk_${Date.now()}.wav`);
+  // Random suffix rather than Date.now() so two concurrent fallback
+  // transcribes (or a same-user process predicting the path) can't race
+  // on the filename.
+  const tmpFile = path.join(os.tmpdir(), `listenk_${require('crypto').randomBytes(12).toString('hex')}.wav`);
   await fs.promises.writeFile(tmpFile, buf);
   const lang = (language || '').split('-')[0] || 'auto';
   const engine = currentEngine();
@@ -1764,8 +1768,6 @@ ipcMain.handle('paste-text', async (_e, text) => {
     }
   });
 });
-
-ipcMain.handle('show-window', () => showWindowActive());
 
 ipcMain.handle('get-status', () => collectStatus());
 

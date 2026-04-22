@@ -12,6 +12,66 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.5.6] — 2026-04-23
+
+### Changed
+- Tmp WAV file used by the batch-transcribe fallback is now named with
+  `crypto.randomBytes` rather than `Date.now()`. On macOS the path is
+  under the per-user `$TMPDIR` so the old pattern was never actually
+  race-able by another user, but a predictable same-user path is a
+  gratuitous invariant to lose.
+- `scripts/after-pack.js` switched from `execSync` with shell-interpolated
+  strings to `execFileSync` with array args. `productFilename` comes from
+  electron-builder today, so no concrete injection path existed, but the
+  array form is simply safer hygiene.
+- `.github/dependabot.yml` now covers a third ecosystem: `swift`, rooted at
+  `native/transcribe-helper`. Transitive Swift deps (WhisperKit →
+  swift-transformers → swift-jinja / swift-crypto / yyjson /
+  swift-collections + swift-argument-parser) will get weekly update
+  PRs like the npm + Actions ones already do.
+- `scripts/migrate-from-ad-hoc.sh` header now recommends `curl ... -o
+  migrate.sh && less migrate.sh && bash migrate.sh` over the direct
+  `curl | bash` pattern. The script content is unchanged; just a safer
+  default instruction.
+
+### Fixed
+- Stats IPC handlers (`stats-record-transcribe`) now whitelist the
+  `engine` value against `['apple', 'whisper.cpp', 'openai',
+  'whisperkit']` before using it as an object key. Prior code would
+  accept arbitrary renderer-supplied strings (including `__proto__`,
+  `constructor`) into `stats.counters.callsByEngine[engine]`; the
+  practical blast radius was pollution of the local `stats.json`, not
+  an escape into the main process, but dropping bogus keys is free.
+- Removed dead IPC + dead pushes from main.js:
+  - `ipcMain.handle('show-window', ...)` had no preload bridge and no
+    caller — deleted.
+  - `stream-started` / `stream-stopping` were pushed to the renderer
+    but no renderer ever registered a listener — removed both sends.
+  - `fnListenerReady` was assigned on READY and exit but never read
+    downstream — the variable and its three assignment sites are gone.
+- Dropped the `--bundle <frontmost>` flag from `paste-helper`
+  invocation. `paste-helper.swift` reads `args[1] == "--check"` and
+  ignores every other argument; the flag was pure noise. focus-helper
+  has already restored the target frontmost before we call paste, so
+  nothing behavioural changed.
+- `tray.html` no longer shows a `⌘Q` shortcut glyph next to the Quit
+  button. No accelerator was actually registered for that key, so the
+  glyph was misleading. If/when we add a real accelerator, the glyph
+  comes back with it.
+- Removed a stale comment in `renderer.js` that referenced the literal
+  Korean toast string `"전사 엔진 준비됨"` — the banner-hide trigger
+  stopped string-matching it when the toast got localised back in
+  v0.2.0.
+- CHANGELOG `[0.3.0]` date format aligned with every other entry
+  (`2026-04` → `2026-04-22`).
+- `scripts/smoke.sh` now checks for
+  `bin/apple-speech-helper.app/Contents/MacOS/apple-speech-helper`
+  alongside the other four helpers, so a broken Apple Speech build
+  fails the smoke step instead of silently passing.
+- `i18n.js` entry `'kpi.unitTimes': ''` for English now carries a
+  one-line comment explaining that English has no count classifier and
+  `withUnit()` intentionally hides the span when the value is empty.
+
 ## [0.5.5] — 2026-04-23
 
 ### Changed
@@ -270,7 +330,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `hudDoneTimer` and `hudSafetyTimer` are cleared on `app.will-quit` so they
   cannot fire during shutdown.
 
-## [0.3.0] — 2026-04
+## [0.3.0] — 2026-04-22
 
 ### Added
 - Page routing, OpenAI engine option, statistics page.
@@ -315,7 +375,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/ibank/listen-k/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/ibank/listen-k/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/ibank/listen-k/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/ibank/listen-k/compare/v0.5.2...v0.5.3

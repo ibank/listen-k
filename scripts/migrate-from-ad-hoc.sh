@@ -30,12 +30,15 @@
 #   - Any System keychain or TCC database directly via sudo — tccutil
 #     is the supported per-user reset path.
 #
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/ibank/listen-k/main/scripts/migrate-from-ad-hoc.sh | bash
-#   # or, if you cloned the repo:
+# Usage (read-before-run, preferred — you should never pipe a random URL
+# straight into bash):
+#   curl -fsSL https://raw.githubusercontent.com/ibank/listen-k/main/scripts/migrate-from-ad-hoc.sh -o migrate.sh
+#   less migrate.sh        # inspect before running
+#   bash migrate.sh        # or `bash migrate.sh --dry-run` first
+#
+# If you cloned the repo:
 #   bash scripts/migrate-from-ad-hoc.sh
-#   # preview without changing anything:
-#   bash scripts/migrate-from-ad-hoc.sh --dry-run
+#   bash scripts/migrate-from-ad-hoc.sh --dry-run   # preview without changes
 
 set -u
 

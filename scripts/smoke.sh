@@ -32,6 +32,9 @@ echo "[smoke] helper binaries"
 [[ -x bin/paste-helper ]]      && step "bin/paste-helper present"      true || step "bin/paste-helper missing"      false
 [[ -x bin/focus-helper ]]      && step "bin/focus-helper present"      true || step "bin/focus-helper missing"      false
 [[ -x bin/transcribe-helper ]] && step "bin/transcribe-helper present" true || step "bin/transcribe-helper missing" false
+[[ -x bin/apple-speech-helper.app/Contents/MacOS/apple-speech-helper ]] \
+  && step "bin/apple-speech-helper.app present" true \
+  || step "bin/apple-speech-helper.app missing" false
 
 echo ""
 echo "[smoke] renderer HTML assets"

@@ -20,3 +20,14 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: "ci"
+  # Swift Package Manager — covers the transitive deps of transcribe-helper
+  # (WhisperKit → swift-transformers → swift-jinja / swift-crypto / yyjson /
+  #  swift-collections, plus swift-argument-parser).
+  - package-ecosystem: "swift"
+    directory: "/native/transcribe-helper"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
