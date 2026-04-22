@@ -64,18 +64,17 @@ jobs:
 
       - name: Build signed and notarised DMG
         env:
-          # electron-builder reads these directly for signing + notarisation.
+          # electron-builder reads these directly. CSC_* triggers Developer ID
+          # signing; APPLE_* triggers notarisation via @electron/notarize.
+          # Signing/notarisation settings come from package.json mac.*; CLI
+          # overrides are intentionally avoided (electron-builder 26 rejects
+          # the old nested mac.notarize.teamId shape).
           CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          npx electron-builder --mac dmg \
-            --config.mac.identity="Developer ID Application" \
-            --config.mac.hardenedRuntime=true \
-            --config.mac.gatekeeperAssess=false \
-            --config.mac.notarize.teamId=$APPLE_TEAM_ID
+        run: npx electron-builder --mac dmg --publish never
 
       - name: Compute checksum
         run: |
