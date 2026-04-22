@@ -16,6 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const i18n = require('./i18n');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 let hudWindow;
@@ -1468,6 +1469,60 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
     else showWindowActive();
   });
+
+  setupAutoUpdater();
+});
+
+// ── Auto-update ─────────────────────────────────────────────────────
+// electron-updater pulls the latest release from GitHub, downloads the
+// signed + notarised DMG in the background, and installs it the next time
+// the app quits. No manifest hosting on our side — electron-builder
+// uploaded `latest-mac.yml` alongside the DMG when it published the
+// release (see `mac.publish` in package.json and `release.yml`).
+// Silently no-ops in dev builds (autoUpdater checks `app.isPackaged`).
+function setupAutoUpdater() {
+  if (!app.isPackaged) {
+    console.log('[updater] dev build — skipping');
+    return;
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => console.log('[updater] checking…'));
+  autoUpdater.on('update-available', (info) => {
+    console.log('[updater] update available:', info.version);
+    safeSend(mainWindow, 'toast', tr('toast.updateAvailable', { version: info.version }));
+  });
+  autoUpdater.on('update-not-available', () => {
+    console.log('[updater] no update available');
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[updater] update downloaded:', info.version);
+    safeSend(mainWindow, 'toast', tr('toast.updateReady', { version: info.version }));
+  });
+  autoUpdater.on('error', (err) => {
+    // Don't surface transient network errors to the user — first-run or
+    // offline Macs would see an alarming toast for a retryable problem.
+    console.warn('[updater] error:', err && err.message ? err.message : err);
+  });
+
+  // First check 10 s after launch (let the model load and mic permission
+  // settle first). Subsequent checks every 4 h while the app stays open.
+  setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 10_000);
+  setInterval(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 4 * 60 * 60 * 1000);
+}
+
+// Renderer can invoke this from a Settings "Check for updates" button.
+// Returns the UpdateCheckResult from electron-updater or null on failure.
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) return { ok: false, reason: 'dev' };
+  try {
+    const res = await autoUpdater.checkForUpdates();
+    return { ok: true, updateAvailable: Boolean(res && res.updateInfo && res.updateInfo.version && res.updateInfo.version !== app.getVersion()) };
+  } catch (err) {
+    return { ok: false, reason: (err && err.message) || 'unknown' };
+  }
 });
 
 app.on('window-all-closed', (e) => {

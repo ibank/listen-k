@@ -12,6 +12,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.6.0] — 2026-04-23
+
+### Added
+- **Auto-update** via `electron-updater`. On launch the app pulls the
+  latest signed + notarised DMG from the public GitHub Releases feed,
+  downloads it in the background, and installs it the next time the
+  user quits. First check fires 10 seconds after launch; subsequent
+  checks every 4 hours while the app stays open. A
+  `check-for-updates` IPC handler exposes a manual re-check for a
+  future "Check for updates" button. Toasts surface
+  `toast.updateAvailable` and `toast.updateReady` in all four
+  locales. Silently no-ops in development (`app.isPackaged === false`).
+
+### Changed
+- `electron-updater` added as the first production npm dependency
+  (MIT; transitive deps `argparse` Python-2.0 and `sax`
+  BlueOak-1.0.0 both OSI-approved permissive, added to the CI
+  license-allowlist so `license-checker` stays green).
+- `package.json.build.publish` now pins
+  `provider: github`, `owner: ibank`, `repo: listen-k`,
+  `releaseType: draft` — electron-builder uses this both to drive
+  upload and to emit `latest-mac.yml` for the updater to read.
+- `release.yml` switched from the manual two-step flow
+  (`--publish never` + `gh release create`) to
+  `--publish always`, which creates the Release, uploads the DMG +
+  blockmap + `latest-mac.yml` in one shot. The follow-up `gh release
+  upload` step keeps the SHA256SUMS addition.
+
 ## [0.5.6] — 2026-04-23
 
 ### Changed
@@ -375,7 +403,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ibank/listen-k/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/ibank/listen-k/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/ibank/listen-k/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/ibank/listen-k/compare/v0.5.3...v0.5.4

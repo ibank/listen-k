@@ -351,6 +351,8 @@ const strings = {
     'toast.engineCrashMax': '전사 엔진이 반복 종료됐습니다. 앱을 재시작해주세요.',
     'toast.engineAppleFallback': 'Apple Speech 엔진 초기화 실패 — WhisperKit 으로 전환했습니다 (설치된 Listen K.app 에서만 Apple 엔진 정상 동작)',
     'toast.engineBusy': '녹음·처리 중에는 엔진을 전환할 수 없습니다',
+    'toast.updateAvailable': '새 버전 {version} 이 있습니다 — 백그라운드에서 다운로드 중',
+    'toast.updateReady': '업데이트 {version} 준비 완료 — Listen K 를 종료하면 자동 설치됩니다',
 
     // ── Tray native fallback menu (right-click) ──────────────────────
     'tray.state.recording': '🔴 녹음 중',
@@ -713,6 +715,8 @@ const strings = {
     'toast.engineCrashMax': 'Transcription engine keeps crashing. Please restart the app.',
     'toast.engineAppleFallback': 'Apple Speech engine failed to start — switched to WhisperKit (Apple engine only works in the installed Listen K.app)',
     'toast.engineBusy': 'Can\u2019t switch engine while recording or processing',
+    'toast.updateAvailable': 'New version {version} is available — downloading in the background',
+    'toast.updateReady': 'Update {version} ready — Listen K will install it when you quit',
 
     'tray.state.recording': '🔴 Recording',
     'tray.state.processing': '⏳ Processing',
@@ -1072,6 +1076,8 @@ const strings = {
     'toast.engineCrashMax': '文字起こしエンジンが繰り返しクラッシュします。アプリを再起動してください。',
     'toast.engineAppleFallback': 'Apple Speech エンジン初期化失敗 — WhisperKit に切り替えました (インストール済みの Listen K.app でのみ Apple エンジン動作)',
     'toast.engineBusy': '録音・処理中はエンジンを切り替えられません',
+    'toast.updateAvailable': '新しいバージョン {version} が利用可能です — バックグラウンドでダウンロード中',
+    'toast.updateReady': 'アップデート {version} の準備ができました — Listen K を終了すると自動でインストールされます',
 
     'tray.state.recording': '🔴 録音中',
     'tray.state.processing': '⏳ 変換・整形中',
@@ -1431,6 +1437,8 @@ const strings = {
     'toast.engineCrashMax': '转录引擎反复崩溃。请重启应用。',
     'toast.engineAppleFallback': 'Apple Speech 引擎启动失败 — 已切换到 WhisperKit (Apple 引擎仅在已安装的 Listen K.app 中正常工作)',
     'toast.engineBusy': '录音·处理中无法切换引擎',
+    'toast.updateAvailable': '新版本 {version} 已可用 — 正在后台下载',
+    'toast.updateReady': '更新 {version} 已就绪 — 退出 Listen K 后将自动安装',
 
     'tray.state.recording': '🔴 录音中',
     'tray.state.processing': '⏳ 转换·整理中',

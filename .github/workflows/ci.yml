@@ -40,7 +40,7 @@ jobs:
         run: |
           npx --yes license-checker --production --summary
           npx --yes license-checker --production --onlyAllow \
-            "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;CC0-1.0;Unlicense;0BSD"
+            "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;CC0-1.0;Unlicense;0BSD;Python-2.0;BlueOak-1.0.0"
 
   build:
     name: Build helpers and app bundle (ad-hoc)

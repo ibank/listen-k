@@ -62,34 +62,30 @@ jobs:
           test -n "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" || (echo "::error::APPLE_APP_SPECIFIC_PASSWORD not set" && exit 1)
           test -n "${{ secrets.APPLE_TEAM_ID }}"              || (echo "::error::APPLE_TEAM_ID not set" && exit 1)
 
-      - name: Build signed and notarised DMG
+      - name: Build, sign, notarise, and publish DMG
         env:
           # electron-builder reads these directly. CSC_* triggers Developer ID
           # signing; APPLE_* triggers notarisation via @electron/notarize.
-          # Signing/notarisation settings come from package.json mac.*; CLI
-          # overrides are intentionally avoided (electron-builder 26 rejects
-          # the old nested mac.notarize.teamId shape).
+          # `--publish always` tells electron-builder to create the GitHub
+          # Release (as a draft per package.json `mac.publish.releaseType`),
+          # upload the DMG + blockmap, and — critically for auto-update —
+          # upload `latest-mac.yml` so electron-updater clients can see the
+          # new version.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder --mac dmg --publish never
+        run: npx electron-builder --mac dmg --publish always
 
-      - name: Compute checksum
-        run: |
-          cd dist
-          shasum -a 256 ListenK-*.dmg > SHA256SUMS
-
-      - name: Publish GitHub Release
+      - name: Compute checksum and attach
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          cd dist
+          shasum -a 256 ListenK-*.dmg > SHA256SUMS
           TAG="${GITHUB_REF#refs/tags/}"
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes "See [CHANGELOG.md](https://github.com/ibank/listen-k/blob/main/CHANGELOG.md) for release notes." \
-            --draft \
-            dist/ListenK-*.dmg \
-            dist/ListenK-*.dmg.blockmap \
-            dist/SHA256SUMS
+          # electron-builder already created the draft release in the
+          # previous step; just append the checksum file.
+          gh release upload "$TAG" SHA256SUMS --clobber
