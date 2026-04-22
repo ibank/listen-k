@@ -12,6 +12,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.6.1] — 2026-04-23
+
+### Changed
+- DMG now ships with a distinct silver-palette volume icon
+  (`build/dmg-icon.icns`, produced from `scripts/generate-dmg-icon.js`
+  via the new `npm run icon:dmg`). The installer's mounted volume reads
+  visually as a "disk" — inverse of the dark app icon — while keeping
+  the same five-bar equalizer motif so the product identity is still
+  instantly recognisable. Wired through `package.json.build.dmg.icon`
+  plus `iconSize: 110`.
+
+### Fixed
+- Main window no longer disappears mid-onboarding after the user grants
+  Accessibility or Input Monitoring. macOS relaunches the app when those
+  TCC toggles flip; after the relaunch the previous `ready-to-show`
+  heuristic saw `isFirstRun=false` and `isSetupComplete()=true` and
+  silently kept the window hidden, stranding the user at the tray icon
+  before they had ever reached the onboarding "시작 / 완료" button.
+  The check now also consults `cfg.onboardingDone`, so the dashboard
+  stays visible until the user explicitly finishes the flow.
+
 ## [0.6.0] — 2026-04-23
 
 ### Added
@@ -403,7 +424,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/ibank/listen-k/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/ibank/listen-k/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/ibank/listen-k/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/ibank/listen-k/compare/v0.5.4...v0.5.5
