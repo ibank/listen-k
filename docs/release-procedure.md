@@ -85,8 +85,8 @@ Rename `[Unreleased]` to `[0.4.0] — 2026-04-22` and add a fresh empty
 Update the compare links at the bottom of the file:
 
 ```markdown
-[Unreleased]: https://github.com/ibank/ListenK/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/ibank/ListenK/compare/v0.3.0...v0.4.0
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ibank/listen-k/compare/v0.3.0...v0.4.0
 ```
 
 ## 5. Commit and tag

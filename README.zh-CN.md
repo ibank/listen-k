@@ -3,9 +3,9 @@
 # Listen K
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/ibank/ListenK)](https://github.com/ibank/ListenK/releases)
+[![GitHub release](https://img.shields.io/github/v/release/ibank/listen-k)](https://github.com/ibank/listen-k/releases)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)](https://developer.apple.com/macos/)
-[![Star on GitHub](https://img.shields.io/github/stars/ibank/ListenK?style=social)](https://github.com/ibank/ListenK)
+[![Star on GitHub](https://img.shields.io/github/stars/ibank/listen-k?style=social)](https://github.com/ibank/listen-k)
 
 面向 Apple Silicon Mac 的**本地 AI 语音听写**应用,在英语之外**一流支持韩语、日语、简体中文**。双击 Right Shift 即可呼出浮动 HUD,实时显示语音文本,再次双击便会自动粘贴到当前焦点的输入框。
 
@@ -45,7 +45,7 @@ macOS 上的听写应用已经有几款不错的产品。Listen K 占据的是�
 ## 安装
 
 ### 公证版 (Developer ID 签名后的标准路径)
-1. 从 [Releases](https://github.com/ibank/ListenK/releases) 下载最新 `ListenK-x.y.z-arm64.dmg`
+1. 从 [Releases](https://github.com/ibank/listen-k/releases) 下载最新 `ListenK-x.y.z-arm64.dmg`
 2. 打开后将 Listen K 拖入 Applications
 3. 启动 — 首次运行时仪表盘会自动打开
 4. 按提示授予 2 项权限
@@ -95,8 +95,8 @@ macOS 上的听写应用已经有几款不错的产品。Listen K 占据的是�
 要求: macOS 14+、Apple Silicon、Xcode 15+、Node.js 20 LTS。
 
 ```bash
-git clone https://github.com/ibank/ListenK.git
-cd ListenK
+git clone https://github.com/ibank/listen-k.git
+cd listen-k
 npm install
 npm run build:helper       # Swift 辅助程序: fn-listener, paste-helper, focus-helper
 npm run build:transcribe   # bin/transcribe-helper (WhisperKit)

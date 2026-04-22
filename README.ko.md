@@ -3,9 +3,9 @@
 # Listen K
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/ibank/ListenK)](https://github.com/ibank/ListenK/releases)
+[![GitHub release](https://img.shields.io/github/v/release/ibank/listen-k)](https://github.com/ibank/listen-k/releases)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)](https://developer.apple.com/macos/)
-[![Star on GitHub](https://img.shields.io/github/stars/ibank/ListenK?style=social)](https://github.com/ibank/ListenK)
+[![Star on GitHub](https://img.shields.io/github/stars/ibank/listen-k?style=social)](https://github.com/ibank/listen-k)
 
 Apple Silicon macOS 용 **로컬 AI 음성 받아쓰기**. Right Shift 를 두 번 탭하면 HUD 가 뜨고, 말한 내용이 실시간으로 표시된 뒤 한 번 더 탭하면 포커스된 앱의 입력 필드에 자동으로 붙여넣어집니다.
 
@@ -44,7 +44,7 @@ macOS 받아쓰기 앱은 이미 좋은 것들이 많습니다. Listen K 는 그
 ## 설치 (DMG)
 
 ### 공증 릴리즈 (Developer ID 서명 후 기본 경로)
-1. [Releases](https://github.com/ibank/ListenK/releases) 에서 최신 `ListenK-x.y.z-arm64.dmg` 다운로드
+1. [Releases](https://github.com/ibank/listen-k/releases) 에서 최신 `ListenK-x.y.z-arm64.dmg` 다운로드
 2. 열어서 Listen K 를 Applications 로 드래그
 3. 최초 실행 시 대시보드가 자동으로 열립니다
 4. 안내에 따라 권한 2가지 허용
@@ -94,8 +94,8 @@ macOS 받아쓰기 앱은 이미 좋은 것들이 많습니다. Listen K 는 그
 요건: macOS 14+, Apple Silicon, Xcode 15+, Node.js 20 LTS.
 
 ```bash
-git clone https://github.com/ibank/ListenK.git
-cd ListenK
+git clone https://github.com/ibank/listen-k.git
+cd listen-k
 npm install
 npm run build:helper       # bin/fn-listener, paste-helper, focus-helper (Swift)
 npm run build:transcribe   # bin/transcribe-helper (WhisperKit)

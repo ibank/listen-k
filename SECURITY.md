@@ -17,7 +17,7 @@ Please **do not open a public GitHub issue** for security problems.
 Use one of these private channels:
 
 1. **GitHub Private Vulnerability Reporting** (preferred) —
-   https://github.com/ibank/ListenK/security/advisories/new
+   https://github.com/ibank/listen-k/security/advisories/new
 2. **Email** — hello@listenk.com
    Subject line: `[security] <short description>`
    Include: affected version, reproduction steps, platform details, and

@@ -9,7 +9,7 @@ body:
         completely as you can — reproducible reports get fixed sooner.
 
         For purchase, refund, or license-key questions, email hello@listenk.com
-        instead. For security issues, see [SECURITY.md](https://github.com/ibank/ListenK/blob/main/SECURITY.md).
+        instead. For security issues, see [SECURITY.md](https://github.com/ibank/listen-k/blob/main/SECURITY.md).
   - type: input
     id: version
     attributes:

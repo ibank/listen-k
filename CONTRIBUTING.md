@@ -21,7 +21,7 @@ By participating, you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Before you open an issue
 
-- Search existing [issues](https://github.com/ibank/ListenK/issues).
+- Search existing [issues](https://github.com/ibank/listen-k/issues).
 - Purchase, refund, and license-key questions go to hello@listenk.com, not
   GitHub issues.
 - For suspected security vulnerabilities, follow [SECURITY.md](SECURITY.md)
@@ -37,8 +37,8 @@ Requirements:
 - (optional) Ollama, cmake — only if working on those paths
 
 ```bash
-git clone https://github.com/ibank/ListenK.git
-cd ListenK
+git clone https://github.com/ibank/listen-k.git
+cd listen-k
 npm install
 npm run build:helper          # Swift helpers: fn-listener, paste-helper, focus-helper
 npm run build:transcribe      # transcribe-helper (WhisperKit)
@@ -133,5 +133,5 @@ Before opening a PR, confirm:
 - Telemetry or analytics without explicit opt-in
 - Bundling proprietary models or assets without a clear license
 
-Unsure whether an idea fits? Open a [discussion](https://github.com/ibank/ListenK/discussions)
+Unsure whether an idea fits? Open a [discussion](https://github.com/ibank/listen-k/discussions)
 before investing time in code.

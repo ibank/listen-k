@@ -3,9 +3,9 @@
 # Listen K
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/ibank/ListenK)](https://github.com/ibank/ListenK/releases)
+[![GitHub release](https://img.shields.io/github/v/release/ibank/listen-k)](https://github.com/ibank/listen-k/releases)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)](https://developer.apple.com/macos/)
-[![Star on GitHub](https://img.shields.io/github/stars/ibank/ListenK?style=social)](https://github.com/ibank/ListenK)
+[![Star on GitHub](https://img.shields.io/github/stars/ibank/listen-k?style=social)](https://github.com/ibank/listen-k)
 
 Apple Silicon Mac 向けの **ローカル AI 音声入力** アプリ。**韓国語・日本語・中国語のファーストクラス対応** と英語をサポート。Right Shift を 2 回タップすると HUD が表示され、話した内容がリアルタイムで表示されます。もう一度 2 回タップすると、フォーカスされていたアプリの入力欄に自動でペーストされます。
 
@@ -45,7 +45,7 @@ macOS 向けの音声入力アプリは既に良いものがいくつもあり�
 ## インストール
 
 ### 公証済みリリース (Developer ID 署名後の本番経路)
-1. [Releases](https://github.com/ibank/ListenK/releases) から最新の `ListenK-x.y.z-arm64.dmg` をダウンロード
+1. [Releases](https://github.com/ibank/listen-k/releases) から最新の `ListenK-x.y.z-arm64.dmg` をダウンロード
 2. 開いて Listen K を Applications にドラッグ
 3. 起動 — 初回起動時にダッシュボードが自動で開きます
 4. 案内に従って 2 つの権限を許可
@@ -95,8 +95,8 @@ macOS 向けの音声入力アプリは既に良いものがいくつもあり�
 要件: macOS 14+, Apple Silicon, Xcode 15+, Node.js 20 LTS。
 
 ```bash
-git clone https://github.com/ibank/ListenK.git
-cd ListenK
+git clone https://github.com/ibank/listen-k.git
+cd listen-k
 npm install
 npm run build:helper       # Swift ヘルパー: fn-listener, paste-helper, focus-helper
 npm run build:transcribe   # bin/transcribe-helper (WhisperKit)

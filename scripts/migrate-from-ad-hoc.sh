@@ -31,7 +31,7 @@
 #     is the supported per-user reset path.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/ibank/ListenK/main/scripts/migrate-from-ad-hoc.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/ibank/listen-k/main/scripts/migrate-from-ad-hoc.sh | bash
 #   # or, if you cloned the repo:
 #   bash scripts/migrate-from-ad-hoc.sh
 #   # preview without changing anything:
@@ -150,7 +150,7 @@ cat <<'EOF'
 [5/5] 사용자가 직접 해야 할 일
 
   (a) v0.5.1+ DMG 를 Applications 로 드래그
-      https://github.com/ibank/ListenK/releases/latest
+      https://github.com/ibank/listen-k/releases/latest
       (내부 유통 중엔 draft 링크를 따로 공유 받으세요.)
 
   (b) 앱 첫 실행 시 권한 프롬프트에서 "항상 허용 (Always Allow)" 을 선택

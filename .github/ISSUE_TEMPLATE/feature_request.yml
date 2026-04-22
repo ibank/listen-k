@@ -8,7 +8,7 @@ body:
         Thanks for the suggestion. Listen K is a focused solo project — we
         will be honest if something is out of scope rather than leave it
         open indefinitely. See
-        [CONTRIBUTING.md](https://github.com/ibank/ListenK/blob/main/CONTRIBUTING.md#what-is-in-scope-what-is-not)
+        [CONTRIBUTING.md](https://github.com/ibank/listen-k/blob/main/CONTRIBUTING.md#what-is-in-scope-what-is-not)
         for the scope summary.
   - type: textarea
     id: problem

@@ -4,8 +4,8 @@ contact_links:
     url: mailto:hello@listenk.com
     about: Billing and licensing questions are handled by email, not GitHub issues.
   - name: Security vulnerability
-    url: https://github.com/ibank/ListenK/security/advisories/new
+    url: https://github.com/ibank/listen-k/security/advisories/new
     about: Please report privately. See SECURITY.md for details.
   - name: General discussion or question
-    url: https://github.com/ibank/ListenK/discussions
+    url: https://github.com/ibank/listen-k/discussions
     about: Open-ended questions and ideas belong in Discussions.

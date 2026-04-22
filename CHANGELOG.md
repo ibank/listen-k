@@ -201,15 +201,15 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/ListenK/compare/v0.5.2...HEAD
-[0.5.2]: https://github.com/ibank/ListenK/compare/v0.5.1...v0.5.2
-[0.5.1]: https://github.com/ibank/ListenK/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/ibank/ListenK/compare/v0.4.4...v0.5.0
-[0.4.4]: https://github.com/ibank/ListenK/compare/v0.4.3...v0.4.4
-[0.4.3]: https://github.com/ibank/ListenK/compare/v0.4.2...v0.4.3
-[0.4.2]: https://github.com/ibank/ListenK/compare/v0.4.1...v0.4.2
-[0.4.1]: https://github.com/ibank/ListenK/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/ibank/ListenK/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/ibank/ListenK/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/ibank/ListenK/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/ibank/ListenK/releases/tag/v0.1.0
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/ibank/listen-k/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/ibank/listen-k/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/ibank/listen-k/compare/v0.4.4...v0.5.0
+[0.4.4]: https://github.com/ibank/listen-k/compare/v0.4.3...v0.4.4
+[0.4.3]: https://github.com/ibank/listen-k/compare/v0.4.2...v0.4.3
+[0.4.2]: https://github.com/ibank/listen-k/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/ibank/listen-k/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/ibank/listen-k/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/ibank/listen-k/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/ibank/listen-k/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/ibank/listen-k/releases/tag/v0.1.0

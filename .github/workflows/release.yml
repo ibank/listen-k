@@ -88,7 +88,7 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           gh release create "$TAG" \
             --title "$TAG" \
-            --notes "See [CHANGELOG.md](https://github.com/ibank/ListenK/blob/main/CHANGELOG.md) for release notes." \
+            --notes "See [CHANGELOG.md](https://github.com/ibank/listen-k/blob/main/CHANGELOG.md) for release notes." \
             --draft \
             dist/ListenK-*.dmg \
             dist/ListenK-*.dmg.blockmap \

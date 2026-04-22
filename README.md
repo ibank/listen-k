@@ -3,9 +3,9 @@
 # Listen K
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/ibank/ListenK)](https://github.com/ibank/ListenK/releases)
+[![GitHub release](https://img.shields.io/github/v/release/ibank/listen-k)](https://github.com/ibank/listen-k/releases)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)](https://developer.apple.com/macos/)
-[![Star on GitHub](https://img.shields.io/github/stars/ibank/ListenK?style=social)](https://github.com/ibank/ListenK)
+[![Star on GitHub](https://img.shields.io/github/stars/ibank/listen-k?style=social)](https://github.com/ibank/listen-k)
 
 **Local AI voice dictation for Apple Silicon Macs**, with **first-class Korean, Japanese, and Chinese** alongside English. Double-tap Right Shift to open a floating HUD, speak, watch the text appear in real time, double-tap again, and it is pasted into whatever app you had focused.
 
@@ -43,7 +43,7 @@ If you write Korean, Japanese, or Chinese daily and want your transcripts to sta
 ## Install
 
 ### Notarised release (default path once signing is set up)
-1. Download the latest `ListenK-x.y.z-arm64.dmg` from [Releases](https://github.com/ibank/ListenK/releases)
+1. Download the latest `ListenK-x.y.z-arm64.dmg` from [Releases](https://github.com/ibank/listen-k/releases)
 2. Open it and drag **Listen K** into Applications
 3. Launch — the dashboard opens automatically the first time
 4. Grant two permissions when prompted
@@ -93,8 +93,8 @@ First-run marker: `.first-run-done` in the same directory. Delete it to re-open 
 Requirements: macOS 14+ on Apple Silicon, Xcode 15+, Node.js 20 LTS.
 
 ```bash
-git clone https://github.com/ibank/ListenK.git
-cd ListenK
+git clone https://github.com/ibank/listen-k.git
+cd listen-k
 npm install
 npm run build:helper       # Swift helpers: fn-listener, paste-helper, focus-helper
 npm run build:transcribe   # bin/transcribe-helper (WhisperKit Swift Package)

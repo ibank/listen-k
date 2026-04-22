@@ -258,5 +258,5 @@ For the full threat model see [SECURITY.md](../SECURITY.md).
 - **Mobile (iOS).** Out of scope. Sindre's [Aiko](https://sindresorhus.com/aiko)
   is the reference app for iOS Whisper.
 
-If you want to change any of the above, open a [discussion](https://github.com/ibank/ListenK/discussions)
+If you want to change any of the above, open a [discussion](https://github.com/ibank/listen-k/discussions)
 before writing code.

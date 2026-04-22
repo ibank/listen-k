@@ -7,10 +7,10 @@
   "homepage": "https://listenk.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ibank/ListenK.git"
+    "url": "https://github.com/ibank/listen-k.git"
   },
   "bugs": {
-    "url": "https://github.com/ibank/ListenK/issues",
+    "url": "https://github.com/ibank/listen-k/issues",
     "email": "hello@listenk.com"
   },
   "keywords": [
