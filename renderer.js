@@ -520,7 +520,7 @@ async function cleanupWithOllama(raw, opts = {}) {
   const prompt = buildPrompt(raw, opts);
   // modelInput is now a <select>; fall back to a sensible default if Ollama
   // is offline or hasn't been listed yet.
-  const model = (modelInput?.value || '').trim() || 'gemma3:4b';
+  const model = (modelInput?.value || '').trim() || 'gemma4:e4b';
 
   try {
     const res = await fetch(OLLAMA_URL, {
@@ -904,7 +904,10 @@ async function renderStatus(statusArg) {
   }
 
   const mode = modeSel?.value;
-  const hasGemma = s.ollama?.models?.some((m) => m.startsWith('gemma3'));
+  // Accept any Gemma generation — the recommended default tracks the
+  // latest family (currently gemma4:e4b) but a user pinned to gemma3
+  // should still register as "has a usable Ollama model".
+  const hasGemma = s.ollama?.models?.some((m) => m.startsWith('gemma'));
   if (mode === 'ollama' || s.ollama?.running) {
     let ollamaState, ollamaDesc, ollamaActions = [];
     if (!s.ollama?.running) {
@@ -919,7 +922,7 @@ async function renderStatus(statusArg) {
       ollamaDesc = t('check.ollama.noModels', { models: (s.ollama.models || []).join(', ') || '—' });
       ollamaActions = [{
         label: t('check.ollama.pullCmd'),
-        onClick: async () => { await copyToClipboard('ollama pull gemma3:4b'); toast(t('toast.copied')); },
+        onClick: async () => { await copyToClipboard('ollama pull gemma4:e4b'); toast(t('toast.copied')); },
       }];
     } else {
       ollamaState = 'ok';
@@ -1586,12 +1589,19 @@ async function refreshKpiTiles() {
 // dropdown on the post-processing page stays in sync because it reads
 // from the same /api/tags endpoint each refresh cycle.
 
+// Refreshed 2026-04 from ollama.com/library for post-processing
+// transcripts (cleanup + translate). Criteria: <10 GB on disk, strong
+// multilingual (KR/JA/ZH/EN), still actively maintained on Ollama.
+// qwen3.6 is intentionally excluded — it only ships at 35B today, too
+// heavy for the target machines. gemma4 is the new default; gemma3:12b
+// stays for higher-quality jobs.
 const OLLAMA_RECOMMENDED = [
-  { name: 'gemma3:4b',    size: '3.2 GB', note: 'noteDefault',     kind: 'gemma' },
-  { name: 'gemma3:12b',   size: '8.1 GB', note: 'noteHighQuality', kind: 'gemma' },
-  { name: 'llama3.2:3b',  size: '2.0 GB', note: 'noteFast',        kind: 'llama' },
-  { name: 'qwen2.5:7b',   size: '4.7 GB', note: 'noteMultilingual',kind: 'qwen' },
-  { name: 'mistral:7b',   size: '4.4 GB', note: 'noteBalanced',    kind: 'mistral' },
+  { name: 'gemma4:e4b',     size: '3.4 GB', note: 'noteDefault',      kind: 'gemma' },
+  { name: 'qwen3.5:4b',     size: '2.6 GB', note: 'noteMultilingual', kind: 'qwen' },
+  { name: 'gemma3:12b',     size: '8.1 GB', note: 'noteHighQuality',  kind: 'gemma' },
+  { name: 'llama3.2:3b',    size: '2.0 GB', note: 'noteFast',         kind: 'llama' },
+  { name: 'qwen2.5:7b',     size: '4.7 GB', note: 'noteBalanced',     kind: 'qwen' },
+  { name: 'phi4-mini:3.8b', size: '2.5 GB', note: 'notePhi4',         kind: 'phi' },
 ];
 
 function fmtBytes(n) {
