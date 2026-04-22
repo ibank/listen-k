@@ -267,4 +267,12 @@ Week 4: 최종 audit → public 전환 → 공지
 2. 공개 이메일: **hello@listenk.com**
 3. 도메인: **listenk.com** — `homepage` / `bugs.email` / 웹사이트 모두 연결
 
-다음 단계: LICENSE / THIRD_PARTY_LICENSES / CONTRIBUTING / SECURITY / 이슈 템플릿 / CI 워크플로우 파일 생성.
+OSS 릴리즈 파일(LICENSE / THIRD_PARTY_LICENSES / CONTRIBUTING / SECURITY / CODE_OF_CONDUCT / CHANGELOG / `.github/` 템플릿 / CI 워크플로우) 생성 완료.
+
+## Public 전환 전 남은 수동 작업 — 매뉴얼
+순서대로 진행:
+1. [Manual 1 — Apple Developer ID 인증서 준비](manual-developer-id.md)
+2. [Manual 2 — GitHub Secrets 등록](manual-github-secrets.md)
+3. [Manual 3 — 상표 검색 + 도메인 확정](manual-trademark-domain.md)
+
+세 매뉴얼 완료 후 위 §9 의 Public 전환 D-Day 체크로 넘어갑니다.
