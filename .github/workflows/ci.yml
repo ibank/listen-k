@@ -21,7 +21,11 @@ jobs:
           node-version: "20"
           cache: "npm"
       - name: Install deps
-        run: npm ci
+        # --force bypasses EBADPLATFORM on Ubuntu: the package itself declares
+        # os=darwin / cpu=arm64 so that npm install on a user's Windows or
+        # Linux box fails loudly, but CI's syntax/license checks don't execute
+        # any of the Apple-only code and just need node_modules populated.
+        run: npm ci --force
       - name: JS syntax check
         run: |
           node -c main.js

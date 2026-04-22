@@ -62,6 +62,8 @@ echo "[smoke] WhisperKit model present"
 MODEL_ROOT="models/whisperkit"
 if [[ -d "$MODEL_ROOT" ]] && [[ -n "$(ls -A "$MODEL_ROOT" 2>/dev/null)" ]]; then
   step "models/whisperkit/* exists" true
+elif [[ -n "${CI:-}" ]] || [[ -n "${SMOKE_SKIP_MODEL:-}" ]]; then
+  echo "  · skip (CI mode, 632 MB model download avoided)"
 else
   step "models/whisperkit empty — run: npm run model:whisperkit" false
 fi
