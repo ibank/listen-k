@@ -1,0 +1,29 @@
+node_modules/
+dist/
+bin/
+models/
+.whisper-cpp/
+.whisper-cpp-version
+native/transcribe-helper/.build/
+native/transcribe-helper/Package.resolved
+native/translate-helper/.build/
+native/translate-helper/Package.resolved
+*.log
+.DS_Store
+
+# Maintainer-only operational docs (pricing strategy, release runbooks
+# with sensitive account references, pre-public audit checklists, etc.).
+# Kept on disk under ops/ for local reference but never committed.
+ops/
+
+# Editor / tool local state
+.claude/
+.vscode/
+.idea/
+
+# Secrets / env
+.env
+.env.local
+*.p12
+*.provisionprofile
+*.mobileprovision

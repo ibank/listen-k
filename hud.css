@@ -1,0 +1,316 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: transparent;
+  overflow: hidden;
+  -webkit-user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 8px;
+  flex-direction: column;
+  gap: 0;
+}
+
+.hud-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  color: #c7c7cc;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  background: rgba(14, 14, 17, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  animation: ctx-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hud-context[hidden] { display: none; }
+.hud-context-ico {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #5b8dff, #b367ff);
+  flex-shrink: 0;
+}
+.hud-context[data-engine='openai'] .hud-context-ico {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+.hud-context[data-engine='apple'] .hud-context-ico {
+  background: linear-gradient(135deg, #8b7aff, #6d28d9);
+}
+.hud-context[data-engine='whisper.cpp'] .hud-context-ico {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+/* State tint — processing = accent blue, done = ok green. Recording keeps
+   the neutral gray so "which engine + which mode" stays the dominant read. */
+.hud-context[data-state='processing'] {
+  color: #5b8dff;
+  border-color: rgba(91, 141, 255, 0.28);
+}
+.hud-context[data-state='processing'] .hud-context-ico {
+  background: linear-gradient(135deg, #5b8dff, #b367ff);
+  box-shadow: 0 0 8px rgba(91, 141, 255, 0.4);
+}
+.hud-context[data-state='done'] {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.32);
+}
+.hud-context[data-state='done'] .hud-context-ico {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+}
+@keyframes ctx-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pill {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 50px;
+  padding: 4px;
+  background: rgba(14, 14, 17, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(36px);
+  backdrop-filter: saturate(180%) blur(36px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  min-width: 240px;
+  max-width: 560px;
+  animation: pop-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: max-width 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pill[data-has-text='true'] { max-width: 680px; }
+
+.pill[data-state='recording'] {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 90, 95, 0.32),
+    0 0 40px rgba(255, 90, 95, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.pill[data-state='processing'] {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(91, 141, 255, 0.32),
+    0 0 40px rgba(91, 141, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.pill[data-state='done'] {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(74, 222, 128, 0.4),
+    0 0 40px rgba(74, 222, 128, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+/* Recording-state waveform tints toward red so the "listening" state reads
+   at a glance even at the corner of an eye. */
+.pill[data-state='recording'] .wave span {
+  background: linear-gradient(180deg, #ff7f84 0%, #ff5a5f 100%);
+  box-shadow: 0 0 8px rgba(255, 90, 95, 0.24);
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.9) translateY(8px); opacity: 0; }
+  to   { transform: scale(1) translateY(0);    opacity: 1; }
+}
+
+.btn {
+  -webkit-app-region: no-drag;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    transform 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 160ms,
+    box-shadow 160ms;
+  flex-shrink: 0;
+}
+.btn:active { transform: scale(0.9); }
+.btn:focus-visible { outline: 2px solid rgba(91, 141, 255, 0.6); outline-offset: 2px; }
+
+.btn.cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e5e7;
+}
+.btn.cancel:hover {
+  background: rgba(248, 113, 113, 0.2);
+  color: #fca5a5;
+}
+
+.btn.confirm {
+  background: #ffffff;
+  color: #0a0a0c;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.18);
+}
+.btn.confirm:hover {
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.25);
+}
+
+.center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  height: 100%;
+  position: relative;
+}
+
+.wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+  padding: 0 14px;
+}
+.wave span {
+  display: inline-block;
+  width: 3px;
+  height: 6px;
+  background: linear-gradient(180deg, #ffffff 0%, #c7c7cc 100%);
+  border-radius: 2px;
+  transform-origin: center;
+  animation: wave-anim 1.25s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.12);
+}
+.wave span:nth-child(1) { animation-delay: 0.00s; }
+.wave span:nth-child(2) { animation-delay: 0.08s; }
+.wave span:nth-child(3) { animation-delay: 0.16s; }
+.wave span:nth-child(4) { animation-delay: 0.24s; }
+.wave span:nth-child(5) { animation-delay: 0.32s; }
+.wave span:nth-child(6) { animation-delay: 0.24s; }
+.wave span:nth-child(7) { animation-delay: 0.16s; }
+.wave span:nth-child(8) { animation-delay: 0.08s; }
+.wave span:nth-child(9) { animation-delay: 0.00s; }
+
+@keyframes wave-anim {
+  0%, 100% { height: 6px;  opacity: 0.5; }
+  50%      { height: 24px; opacity: 1; }
+}
+
+.spinner {
+  display: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.pill[data-state='processing'] .wave { display: none; }
+.pill[data-state='processing'] .spinner { display: block; }
+.pill[data-state='processing'] .btn.confirm { opacity: 0.35; pointer-events: none; }
+.pill[data-state='processing'] .btn.cancel { opacity: 0.7; }
+
+/* "Done" state: hide the wave + confirm button, show a pop-in green
+   checkmark, dim the cancel button. The HUD auto-dismisses ~1s later via
+   hud.js so this is a brief success flash, not a persistent state. */
+.done-check {
+  -webkit-app-region: no-drag;
+  display: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #4ade80;
+  color: #0a0a0c;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pill[data-state='done'] .wave,
+.pill[data-state='done'] .spinner,
+.pill[data-state='done'] .btn.confirm { display: none; }
+.pill[data-state='done'] .btn.cancel { opacity: 0.4; pointer-events: none; }
+.pill[data-state='done'] .done-check {
+  display: flex;
+  animation: done-pop 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes done-pop {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.live-text {
+  display: none;
+  flex: 1;
+  padding: 0 14px;
+  color: #f5f5f7;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  align-items: center;
+  mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  animation: text-fade-in 180ms ease-out;
+}
+.pill[data-has-text='true'] .wave { display: none; }
+.pill[data-has-text='true'] .live-text { display: flex; }
+.pill[data-state='processing'] .live-text { opacity: 0.6; }
+
+/* Blinking cursor at the end of the live-text — mirrors the design's
+   transcription-in-progress cue. Hidden when the pill isn't actively
+   streaming text (recording state with no text, processing, done). */
+.live-text .cursor {
+  display: inline-block;
+  width: 2px;
+  height: 13px;
+  background: #5b8dff;
+  margin-left: 3px;
+  vertical-align: middle;
+  animation: cursor-blink 0.9s step-end infinite;
+  flex-shrink: 0;
+}
+@keyframes cursor-blink { 50% { opacity: 0; } }
+.pill[data-state='processing'] .cursor,
+.pill[data-state='done'] .cursor { display: none; }
+
+/* Done state — live-text becomes the success message line, not hidden. */
+.pill[data-state='done'] .live-text {
+  display: flex !important;
+  color: #4ade80;
+  font-weight: 500;
+  opacity: 1;
+}
+.pill[data-state='done'] .live-text .live-text-body::before {
+  content: '✓ ';
+  margin-right: 2px;
+}
+
+@keyframes text-fade-in {
+  from { opacity: 0; transform: translateX(4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}

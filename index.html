@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Listen K</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="titlebar">
+    <div class="brand">
+      <span class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 18 18" width="11" height="11" fill="none">
+          <path d="M6 4v10M9 2v14M12 5v8M3 7v4M15 7v4"
+                stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">Listen K</span>
+      <span class="brand-sep" aria-hidden="true">·</span>
+      <span class="brand-page" id="brandPage" data-i18n="sidebar.nav.dashboard">Dashboard</span>
+    </div>
+    <div class="titlebar-right">
+      <div class="engine-chip" id="engineChip" hidden>
+        <svg class="engine-chip-ico" viewBox="0 0 16 16" width="11" height="11" aria-hidden="true">
+          <rect x="6" y="2" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <path d="M4 8c0 2 1.8 3.5 4 3.5S12 10 12 8 M8 11.5v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        </svg>
+        <span class="engine-chip-name" id="engineChipName">—</span>
+      </div>
+      <div class="status" id="status">
+        <span class="status-led" aria-hidden="true"></span>
+        <span class="status-text" data-i18n="status.idle">Idle</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <nav class="sidebar" aria-label="Navigation">
+      <div class="nav-group-label" data-i18n="sidebar.group.main">Main</div>
+      <a href="#sec-status" class="nav-item" data-section="sec-status">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 8h6M5 5.5h6M5 10.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.dashboard">Dashboard</span>
+      </a>
+      <a href="#sec-history" class="nav-item" data-section="sec-history">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.history">History</span>
+        <span class="nav-count" id="navCountHistory" hidden></span>
+      </a>
+      <a href="#sec-stats" class="nav-item" data-section="sec-stats">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13V9M7 13V5M11 13V7M13 13h-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.stats">Stats</span>
+      </a>
+
+      <div class="nav-group-label" data-i18n="sidebar.group.settings">Settings</div>
+      <a href="#sec-engine" class="nav-item" data-section="sec-engine">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="6" y="2" width="4" height="7" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M4 8c0 2 1.8 3.5 4 3.5S12 10 12 8 M8 11.5v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+        <span data-i18n="sidebar.nav.engine">Engine</span>
+      </a>
+      <a href="#sec-input" class="nav-item" data-section="sec-input">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 8h.01M8 8h.01M11 8h.01M4.5 10.5h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.input">Hotkey & Input</span>
+      </a>
+      <a href="#sec-post" class="nav-item" data-section="sec-post">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.post">Post-processing</span>
+      </a>
+      <a href="#sec-ollama" class="nav-item" data-section="sec-ollama">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 2C5 2 3.5 4 3.5 6.5c0 1.8 1 2.8 1 4 0 1.3-1 2-1 3 0 .8.7 1 1.5 1h8c.8 0 1.5-.2 1.5-1 0-1-1-1.7-1-3 0-1.2 1-2.2 1-4C12.5 4 11 2 8 2z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="6" cy="7" r="0.8" fill="currentColor"/><circle cx="10" cy="7" r="0.8" fill="currentColor"/></svg>
+        <span data-i18n="sidebar.nav.ollama">Ollama models</span>
+        <span class="nav-count" id="navCountOllama" hidden></span>
+      </a>
+
+      <div class="nav-group-label" data-i18n="sidebar.group.help">Help</div>
+      <a href="#sec-usage" class="nav-item" data-section="sec-usage">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 5v3.5M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span data-i18n="sidebar.nav.usage">Usage</span>
+      </a>
+    </nav>
+
+    <main class="content" id="content">
+      <section class="banner" id="firstRunBanner" hidden>
+        <div class="banner-body">
+          <div class="banner-title" id="bannerTitle" data-i18n="banner.title">Preparing transcription engine</div>
+          <div class="banner-desc" data-i18n="banner.desc">
+            Compiling the WhisperKit model to Core ML. First run takes 30–90 seconds; after that it's cached and ready in seconds.
+          </div>
+          <div class="banner-elapsed" id="bannerElapsed">Elapsed: 0s</div>
+        </div>
+        <div class="banner-spinner"></div>
+      </section>
+
+      <section class="page" id="sec-status">
+        <div class="hero">
+          <div class="hero-row">
+            <div class="hero-body">
+              <div class="hero-eyebrow" data-i18n="hero.eyebrow">Ready to listen</div>
+              <h2 class="hero-title" data-i18n="hero.title">Press ⇧⇧ anywhere to dictate</h2>
+              <p class="hero-desc" data-i18n="hero.desc">
+                Double-tap the hotkey anywhere — text streams into the HUD and auto-pastes into the focused app.
+              </p>
+              <div class="hero-actions">
+                <button class="btn-hero rec" id="heroRecBtn" type="button">
+                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>
+                  <span data-i18n="hero.recNow">Record now</span>
+                </button>
+                <button class="btn-hero ghost" id="heroHotkeyBtn" type="button" data-i18n="hero.changeHotkey">Change hotkey</button>
+              </div>
+            </div>
+            <div class="hero-wave" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <div id="kpiTiles" class="kpi-tiles"></div>
+
+        <div class="section-head">
+          <h2 data-i18n="page.status.title">Setup status</h2>
+          <button id="refreshBtn" class="ghost" data-i18n="page.status.refresh" data-i18n-title="page.status.refreshTitle" title="Refresh status">↻ Refresh</button>
+        </div>
+        <div id="checkList" class="check-list"></div>
+      </section>
+
+      <section class="card page" id="sec-engine" hidden>
+        <div class="card-head">
+          <div>
+            <h2 data-i18n="page.engine.title">Engine</h2>
+            <div class="card-head-sub" data-i18n="page.engine.sub">Speech-to-text pipeline</div>
+          </div>
+        </div>
+
+        <div class="engine-grid" id="engineGrid">
+          <!-- Cards rendered by renderer.js. Kept in sync with the hidden
+               <select id="engine"> below so existing change-listener code
+               keeps working. -->
+        </div>
+
+        <!-- Second group, matching the design's "모델 & 최적화" sub-card.
+             The title text + whole group is toggled via data-engine-group
+             so Apple Speech (no extra options) doesn't show an empty box. -->
+        <div class="fields" id="engineOptions" data-engine-group>
+          <div class="fields-head">
+            <h3 id="engineOptionsTitle" data-i18n="page.engine.optionsTitle">Model &amp; Options</h3>
+            <span class="card-head-sub" id="engineOptionsSub"></span>
+          </div>
+          <!-- Accessibility / backwards-compat: keep the select in the DOM
+               (hidden) so code that reads engineSel.value still works. -->
+          <div class="field-row" hidden>
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.engine.title">Transcription engine</div>
+              <div class="field-help" data-i18n="field.engine.help">Apple Speech is fast and lightweight, WhisperKit is accurate, whisper.cpp is batch-only.</div>
+            </div>
+            <div class="field-control">
+              <select id="engine">
+                <option value="apple">Apple Speech</option>
+                <option value="whisperkit">WhisperKit (Core ML)</option>
+                <option value="whisper.cpp">whisper.cpp</option>
+                <option value="openai">OpenAI Whisper API</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row" data-engine-only="whisperkit">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.whisperModel.title">Transcription model</div>
+              <div class="field-help" data-i18n="field.whisperModel.help">Larger models are more accurate but slower. "Auto" picks the best installed.</div>
+            </div>
+            <div class="field-control">
+              <select id="whisperModel">
+                <option value="" data-i18n="field.whisperModel.auto">Auto (quality first)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row" data-engine-only="openai">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.openaiKey.title">OpenAI API key</div>
+              <div class="field-help" data-i18n="field.openaiKey.help">
+                Get one at platform.openai.com/api-keys. Stored encrypted via macOS Keychain. OPENAI_API_KEY env var takes precedence.
+              </div>
+            </div>
+            <div class="field-control">
+              <input id="openaiKey" type="password" placeholder="sk-..." data-i18n-placeholder="field.openaiKey.placeholder" autocomplete="off" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="field-row" data-engine-only="openai">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.openaiModel.title">OpenAI model</div>
+              <div class="field-help" data-i18n="field.openaiModel.help">
+                gpt-4o-transcribe has the highest quality ($0.006/min). mini is half price. whisper-1 is legacy.
+              </div>
+            </div>
+            <div class="field-control">
+              <select id="openaiModel">
+                <option value="gpt-4o-transcribe" data-i18n="field.openaiModel.recommended">gpt-4o-transcribe (recommended)</option>
+                <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+                <option value="whisper-1">whisper-1</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card page" id="sec-input" hidden>
+        <div class="card-head"><h2 data-i18n="page.input.title">Hotkey & Input</h2></div>
+        <div class="fields">
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.hotkey.title">Hotkey</div>
+              <div class="field-help" data-i18n="field.hotkey.help">Global key to toggle recording. Double-tap must land within 380ms.</div>
+            </div>
+            <div class="field-control">
+              <select id="hotkey">
+                <option value="rshift-double" data-i18n="field.hotkey.rshift">Right ⇧ double-tap (recommended)</option>
+                <option value="ropt-double" data-i18n="field.hotkey.ropt">Right ⌥ double-tap</option>
+                <option value="rctl-double" data-i18n="field.hotkey.rctl">Right ⌃ double-tap</option>
+                <option value="rcmd-double" data-i18n="field.hotkey.rcmd">Right ⌘ double-tap</option>
+                <option value="fn" data-i18n="field.hotkey.fn">fn (Globe key)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.lang.title">Language</div>
+              <div class="field-help" data-i18n="field.lang.help">Whisper transcription language hint. Apple Speech uses the locale as-is.</div>
+            </div>
+            <div class="field-control">
+              <select id="lang">
+                <option value="ko-KR">한국어</option>
+                <option value="en-US" selected>English (US)</option>
+                <option value="en-GB">English (UK)</option>
+                <option value="ja-JP">日本語</option>
+                <option value="zh-CN">简体中文</option>
+                <option value="zh-TW">繁體中文</option>
+                <option value="es-ES">Español</option>
+                <option value="fr-FR">Français</option>
+                <option value="de-DE">Deutsch</option>
+                <option value="it-IT">Italiano</option>
+                <option value="pt-BR">Português (Brasil)</option>
+                <option value="ru-RU">Русский</option>
+                <option value="vi-VN">Tiếng Việt</option>
+                <option value="id-ID">Bahasa Indonesia</option>
+                <option value="th-TH">ไทย</option>
+                <option value="hi-IN">हिन्दी</option>
+                <option value="ar-SA">العربية</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.streaming.title">Live display</div>
+              <div class="field-help" data-i18n="field.streaming.help">Whether to stream text into the HUD while you speak.</div>
+            </div>
+            <div class="field-control">
+              <!-- Segmented toggle. The hidden <select> below is the actual
+                   source of truth so existing change-listeners keep working. -->
+              <div class="seg" id="streamingSeg" role="tablist">
+                <button type="button" data-value="on" role="tab" data-i18n="field.streaming.on">On</button>
+                <button type="button" data-value="off" role="tab" data-i18n="field.streaming.off">Off</button>
+              </div>
+              <select id="streaming" hidden>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.uiLocale.title">App language</div>
+              <div class="field-help" data-i18n="field.uiLocale.help">UI display language. Applies immediately.</div>
+            </div>
+            <div class="field-control">
+              <select id="uiLocale">
+                <option value="en">English</option>
+                <option value="ko">한국어</option>
+                <option value="ja">日本語</option>
+                <option value="zh-CN">简体中文</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.theme.title">Theme</div>
+              <div class="field-help" data-i18n="field.theme.help">Match the system appearance or lock to light/dark.</div>
+            </div>
+            <div class="field-control">
+              <select id="theme">
+                <option value="system" data-i18n="field.theme.system">System</option>
+                <option value="light" data-i18n="field.theme.light">Light</option>
+                <option value="dark" data-i18n="field.theme.dark">Dark</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card page" id="sec-post" hidden>
+        <div class="card-head"><h2 data-i18n="page.post.title">Post-processing</h2></div>
+        <div class="fields">
+          <div class="field-row">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.mode.title">Post-processing mode</div>
+              <div class="field-help" data-i18n="field.mode.help">Choose how to polish the transcript.</div>
+            </div>
+            <div class="field-control">
+              <select id="mode">
+                <option value="off" selected data-i18n="field.mode.off">Off (raw)</option>
+                <option value="rules" data-i18n="field.mode.rules">Rule-based (filler removal)</option>
+                <option value="ollama" data-i18n="field.mode.ollama">Ollama · Clean up</option>
+                <option value="translate" data-i18n="field.mode.translate">Ollama · Translate</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row" data-mode-only="translate">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.translateTarget.title">Target language</div>
+              <div class="field-help" data-i18n="field.translateTarget.help">Translate the transcript into this language.</div>
+            </div>
+            <div class="field-control">
+              <select id="translateTarget">
+                <option value="English" selected>English</option>
+                <option value="Japanese">日本語</option>
+                <option value="Chinese (Simplified)">简体中文</option>
+                <option value="Chinese (Traditional)">繁體中文</option>
+                <option value="Spanish">Español</option>
+                <option value="French">Français</option>
+                <option value="German">Deutsch</option>
+                <option value="Vietnamese">Tiếng Việt</option>
+                <option value="Indonesian">Bahasa Indonesia</option>
+                <option value="Korean">한국어</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row" data-mode-only="ollama,translate">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.ollamaModel.title">Ollama model</div>
+              <div class="field-help" data-i18n="field.ollamaModel.help">Pick from installed Ollama models.</div>
+            </div>
+            <div class="field-control">
+              <select id="model">
+                <option value="" data-i18n="field.ollamaModel.loading">Loading…</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row" data-mode-only="ollama">
+            <div class="field-info">
+              <div class="field-title" data-i18n="field.tone.title">Tone</div>
+              <div class="field-help" data-i18n="field.tone.help">Writing style for Ollama cleanup.</div>
+            </div>
+            <div class="field-control">
+              <select id="tone">
+                <option value="neutral" selected data-i18n="field.tone.neutral">Natural</option>
+                <option value="formal" data-i18n="field.tone.formal">Formal</option>
+                <option value="casual" data-i18n="field.tone.casual">Casual</option>
+                <option value="email" data-i18n="field.tone.email">Email</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card page" id="sec-ollama" hidden>
+        <div class="card-head">
+          <div>
+            <h2 data-i18n="page.ollama.title">Ollama models</h2>
+            <div class="card-head-sub" id="ollamaDiskUsage" data-i18n="page.ollama.sub">Manage post-processing models</div>
+          </div>
+        </div>
+
+        <!-- Status banner when Ollama isn't running -->
+        <div class="ollama-empty" id="ollamaEmpty" hidden>
+          <div class="ollama-empty-title" data-i18n="page.ollama.notRunningTitle">Ollama isn't running</div>
+          <div class="ollama-empty-desc" data-i18n="page.ollama.notRunningDesc">
+            Start it with <code>brew services start ollama</code> or run <code>ollama serve</code>.
+          </div>
+        </div>
+
+        <!-- Installed models list -->
+        <div class="fields" id="ollamaInstalledBox">
+          <div class="fields-head">
+            <h3 data-i18n="page.ollama.installedTitle">Installed</h3>
+            <span class="card-head-sub" id="ollamaInstalledSub"></span>
+          </div>
+          <div id="ollamaInstalledList"></div>
+        </div>
+
+        <!-- Curated recommended list — install in-app -->
+        <div class="fields" id="ollamaRecommendedBox">
+          <div class="fields-head">
+            <h3 data-i18n="page.ollama.recommendedTitle">Recommended</h3>
+            <span class="card-head-sub" data-i18n="page.ollama.recommendedSub">Tuned for post-processing transcripts</span>
+          </div>
+          <div id="ollamaRecommendedList"></div>
+        </div>
+      </section>
+
+      <section class="card page" id="sec-history" hidden>
+        <div class="card-head">
+          <h2 data-i18n="page.history.title">History</h2>
+          <button id="historyClearBtn" class="ghost" data-i18n="page.history.clear" data-i18n-title="page.history.clearTitle" title="Clear all history">Clear all</button>
+        </div>
+        <div class="history-bar">
+          <div class="history-search">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8.5 8.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input id="historySearch" type="search" autocomplete="off" spellcheck="false"
+                   placeholder="Search history…" data-i18n-placeholder="history.searchPlaceholder" />
+          </div>
+          <button class="filter-chip active" data-filter-period="all" data-i18n="history.filterAll">All</button>
+          <button class="filter-chip" data-filter-period="today" data-i18n="history.filterToday">Today</button>
+          <button class="filter-chip" data-filter-period="week" data-i18n="history.filterWeek">This week</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+      <section class="card page" id="sec-stats" hidden>
+        <div class="card-head">
+          <h2 data-i18n="page.stats.title">Stats</h2>
+          <button id="statsClearBtn" class="ghost" data-i18n="page.stats.clear" data-i18n-title="page.stats.clearTitle" title="Reset all stats">Reset</button>
+        </div>
+
+        <div id="statsKpiTiles" class="kpi-tiles"></div>
+
+        <div class="stats-grid">
+          <div class="chart-card">
+            <h4 data-i18n="chart.weekly.title">Daily usage</h4>
+            <div class="chart-sub" data-i18n="chart.weekly.sub">Last 14 days, minutes per day</div>
+            <div id="statsBarChart" class="chart-bars"></div>
+          </div>
+          <div class="chart-card">
+            <h4 data-i18n="chart.engine.title">Engine share</h4>
+            <div class="chart-sub" data-i18n="chart.engine.sub">Cumulative calls</div>
+            <div class="donut-wrap">
+              <svg id="statsDonut" class="donut" viewBox="0 0 42 42" aria-hidden="true"></svg>
+              <div id="statsDonutLegend" class="donut-legend"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="statsContent"></div>
+      </section>
+
+      <section class="card" id="recentCard" hidden>
+        <div class="card-head">
+          <h2 data-i18n="page.recent.title">Current transcript</h2>
+          <button id="copyBtn" class="ghost" data-i18n="page.recent.copy">Copy</button>
+        </div>
+        <div id="raw" class="output raw" spellcheck="false"></div>
+        <div id="clean" class="output clean"></div>
+      </section>
+
+      <section class="card page" id="sec-usage" hidden>
+        <div class="card-head"><h2 data-i18n="page.usage.title">Usage</h2></div>
+        <div class="usage">
+          <div class="usage-row">
+            <span class="usage-step">1</span>
+            <span data-i18n="usage.step1">Put the cursor where you want text.</span>
+          </div>
+          <div class="usage-row" data-i18n-html="usage.step2" data-hotkey="⇧⇧">
+            <span class="usage-step">2</span>
+            <kbd class="hotkey-hint">⇧⇧</kbd> once — recording starts (HUD appears).
+          </div>
+          <div class="usage-row" data-i18n-html="usage.step3" data-hotkey="⇧⇧">
+            <span class="usage-step">3</span>
+            When done speaking, <kbd class="hotkey-hint">⇧⇧</kbd> again or click <span class="icon-check">✓</span> on the HUD.
+          </div>
+          <div class="usage-row">
+            <span class="usage-step">4</span>
+            <span data-i18n="usage.step4">The cleaned/translated text is auto-pasted into the focused field.</span>
+          </div>
+          <div class="usage-row usage-row--muted" data-i18n-html="usage.cancel">
+            Cancel via <span class="icon-x">✕</span> on the HUD · alternate hotkey <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Space</kbd>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- ============ Onboarding overlay (first-run only) ============ -->
+  <div class="onboard-backdrop" id="onboard" hidden role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <div class="onboard-card">
+      <div class="onboard-steps" id="onboardSteps">
+        <span class="step-dot" data-step="0"></span>
+        <span class="step-dot" data-step="1"></span>
+        <span class="step-dot" data-step="2"></span>
+      </div>
+
+      <!-- Step 0: Welcome -->
+      <section class="onboard-step" data-step="0">
+        <div class="onboard-icon-big" aria-hidden="true">
+          <svg viewBox="0 0 36 36" width="40" height="40" fill="none">
+            <path d="M12 9v18M18 5v26M24 11v14M6 14v8M30 14v8"
+                  stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2 id="onboardTitle" data-i18n="onboard.welcome.title">Welcome to Listen K</h2>
+        <p data-i18n="onboard.welcome.desc">Speak in any app — text appears instantly.</p>
+        <div class="onboard-actions">
+          <button class="btn-hero rec" id="onboardStart" type="button">
+            <span data-i18n="onboard.welcome.cta">Get started</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+        <div class="onboard-hint" data-i18n="onboard.welcome.hint">First launch warms up the model (~40s).</div>
+      </section>
+
+      <!-- Step 1: Permissions -->
+      <section class="onboard-step" data-step="1" hidden>
+        <h2 data-i18n="onboard.perm.title">Two permissions, please</h2>
+        <p data-i18n="onboard.perm.desc">Required to turn your voice into text and paste it.</p>
+        <div class="onboard-perm-list" id="onboardPermList">
+          <!-- Populated by renderer.js from current permission status -->
+        </div>
+        <div class="onboard-actions split">
+          <button class="btn-hero ghost" id="onboardBack1" type="button" data-i18n="onboard.back">Back</button>
+          <button class="btn-hero rec" id="onboardNext1" type="button">
+            <span data-i18n="onboard.next">Next</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Step 2: Hotkey -->
+      <section class="onboard-step" data-step="2" hidden>
+        <h2 data-i18n="onboard.hotkey.title">Pick a hotkey</h2>
+        <p data-i18n="onboard.hotkey.desc">You can change this later in Settings.</p>
+        <div class="onboard-hotkey-row">
+          <select id="onboardHotkey">
+            <option value="rshift-double">Right ⇧⇧</option>
+            <option value="ropt-double">Right ⌥⌥</option>
+            <option value="rctl-double">Right ⌃⌃</option>
+            <option value="rcmd-double">Right ⌘⌘</option>
+            <option value="fn">fn</option>
+          </select>
+        </div>
+        <!-- Live-test box. Highlights green + shows check when the user
+             actually presses the hotkey, so they leave onboarding with
+             confidence that the binding works. -->
+        <div class="onboard-test-box" id="onboardTestBox" data-state="waiting">
+          <div class="onboard-test-kbd" id="onboardTestKbd">⇧⇧</div>
+          <div class="onboard-test-status" id="onboardTestStatus" data-i18n="onboard.hotkey.testPrompt">
+            Tap your hotkey now to confirm it's detected.
+          </div>
+        </div>
+        <div class="onboard-hint" id="onboardHotkeyHint"></div>
+        <div class="onboard-actions split">
+          <button class="btn-hero ghost" id="onboardBack2" type="button" data-i18n="onboard.back">Back</button>
+          <button class="btn-hero rec" id="onboardDone" type="button" data-i18n="onboard.done">Done · Start</button>
+        </div>
+      </section>
+
+      <button class="onboard-skip" id="onboardSkip" type="button" data-i18n="onboard.skip">Skip</button>
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

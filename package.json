@@ -1,0 +1,151 @@
+{
+  "name": "listen-k",
+  "version": "0.5.2",
+  "description": "Listen K — AI voice dictation for macOS. Local Whisper + optional Ollama post-processing.",
+  "author": "ibank <hello@listenk.com>",
+  "license": "MIT",
+  "homepage": "https://listenk.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ibank/ListenK.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ibank/ListenK/issues",
+    "email": "hello@listenk.com"
+  },
+  "keywords": [
+    "whisper",
+    "dictation",
+    "macos",
+    "korean",
+    "japanese",
+    "chinese",
+    "whisperkit",
+    "electron",
+    "ollama",
+    "speech-to-text",
+    "local-first",
+    "privacy",
+    "accessibility"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "main": "main.js",
+  "scripts": {
+    "prestart": "bash scripts/patch-dev-electron-plist.sh",
+    "start": "electron .",
+    "icon": "node scripts/generate-icon.js",
+    "build:helper": "bash scripts/build-helper.sh",
+    "build:transcribe": "bash scripts/build-transcribe-helper.sh",
+    "build:whisper": "bash scripts/build-whisper.sh",
+    "model:whisperkit": "bash scripts/download-whisperkit-model.sh",
+    "model:whisperkit:base": "bash scripts/download-whisperkit-model.sh openai_whisper-base",
+    "model:whisperkit:small": "bash scripts/download-whisperkit-model.sh openai_whisper-small",
+    "model:whisperkit:turbo": "bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_turbo_632MB",
+    "model:whisperkit:accurate": "bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_626MB",
+    "model:ggml:tiny": "bash scripts/download-model.sh tiny",
+    "model:ggml:base": "bash scripts/download-model.sh base",
+    "model:ggml:small": "bash scripts/download-model.sh small",
+    "smoke": "bash scripts/smoke.sh",
+    "predist": "npm run build:helper && npm run build:transcribe && npm run model:whisperkit",
+    "dist": "electron-builder --mac dmg",
+    "dist:dir": "electron-builder --mac --dir"
+  },
+  "devDependencies": {
+    "electron": "^41.2.2",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.eazler.listenk",
+    "productName": "Listen K",
+    "artifactName": "ListenK-${version}-${arch}.${ext}",
+    "asar": true,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "afterPack": "scripts/after-pack.js",
+    "files": [
+      "main.js",
+      "preload.js",
+      "preload-hud.js",
+      "preload-tray.js",
+      "index.html",
+      "hud.html",
+      "tray.html",
+      "styles.css",
+      "hud.css",
+      "tray.css",
+      "renderer.js",
+      "hud.js",
+      "tray.js",
+      "i18n.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "models/whisperkit",
+        "to": "models/whisperkit",
+        "filter": [
+          "openai_whisper-base/**",
+          "openai_whisper-large-v3-v20240930_turbo_632MB/**"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "받아쓴 음성을 텍스트로 변환하는 데 마이크를 사용합니다.",
+        "NSSpeechRecognitionUsageDescription": "Apple Speech 엔진 사용 시 macOS 음성 인식을 통해 음성을 텍스트로 변환합니다. 시스템 설정에서 온디바이스 모드 선택 가능.",
+        "NSAppleEventsUsageDescription": "포커스된 다른 앱의 입력 필드에 정제된 텍스트를 자동으로 붙여넣기 위해 시스템 이벤트를 전송합니다.",
+        "LSUIElement": true,
+        "LSMinimumSystemVersion": "14.0"
+      },
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "Listen K ${version}",
+      "contents": [
+        {
+          "x": 140,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    }
+  }
+}

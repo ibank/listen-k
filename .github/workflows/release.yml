@@ -1,0 +1,95 @@
+name: Release
+
+# Triggered by pushing a version tag (e.g. v0.4.0). Builds a Developer ID
+# signed, notarised DMG and attaches it to the matching GitHub Release.
+#
+# Required repository secrets (set in Settings → Secrets and variables →
+# Actions → Repository secrets) before this workflow can succeed:
+#
+#   MAC_CERTIFICATE_BASE64        - Developer ID Application cert (.p12),
+#                                   base64-encoded. Generate with:
+#                                     base64 -i DeveloperID.p12 | pbcopy
+#   MAC_CERTIFICATE_PASSWORD      - Password used when exporting the .p12
+#   APPLE_ID                      - Apple ID email for notarytool
+#   APPLE_APP_SPECIFIC_PASSWORD   - App-specific password from appleid.apple.com
+#   APPLE_TEAM_ID                 - 10-character team ID from developer.apple.com
+#
+# Also: remove (or flip) `mac.identity: null` in package.json before the first
+# real release — it is currently `null` for local ad-hoc builds.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          # WhisperKit's transitive swift-jinja >= 2.0 requires tools 6.0
+          # (Xcode 16+). macos-14 ships Xcode 15 by default, so pin to the
+          # latest stable Xcode on whatever runner image GitHub selects.
+          xcode-version: latest-stable
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build Swift helpers
+        run: |
+          npm run build:helper
+          npm run build:transcribe
+
+      - name: Download default Whisper model
+        run: npm run model:whisperkit
+
+      - name: Verify signing secrets are present
+        run: |
+          test -n "${{ secrets.MAC_CERTIFICATE_BASE64 }}"    || (echo "::error::MAC_CERTIFICATE_BASE64 not set" && exit 1)
+          test -n "${{ secrets.MAC_CERTIFICATE_PASSWORD }}"  || (echo "::error::MAC_CERTIFICATE_PASSWORD not set" && exit 1)
+          test -n "${{ secrets.APPLE_ID }}"                   || (echo "::error::APPLE_ID not set" && exit 1)
+          test -n "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" || (echo "::error::APPLE_APP_SPECIFIC_PASSWORD not set" && exit 1)
+          test -n "${{ secrets.APPLE_TEAM_ID }}"              || (echo "::error::APPLE_TEAM_ID not set" && exit 1)
+
+      - name: Build signed and notarised DMG
+        env:
+          # electron-builder reads these directly. CSC_* triggers Developer ID
+          # signing; APPLE_* triggers notarisation via @electron/notarize.
+          # Signing/notarisation settings come from package.json mac.*; CLI
+          # overrides are intentionally avoided (electron-builder 26 rejects
+          # the old nested mac.notarize.teamId shape).
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --mac dmg --publish never
+
+      - name: Compute checksum
+        run: |
+          cd dist
+          shasum -a 256 ListenK-*.dmg > SHA256SUMS
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "See [CHANGELOG.md](https://github.com/ibank/ListenK/blob/main/CHANGELOG.md) for release notes." \
+            --draft \
+            dist/ListenK-*.dmg \
+            dist/ListenK-*.dmg.blockmap \
+            dist/SHA256SUMS

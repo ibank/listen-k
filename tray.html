@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="tray.css" />
+</head>
+<body>
+  <div class="tray">
+    <header class="tray-head">
+      <span class="tray-brand-ico" aria-hidden="true">
+        <svg viewBox="0 0 18 18" width="11" height="11" fill="none">
+          <path d="M6 4v10M9 2v14M12 5v8M3 7v4M15 7v4"
+                stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="tray-brand">Listen K</span>
+      <span class="tray-status-chip" id="trayStatusChip">
+        <span class="status-led" aria-hidden="true"></span>
+        <span class="tray-status-text">—</span>
+      </span>
+    </header>
+
+    <button class="tray-record" id="trayRecordBtn" type="button">
+      <span class="rec-ico" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none">
+          <rect x="6" y="2" width="4" height="7" rx="2" fill="currentColor"/>
+          <path d="M4 8c0 2 1.8 3.5 4 3.5S12 10 12 8M8 11.5v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="body">
+        <span class="t" id="trayRecordTitle">Record now</span>
+        <span class="d" id="trayRecordDesc">Double-tap the hotkey anywhere</span>
+      </span>
+      <span class="kbd-mini" id="trayRecordHotkey">⇧⇧</span>
+    </button>
+
+    <div class="tray-menu" role="menu">
+      <button class="tray-menu-item" data-cmd="open" role="menuitem" type="button">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="12" height="12" rx="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5 8h6M5 5.5h6M5 10.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="label" id="trayOpenLabel">Open dashboard</span>
+      </button>
+      <button class="tray-menu-item" data-cmd="history" role="menuitem" type="button">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="label" id="trayHistoryLabel">History</span>
+      </button>
+      <button class="tray-menu-item" data-cmd="stats" role="menuitem" type="button">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+          <path d="M3 13V9M7 13V5M11 13V7M13 13h-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="label" id="trayStatsLabel">Stats</span>
+      </button>
+    </div>
+
+    <div class="tray-sep" aria-hidden="true"></div>
+    <div class="tray-section-label" id="trayRecentLabel">Recent</div>
+    <div class="tray-recent-list" id="trayRecentList">
+      <div class="tray-recent-empty" id="trayRecentEmpty">—</div>
+    </div>
+
+    <div class="tray-sep" aria-hidden="true"></div>
+    <button class="tray-menu-item" data-cmd="quit" role="menuitem" type="button">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
+        <path d="M6 3h-3v10h3M10 5l3 3-3 3M6 8h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="label" id="trayQuitLabel">Quit Listen K</span>
+      <span class="shortcut">⌘Q</span>
+    </button>
+  </div>
+
+  <script src="tray.js"></script>
+</body>
+</html>

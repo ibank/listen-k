@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="hud.css" />
+</head>
+<body>
+  <!-- Small context pill floating above the HUD showing which engine is
+       active + current post-processing mode. Hidden until main sends
+       context via `hud-context` IPC. -->
+  <div class="hud-context" id="hudContext" hidden>
+    <span class="hud-context-ico" aria-hidden="true"></span>
+    <span class="hud-context-text"></span>
+  </div>
+
+  <div class="pill" id="pill" data-state="recording">
+    <button class="btn cancel" id="cancelBtn" aria-label="취소">
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+        <path d="M3 3 L13 13 M13 3 L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <div class="center">
+      <div class="wave" id="wave">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+        <span></span>
+      </div>
+      <div class="spinner" id="spinner" aria-hidden="true"></div>
+      <div class="live-text" id="liveText">
+        <span class="live-text-body" id="liveTextBody"></span><span class="cursor" aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <button class="btn confirm" id="confirmBtn" aria-label="확정">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- Green pop-in checkmark shown in the "done" state only. It replaces
+         the confirm button visually while the HUD is briefly flashing
+         success before auto-hiding. -->
+    <div class="done-check" id="doneCheck" aria-hidden="true">
+      <svg viewBox="0 0 16 16" width="14" height="14">
+        <path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <script src="hud.js"></script>
+</body>
+</html>
