@@ -12,6 +12,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.4.2] — 2026-04-22
+
+### Fixed
+- Stop triggering the "Listen K.app would like to access files in your
+  Documents folder" TCC prompt on first launch. WhisperKit's transitive
+  dependency swift-transformers defaults its `HubApi.downloadBase` to
+  `~/Documents/huggingface/` when no explicit path is provided, and
+  under Developer ID + hardened runtime macOS enforces Documents-folder
+  TCC strictly (ad-hoc builds were exempted by a quirk, which is why
+  this only surfaced after v0.4.0). Pass an explicit `--hf-cache` arg
+  from `main.js` pointing at `app.getPath('userData')/huggingface-cache`
+  and route it through `WhisperKitConfig(downloadBase:)` in
+  `transcribe-helper`, so the tokenizer / config cache lives inside the
+  app's own Application Support directory with no user-visible prompt.
+
 ## [0.4.1] — 2026-04-22
 
 ### Fixed
@@ -98,7 +113,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/ListenK/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/ibank/ListenK/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/ibank/ListenK/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ibank/ListenK/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ibank/ListenK/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ibank/ListenK/compare/v0.2.0...v0.3.0

@@ -40,11 +40,12 @@ struct TranscribeHelper {
         if args.first == "--stream" {
             let modelDir = parseNamed(args, "--model-dir")
             let language = parseNamed(args, "--language") ?? "auto"
+            let hfCache = parseNamed(args, "--hf-cache")
             guard let modelDir else {
                 writeStderr("error: --model-dir <dir> is required\n")
                 exit(2)
             }
-            await runStream(modelDir: modelDir, language: language)
+            await runStream(modelDir: modelDir, language: language, hfCache: hfCache)
             return
         }
 
@@ -83,9 +84,11 @@ struct TranscribeHelper {
             writeStderr("error: --model-dir <dir> is required\n"); exit(2)
         }
         let language = parseNamed(args, "--language") ?? "auto"
+        let hfCache = parseNamed(args, "--hf-cache")
 
         do {
             let whisperKit = try await WhisperKit(
+                downloadBase: hfCache.map { URL(fileURLWithPath: $0, isDirectory: true) },
                 modelFolder: modelDir,
                 verbose: false,
                 logLevel: .none,
@@ -289,7 +292,7 @@ struct TranscribeHelper {
         }
     }
 
-    static func runStream(modelDir: String, language: String) async {
+    static func runStream(modelDir: String, language: String, hfCache: String?) async {
         // Mic permission: this helper binary has its own TCC identity, so
         // it must be authorised independently of the Electron app that
         // spawned it. Without mic access, AudioStreamTranscriber reads
@@ -327,7 +330,21 @@ struct TranscribeHelper {
             prefillCompute: .cpuAndGPU
         )
 
+        // downloadBase tells WhisperKit (and its transitive swift-transformers
+        // HubApi) where to read the tokenizer / config cache. Without it the
+        // default is ~/Documents/huggingface/, which on macOS 14+ triggers a
+        // TCC prompt for the Documents folder even though the user never
+        // asked us to touch their documents. Pointing it into the app's own
+        // Application Support directory keeps everything in a sandbox-safe
+        // location that already has implicit access.
+        let downloadBase = hfCache.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        if let downloadBase {
+            try? FileManager.default.createDirectory(at: downloadBase, withIntermediateDirectories: true)
+            writeStderr("[init] hf cache: \(downloadBase.path)\n")
+        }
+
         let config = WhisperKitConfig(
+            downloadBase: downloadBase,
             modelFolder: modelDir,
             computeOptions: computeOptions,
             verbose: true,

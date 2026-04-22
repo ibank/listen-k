@@ -990,7 +990,9 @@ function startTranscribeStream() {
       return;
     }
     helper = wkHelper;
-    args = ['--stream', '--model-dir', model, '--language', 'auto'];
+    const hfCache = path.join(app.getPath('userData'), 'huggingface-cache');
+    try { fs.mkdirSync(hfCache, { recursive: true }); } catch {}
+    args = ['--stream', '--model-dir', model, '--language', 'auto', '--hf-cache', hfCache];
   }
 
   console.log(`[stream] spawning ${engine} engine:`, helper, args.join(' '));
@@ -1577,10 +1579,12 @@ ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
     fs.unlink(tmpFile, () => {});
     throw new Error(tr('error.wkMissing'));
   }
+  const hfCache = path.join(app.getPath('userData'), 'huggingface-cache');
+  try { fs.mkdirSync(hfCache, { recursive: true }); } catch {}
   return new Promise((resolve, reject) => {
     execFile(
       wkHelper,
-      ['--audio', tmpFile, '--model-dir', wkModel, '--language', lang],
+      ['--audio', tmpFile, '--model-dir', wkModel, '--language', lang, '--hf-cache', hfCache],
       { maxBuffer: 20 * 1024 * 1024 },
       (err, stdout, stderr) => {
         fs.unlink(tmpFile, () => {});
