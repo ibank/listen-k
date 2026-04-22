@@ -12,6 +12,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.4.4] — 2026-04-22
+
+### Fixed
+- The "Listen K wants to use key 'Electron Safe Storage' in your keychain"
+  prompt no longer fires for users who have never configured an OpenAI
+  API key. The `get-openai-key` IPC handler used to call
+  `safeStorage.isEncryptionAvailable()` unconditionally whenever the
+  dashboard's OpenAI pane loaded; on macOS the first call to that API
+  probes the Keychain, which under a fresh Developer ID signing identity
+  surfaces an ACL prompt every launch. Short-circuit the handler when
+  there is no stored key and no `OPENAI_API_KEY` env var, returning an
+  optimistic `encryptionAvailable: true` that gets verified lazily at
+  save time instead.
+
 ## [0.4.3] — 2026-04-22
 
 ### Fixed
@@ -125,7 +139,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/ListenK/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/ibank/ListenK/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/ibank/ListenK/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/ibank/ListenK/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/ibank/ListenK/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ibank/ListenK/compare/v0.4.0...v0.4.1

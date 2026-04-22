@@ -1812,8 +1812,27 @@ ipcMain.handle('get-openai-key', () => {
   // Return just a presence/source hint to the renderer, never the secret
   // itself. The API key is used inside main.js only — exposing its value
   // over IPC would let any compromised renderer exfiltrate it.
+  //
+  // Crucially: do NOT probe safeStorage.isEncryptionAvailable() unconditionally.
+  // On macOS the first call to that API touches the "Electron Safe Storage"
+  // Keychain item, and under a fresh Developer ID signing identity the OS
+  // prompts the user to allow the app to read the keychain. Users who have
+  // never configured an OpenAI API key were getting that prompt on every
+  // launch just because the dashboard's OpenAI pane loaded this status.
+  // Short-circuit when there is no stored key and no env-var override, and
+  // only touch Keychain when the information actually matters.
   const cfg = loadConfig();
   const fromEnv = Boolean((process.env.OPENAI_API_KEY || '').trim());
+  const hasStoredKey = Boolean(cfg.openaiKeyEnc) || Boolean(cfg.openaiKey);
+  if (!hasStoredKey && !fromEnv) {
+    return {
+      hasKey: false,
+      fromEnv: false,
+      encrypted: false,
+      legacyPlaintext: false,
+      encryptionAvailable: true, // assume true; probe lazily when saving
+    };
+  }
   const hasKey = Boolean(currentOpenAiKey());
   return {
     hasKey,
