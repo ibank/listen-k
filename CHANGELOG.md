@@ -12,6 +12,39 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.5.3] — 2026-04-22
+
+### Security
+- Add a strict `Content-Security-Policy` meta on every renderer HTML
+  (`index.html`, `hud.html`, `tray.html`). Default-src self, no remote
+  script origins, `connect-src` locked to `http://localhost:11434`
+  (Ollama) and `https://api.openai.com` (BYOK) on the dashboard and
+  self-only on HUD / tray.
+- Drop the Google Fonts `<link>` from `index.html`. `styles.css`
+  already falls back to `-apple-system` / `SF Mono`, which ship with
+  macOS — the external font request was both a boot-time network
+  dependency and the only reason CSP `font-src` had to include remote
+  origins.
+- Enable the Chromium renderer sandbox on all three BrowserWindows
+  (`mainWindow`, `hudWindow`, `trayWindow`). Each preload only uses
+  `contextBridge` + `ipcRenderer`, both sandbox-safe, so this is a
+  free hardening step.
+- Add `setWindowOpenHandler`/`will-navigate` guards on all three
+  BrowserWindows so a compromised renderer cannot `window.open(...)`
+  a new BrowserWindow or navigate the current one away from the
+  bundled `file://`.
+- Remove the `open-url` IPC handler and its `window.listenk.openUrl`
+  bridge entry — no renderer code ever called it, and exposing
+  `shell.openExternal(<arbitrary string>)` over IPC would let a
+  compromised renderer open `file://`, `smb://`, or custom-scheme
+  URLs. Purpose-specific handlers like `open-settings-pane` remain
+  because they hard-code the URL on the main side.
+- Gate `show-in-finder` with an explicit prefix allowlist
+  (`process.resourcesPath`, `app.getPath('userData')`, `/Applications`,
+  and the repo root in dev). All renderer callers already pass
+  main-supplied paths, so the guard is transparent — but it closes
+  the handler as a generic filesystem-reveal primitive.
+
 ## [0.5.2] — 2026-04-22
 
 ### Fixed
@@ -201,7 +234,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/ibank/listen-k/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/ibank/listen-k/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/ibank/listen-k/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ibank/listen-k/compare/v0.4.4...v0.5.0

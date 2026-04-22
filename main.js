@@ -81,10 +81,20 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 
   mainWindow.loadFile('index.html');
+
+  // Hardening: the renderer has no business opening new windows or
+  // navigating away from the bundled file://. Deny both — if some future
+  // feature really needs an external link, it should go through the
+  // (protocol-gated) open-url IPC path, not an uncontrolled navigation.
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event) => {
+    event.preventDefault();
+  });
 
   mainWindow.once('ready-to-show', async () => {
     const firstRunFlag = path.join(app.getPath('userData'), '.first-run-done');
@@ -197,7 +207,13 @@ function createHudWindow() {
       preload: path.join(__dirname, 'preload-hud.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
+  });
+
+  hudWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  hudWindow.webContents.on('will-navigate', (event) => {
+    event.preventDefault();
   });
 
   hudWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -362,9 +378,14 @@ function createTrayWindow() {
       preload: path.join(__dirname, 'preload-tray.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
   trayWindow.loadFile('tray.html');
+  trayWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  trayWindow.webContents.on('will-navigate', (event) => {
+    event.preventDefault();
+  });
   trayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   // Hide when user clicks outside (normal popover behaviour on macOS).
   trayWindow.on('blur', () => {
@@ -1758,12 +1779,33 @@ ipcMain.handle('request-mic', async () => {
   }
 });
 
-ipcMain.handle('open-url', (_e, url) => {
-  require('electron').shell.openExternal(url);
-});
+// `open-url` was removed: no renderer caller existed, and `shell.openExternal`
+// accepting an unvalidated string (including `file://`, `smb://`, custom
+// schemes) is an unnecessary footgun if the renderer is ever compromised. If
+// a future feature needs to open an external link, add a purpose-specific
+// IPC that hard-codes the URL (see `open-settings-pane` for the pattern).
 
+// `show-in-finder` is the only place we surface a filesystem path in Finder
+// for the user, and the renderer-side callers (`showInFinder(targetPath)`
+// in renderer.js) always hand it a path returned from `collectStatus()` —
+// i.e. app bundle path, paste-helper path, or fn-listener path. Gate the
+// handler with an explicit prefix allowlist so a compromised renderer
+// can't pivot it into a filesystem-reveal primitive.
 ipcMain.handle('show-in-finder', (_e, p) => {
-  require('electron').shell.showItemInFolder(p);
+  if (typeof p !== 'string' || !p) return false;
+  const abs = path.resolve(p);
+  const allowedPrefixes = [
+    process.resourcesPath,
+    app.getPath('userData'),
+    '/Applications/',
+    __dirname, // dev builds point at the repo root
+  ].filter(Boolean);
+  if (!allowedPrefixes.some((pre) => abs === pre || abs.startsWith(pre + '/'))) {
+    console.warn('[security] show-in-finder rejected path outside allowlist:', abs);
+    return false;
+  }
+  require('electron').shell.showItemInFolder(abs);
+  return true;
 });
 
 ipcMain.handle('clipboard-write', (_e, text) => {

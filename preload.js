@@ -9,7 +9,6 @@ contextBridge.exposeInMainWorld('listenk', {
   getStatus: () => ipcRenderer.invoke('get-status'),
   openSettingsPane: (pane) => ipcRenderer.invoke('open-settings-pane', pane),
   requestMic: () => ipcRenderer.invoke('request-mic'),
-  openUrl: (url) => ipcRenderer.invoke('open-url', url),
   showInFinder: (p) => ipcRenderer.invoke('show-in-finder', p),
   clipboardWrite: (text) => ipcRenderer.invoke('clipboard-write', text),
   historyList: (limit) => ipcRenderer.invoke('history-list', limit),

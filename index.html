@@ -2,10 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <!-- Strict CSP: only self-origin code runs. No remote scripts, no eval.
+       style-src allows 'unsafe-inline' because our renderer writes inline
+       style="..." attributes on a handful of dynamic nodes (progress bars,
+       HUD positions). connect-src pins localhost Ollama + OpenAI; anything
+       else the renderer might try to fetch is blocked. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' http://localhost:11434 https://api.openai.com; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <title>Listen K</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Google Fonts removed: styles.css already falls back to -apple-system
+       (San Francisco) and SF Mono, which ship with every macOS install.
+       Removing the external link kills the one network dep on boot and
+       lets CSP use a strict self-only font-src. -->
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
