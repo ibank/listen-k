@@ -1,117 +1,172 @@
+**English** · [한국어](README.ko.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md)
+
 # Listen K
 
-Apple Silicon macOS용 **로컬 AI 음성 받아쓰기**. Right Shift 를 두 번 탭하면 HUD 가 뜨고, 말한 내용이 실시간으로 표시된 뒤 한 번 더 탭하면 포커스된 앱의 입력 필드에 자동으로 붙여넣어집니다.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/ibank/ListenK)](https://github.com/ibank/ListenK/releases)
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)](https://developer.apple.com/macos/)
+[![Star on GitHub](https://img.shields.io/github/stars/ibank/ListenK?style=social)](https://github.com/ibank/ListenK)
 
-- **전사**: WhisperKit (Core ML · Metal GPU, `openai_whisper-large-v3-turbo` 기본)
-- **후처리**: 규칙 기반(기본, 0-deps) / 끄기 / Ollama (Gemma) 중 선택
-- **전송 없음**: 음성도 텍스트도 기기를 벗어나지 않음
-- **대상**: Apple Silicon macOS 14+
+**Local AI voice dictation for Apple Silicon Macs**, with **first-class Korean, Japanese, and Chinese** alongside English. Double-tap Right Shift to open a floating HUD, speak, watch the text appear in real time, double-tap again, and it is pasted into whatever app you had focused.
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Listen K demo" width="720" />
+  <br />
+  <sub><i>Demo asset: see <a href="assets/README.md">assets/README.md</a> for how to drop in <code>demo.gif</code>.</i></sub>
+</p>
+
+- **Engines**: WhisperKit (default, `openai_whisper-large-v3-turbo`) · Apple Speech · whisper.cpp · OpenAI API (BYOK)
+- **Post-processing**: rule-based (default, zero dependencies) · off · Ollama (local LLMs like Gemma) · OpenAI cleanup
+- **No data leaves your device** on the default config — WhisperKit + rules is fully local
+- **UI** in Korean · English · Japanese · Simplified Chinese, auto-switched from your system locale
+- **Target**: Apple Silicon macOS 14 (Sonoma) or newer
+- **License**: MIT — source is open; a signed, notarised DMG is sold at [listenk.com](https://listenk.com)
+
+## Why Listen K?
+
+There are several excellent dictation apps for macOS. Listen K sits in a specific spot:
+
+| | Listen K | [Superwhisper](https://superwhisper.com) | [Wispr Flow](https://wisprflow.ai) | [MacWhisper](https://goodsnooze.gumroad.com/l/macwhisper) | [Whisper Notes](https://whispernotes.app) | Apple Dictation |
+|---|---|---|---|---|---|---|
+| **Source** | MIT open source | Closed | Closed | Closed | Closed | Closed |
+| **Local by default** | ✅ | ✅ | ❌ (cloud) | ✅ | ✅ | ✅ |
+| **Korean / Japanese / Chinese quality** | First-class, CJK-tuned prompts | Good | Good | Mixed | Good | Weak on long-form CJK |
+| **Auto-paste into focused app** | ✅ | ✅ | ✅ | Manual copy | Manual copy | System only |
+| **Hotkey flexibility** | 5 options incl. fn | 3 options | fn only | 1 option | 1 option | Fixed |
+| **Pricing** | Free source · $29 signed DMG | $8.49/mo · $249 lifetime | $15/mo | $79.99 lifetime | $6.99 one-time | Free (OS bundled) |
+| **Four-locale UI** | ko / en / ja / zh-CN | en only | en only | en only | en only | System locale |
+
+If you write Korean, Japanese, or Chinese daily and want your transcripts to stay on your machine without subscribing, Listen K is built for you.
 
 ---
 
-## 설치 (DMG)
+## Install
 
-1. `dist/ListenK-0.1.0-arm64.dmg` 열고 Listen K 를 Applications 로 드래그
-2. 첫 실행 전 Gatekeeper 우회 (아직 공증 전이라 1회 필요)
-   - 빠름: `xattr -cr "/Applications/Listen K.app"`
-   - 또는: 시스템 설정 → 개인정보 보호 및 보안 → "Listen K 가 차단되었습니다" 옆 **그래도 열기**
-3. Applications 에서 Listen K 실행 — 최초 실행 시 대시보드가 자동으로 열립니다
-4. 대시보드 안내를 따라 권한 2가지 허용
-   - **손쉬운 사용**: `/Applications/Listen K.app` 추가 (단축키 감지 + 자동 붙여넣기 둘 다 커버)
-   - **마이크**: 첫 녹음 시 자동 프롬프트
-5. (선택) Ollama 후처리를 쓸 경우: `brew install ollama && ollama pull gemma3:4b`
+### Notarised release (default path once signing is set up)
+1. Download the latest `ListenK-x.y.z-arm64.dmg` from [Releases](https://github.com/ibank/ListenK/releases)
+2. Open it and drag **Listen K** into Applications
+3. Launch — the dashboard opens automatically the first time
+4. Grant two permissions when prompted
+   - **Accessibility**: add `/Applications/Listen K.app` (covers both hotkey detection and auto-paste)
+   - **Microphone**: prompted automatically before the first recording
+5. (Optional) For Ollama post-processing: `brew install ollama && ollama pull gemma3:4b`
 
-첫 실행 시 Core ML 이 모델을 컴파일하면서 ~40초 대기합니다. 캐시되면 이후엔 바로 준비됩니다.
+The first launch takes ~40 seconds while Core ML compiles the model. Subsequent launches are instant.
 
-## 사용법
+### Ad-hoc development builds (v0.3 and earlier)
+If you picked up a build before notarisation was wired up, you have to clear the quarantine flag once:
+- Quick: `xattr -cr "/Applications/Listen K.app"`
+- Or: System Settings → Privacy & Security → **Open Anyway** next to the "Listen K was blocked" banner
 
-1. 텍스트를 넣을 곳에 커서 두기
-2. **⇧⇧** (Right Shift 두 번 탭) — HUD 뜨면서 녹음 시작
-3. 말하기 (HUD 에 실시간 텍스트 흐름)
-4. **⇧⇧** 또는 HUD `✓` — 후처리 → 포커스된 입력 필드에 자동 붙여넣기
-5. 취소: HUD `✕`
+## Usage
 
-**대체 단축키**: `⌘⇧Space`. 메뉴바(⚪) 아이콘 클릭으로 대시보드 재열기.
+1. Place the cursor where the text should go
+2. **⇧⇧** (double-tap Right Shift) — HUD opens and recording starts
+3. Speak (live text streams into the HUD)
+4. **⇧⇧** again, or the HUD `✓` — post-processes and pastes into the focused app
+5. Cancel with the HUD `✕`
+
+**Alternative hotkeys**: `⌥⌥` / `⌃⌃` / `⌘⌘` / `fn`, configurable in settings. Click the menu bar icon to open the tray popover.
 
 ---
 
-## 설정
+## Configuration
 
-`~/Library/Application Support/Listen K/config.json` 에 지속됨 (앱이 직접 갱신):
+Listen K persists settings to `~/Library/Application Support/Listen K/config.json`. The app writes this file; you do not need to edit it by hand.
 
-| 키 | 값 | 설명 |
+| Key | Values | Notes |
 |---|---|---|
-| `hotkey` | `rshift-double` (기본) · `ropt-double` · `rctl-double` · `rcmd-double` · `fn` | 전역 핫키 |
-| `language` | `ko-KR` (기본) · `en-US` · `ja-JP` | Whisper 언어 힌트 |
-| `streaming` | `true` (기본) · `false` | HUD 실시간 텍스트 표시 여부. off 는 녹음 완료 후 일괄 변환 |
-| `mode` | `rules` (기본) · `off` · `ollama` | 후처리. Ollama 선택 시 `gemma3:4b` 필요 |
+| `hotkey` | `rshift-double` (default) · `ropt-double` · `rctl-double` · `rcmd-double` · `fn` | Global hotkey |
+| `engine` | `whisperkit` (default) · `apple-speech` · `whisper-cpp` · `openai` | Transcription engine |
+| `language` | `ko-KR` · `en-US` · `ja-JP` · `zh-CN` | Whisper language hint |
+| `locale` | `ko` · `en` · `ja` · `zh-CN` | UI language (defaults to system locale) |
+| `theme` | `system` (default) · `light` · `dark` | Appearance |
+| `streaming` | `true` (default) · `false` | Whether to show live text in the HUD |
+| `mode` | `rules` (default) · `off` · `ollama` · `openai` | Post-processing |
 
-첫 실행 마커: 같은 디렉토리 `.first-run-done` (지우면 다시 대시보드 자동 오픈)
+First-run marker: `.first-run-done` in the same directory. Delete it to re-open the onboarding dashboard.
 
 ---
 
-## 개발
+## Build from source
+
+Requirements: macOS 14+ on Apple Silicon, Xcode 15+, Node.js 20 LTS.
 
 ```bash
-brew install cmake         # (선택) whisper.cpp 정적 빌드가 필요할 때만
-xcode-select --install     # swiftc
-
+git clone https://github.com/ibank/ListenK.git
+cd ListenK
 npm install
-npm run build:helper       # bin/fn-listener, paste-helper, focus-helper
+npm run build:helper       # Swift helpers: fn-listener, paste-helper, focus-helper
 npm run build:transcribe   # bin/transcribe-helper (WhisperKit Swift Package)
-npm run model:whisperkit   # Core ML 모델 (~632 MB) → models/whisperkit/
+npm run model:whisperkit   # Core ML model (~632 MB) → models/whisperkit/
 
-npm start                  # 개발 모드
-npm run dist               # DMG 빌드 (predist 로 위 3개 자동 실행)
-npm run icon               # 아이콘 재생성
+npm start                  # dev mode
+npm run dist               # DMG build (predist runs the three commands above)
+npm run icon               # regenerate the app icon
 ```
 
-다른 모델 변형으로 바꾸려면:
+To switch to another model variant:
 ```bash
-bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_turbo_632MB
-# 또는
 bash scripts/download-whisperkit-model.sh openai_whisper-base
+bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_626MB
 ```
-`models/whisperkit/` 밑에 있는 폴더 중 품질 우선순위 순서대로 자동 선택됩니다.
+Listen K auto-selects the highest-quality model present under `models/whisperkit/`.
 
-## 구조
+## Project layout
 
 ```
-main.js                         Electron main: IPC, 상태, Tray, 헬퍼 라이프사이클
-preload.js / preload-hud.js     contextIsolation 브릿지
-index.html + renderer.js        대시보드 창 (상태, 설정, 최근 전사)
-hud.html + hud.js               플로팅 HUD (파형 / 실시간 텍스트 / ✕ / ✓)
-styles.css / hud.css            2026 darkfirst 디자인 시스템
+main.js                         Electron main: IPC, state, tray, helper lifecycle
+preload*.js                     contextIsolation bridges (main / HUD / tray)
+index.html + renderer.js        Dashboard (status, settings, stats, history)
+hud.html + hud.js               Floating HUD (waveform / live text / ✕ / ✓)
+tray.html + tray.js             Menu bar tray popover
+i18n.js                         4-locale table (ko/en/ja/zh-CN) + t(key, params)
+styles.css / hud.css / tray.css Design system
 
 native/fn-listener.swift        CGEventTap (modifier double-tap / fn)
 native/paste-helper.swift       Accessibility check + CGEventPost ⌘V
-native/focus-helper.swift       NSWorkspace frontmost 저장/복구
-native/transcribe-helper/       Swift Package. WhisperKit AudioStreamTranscriber
-                                + 배치 재전사 (--stream / --audio / --download)
+native/focus-helper.swift       NSWorkspace frontmost save/restore
+native/transcribe-helper/       WhisperKit AudioStreamTranscriber Swift Package
+native/translate-helper/        MLX-based translation Swift Package (experimental)
 
-scripts/build-helper.sh         3개 Swift 헬퍼 ad-hoc 서명 빌드
-scripts/build-transcribe-helper.sh
-scripts/download-whisperkit-model.sh
-scripts/after-pack.js           electron-builder afterPack ad-hoc 서명
-scripts/generate-icon.js        순수 Node PNG 인코더 (의존성 0)
+scripts/build-*.sh              Swift helper builds
+scripts/smoke.sh                Binary presence + stream-ready verification
+scripts/after-pack.js           electron-builder afterPack (ad-hoc or Developer ID)
 ```
 
-## 트러블슈팅
+## Troubleshooting
 
-- **HUD 뜨는데 텍스트가 안 나옴**: 터미널에서 `npm start` 로 실행해 `[audio] buf=` 로그 확인. buf 가 0 에서 멈추면 마이크 권한 누락.
-- **환각 (말 안 했는데 "Thank you for watching" 등)**: 마이크가 무음을 받는 중. 앱 번들에 마이크 권한 부여했는지 확인. `openai_whisper-large-v3-turbo` 가 작은 모델보다 환각이 적음.
-- **⇧⇧ 눌러도 반응 없음**: 대시보드 "단축키 감지" 행 확인. 손쉬운 사용이 켜져 있으면 초록. 그래도 안 되면 Right Shift 두 번 탭 간격을 380ms 이내로.
-- **포커스 복구 실패, 붙여넣기가 Listen K 에 들어감**: `bin/focus-helper` 로그 확인. 대부분 앱 bundle id 인식 실패. 일반 macOS 앱이 아닐 때 발생 (웹 브라우저 탭 내부 위젯 등).
-- **Core ML 로딩 > 1분**: ANE 컴파일을 돌고 있을 수 있음 (현재 코드는 cpuAndGPU 만 쓰므로 정상적으로는 ~40초). `rm -rf ~/Library/Caches/transcribe-helper` 후 재실행.
+- **HUD appears but no text**: run from a terminal with `npm start` and watch for `[audio] buf=` logs. If buf stays at 0, the app is missing microphone permission.
+- **Hallucinations ("Thank you for watching" with no input)**: the microphone is picking up silence. Verify microphone permission on the app bundle. The `turbo` model hallucinates less than smaller ones.
+- **⇧⇧ does nothing**: check the dashboard "Hotkey detection" row. It goes green once Accessibility is granted. If still red, make sure the double-tap interval is under 380 ms.
+- **Focus restoration fails and text pastes into Listen K itself**: usually a bundle-id recognition failure, common when the focused surface is not a standard macOS app (e.g. a web widget inside a browser tab).
+- **Core ML loading > 1 minute**: the Neural Engine compile step may be running. The shipped code uses cpuAndGPU only, so ~40 seconds is normal. Otherwise, `rm -rf ~/Library/Caches/transcribe-helper` and relaunch.
 
-## 배포 정책
+---
 
-현재 ad-hoc 서명 only — 배포받은 사람이 위 Gatekeeper 우회를 한 번 해야 합니다. 정식 배포는 Apple Developer 가입 ($99/년) 후 `Developer ID Application` + `notarytool` 공증 경로로 이관 예정. 공증 후에는 우회 없이 더블클릭 실행.
+## Contributing
 
-## 로드맵
+Issues, pull requests, and translations are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Security issues go through [SECURITY.md](SECURITY.md).
 
-- [ ] 전사 이력 저장 및 재전사
-- [ ] 앱별 톤/스타일 자동 전환
-- [ ] 사용자 어투 학습 (vocab / 커스텀 발음 사전)
-- [ ] 라이트 모드 (`prefers-color-scheme`)
-- [ ] 자동 업데이트 (electron-updater, 공증 이후)
+## License
+
+MIT — see [LICENSE](LICENSE). Bundled libraries and their licenses are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+## Trademark
+
+The **Listen K** name, logo, and app icon are © 2026 ibank and are **not covered by the MIT license** on the source. If you fork Listen K, please ship it under your own name and icon.
+
+## Supporting the project
+
+Buying a notarised DMG from [listenk.com](https://listenk.com) directly funds development. You can also support the project through [GitHub Sponsors](https://github.com/sponsors/ibank).
+
+## Roadmap
+
+- [x] Light mode (`prefers-color-scheme`)
+- [x] Transcription history
+- [x] Apple Speech / OpenAI / whisper.cpp engine options
+- [x] Four-locale UI
+- [ ] Auto-update via `electron-updater` (after notarisation)
+- [ ] Per-app tone and style profiles
+- [ ] Personal vocabulary / custom pronunciation dictionary
+- [ ] Team licensing

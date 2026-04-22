@@ -19,12 +19,20 @@
     "macos",
     "korean",
     "japanese",
+    "chinese",
     "whisperkit",
     "electron",
     "ollama",
     "speech-to-text",
-    "local-first"
+    "local-first",
+    "privacy",
+    "accessibility"
   ],
+  "engines": {
+    "node": ">=20"
+  },
+  "os": ["darwin"],
+  "cpu": ["arm64"],
   "main": "main.js",
   "scripts": {
     "prestart": "bash scripts/patch-dev-electron-plist.sh",
@@ -104,9 +112,7 @@
         "LSUIElement": true,
         "LSMinimumSystemVersion": "14.0"
       },
-      "identity": null,
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "hardenedRuntime": true
     },
     "dmg": {
       "title": "Listen K ${version}",
