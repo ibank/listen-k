@@ -2190,7 +2190,7 @@ whisperModelSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
   const name = whisperModelSel.value;
   await api.setWhisperModel?.(name);
-  toast(name ? `모델: ${name} (재로딩 중)` : '자동 선택 (재로딩 중)');
+  toast(name ? t('toast.modelChange', { label: name }) : t('toast.modelAuto'));
   lastStatusFingerprint = '';
   setTimeout(refresh, 500);
 });

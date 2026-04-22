@@ -11,11 +11,6 @@ Apple Silicon macOS 용 **로컬 AI 음성 받아쓰기**. Right Shift 를 두 �
 
 **한국어·일본어·중국어 1급 지원** + 영어. UI 는 4개 언어 (ko / en / ja / zh-CN) 자동 전환.
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Listen K 데모" width="720" />
-  <br />
-  <sub><i>데모 에셋: <code>demo.gif</code> 추가 방법은 <a href="assets/README.md">assets/README.md</a> 참조.</i></sub>
-</p>
 
 - **전사 엔진**: WhisperKit (기본, `openai_whisper-large-v3-turbo`) · Apple Speech · whisper.cpp · OpenAI API (BYOK)
 - **후처리**: 규칙 기반 (기본, 의존성 0) · 끄기 · Ollama (Gemma 등 로컬 모델) · OpenAI 문체 정제
@@ -78,12 +73,12 @@ macOS 받아쓰기 앱은 이미 좋은 것들이 많습니다. Listen K 는 그
 | 키 | 값 | 설명 |
 |---|---|---|
 | `hotkey` | `rshift-double` (기본) · `ropt-double` · `rctl-double` · `rcmd-double` · `fn` | 전역 핫키 |
-| `engine` | `whisperkit` (기본) · `apple-speech` · `whisper-cpp` · `openai` | 전사 엔진 |
+| `engine` | `whisperkit` (기본) · `apple` · `whisper.cpp` · `openai` | 전사 엔진 |
 | `language` | `ko-KR` · `en-US` · `ja-JP` · `zh-CN` | Whisper 언어 힌트 |
-| `locale` | `ko` · `en` · `ja` · `zh-CN` | UI 언어 (기본: 시스템 로케일) |
+| `uiLocale` | `ko` · `en` · `ja` · `zh-CN` | UI 언어 (기본: 시스템 로케일) |
 | `theme` | `system` (기본) · `light` · `dark` | 테마 |
 | `streaming` | `true` (기본) · `false` | HUD 실시간 텍스트 표시 |
-| `mode` | `rules` (기본) · `off` · `ollama` · `openai` | 후처리 |
+| `mode` | `rules` (기본) · `off` · `ollama` · `translate` | 후처리 |
 
 첫 실행 마커: 같은 디렉토리 `.first-run-done` (지우면 다시 대시보드 자동 오픈)
 

@@ -9,11 +9,6 @@
 
 **Local AI voice dictation for Apple Silicon Macs**, with **first-class Korean, Japanese, and Chinese** alongside English. Double-tap Right Shift to open a floating HUD, speak, watch the text appear in real time, double-tap again, and it is pasted into whatever app you had focused.
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Listen K demo" width="720" />
-  <br />
-  <sub><i>Demo asset: see <a href="assets/README.md">assets/README.md</a> for how to drop in <code>demo.gif</code>.</i></sub>
-</p>
 
 - **Engines**: WhisperKit (default, `openai_whisper-large-v3-turbo`) · Apple Speech · whisper.cpp · OpenAI API (BYOK)
 - **Post-processing**: rule-based (default, zero dependencies) · off · Ollama (local LLMs like Gemma) · OpenAI cleanup
@@ -77,12 +72,12 @@ Listen K persists settings to `~/Library/Application Support/Listen K/config.jso
 | Key | Values | Notes |
 |---|---|---|
 | `hotkey` | `rshift-double` (default) · `ropt-double` · `rctl-double` · `rcmd-double` · `fn` | Global hotkey |
-| `engine` | `whisperkit` (default) · `apple-speech` · `whisper-cpp` · `openai` | Transcription engine |
+| `engine` | `whisperkit` (default) · `apple` · `whisper.cpp` · `openai` | Transcription engine |
 | `language` | `ko-KR` · `en-US` · `ja-JP` · `zh-CN` | Whisper language hint |
-| `locale` | `ko` · `en` · `ja` · `zh-CN` | UI language (defaults to system locale) |
+| `uiLocale` | `ko` · `en` · `ja` · `zh-CN` | UI language (defaults to system locale) |
 | `theme` | `system` (default) · `light` · `dark` | Appearance |
 | `streaming` | `true` (default) · `false` | Whether to show live text in the HUD |
-| `mode` | `rules` (default) · `off` · `ollama` · `openai` | Post-processing |
+| `mode` | `rules` (default) · `off` · `ollama` · `translate` | Post-processing |
 
 First-run marker: `.first-run-done` in the same directory. Delete it to re-open the onboarding dashboard.
 

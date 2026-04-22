@@ -14,8 +14,8 @@ let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
 let opts = [promptKey: true] as CFDictionary
 if !AXIsProcessTrustedWithOptions(opts) {
     FileHandle.standardError.write(
-        ("ERROR: paste-helper에 손쉬운 사용(Accessibility) 권한이 없습니다.\n" +
-         "시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용 → + 버튼으로 이 바이너리를 추가 후 토글 ON.\n")
+        ("ERROR: paste-helper is missing the Accessibility permission.\n" +
+         "Open System Settings → Privacy & Security → Accessibility, click +, add this binary, and toggle it ON.\n")
         .data(using: .utf8)!
     )
     exit(3)

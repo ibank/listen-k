@@ -72,19 +72,19 @@ func ensureMicAuth() -> Bool {
 }
 
 if !requestSpeechAuth() {
-    emit(["type": "error", "message": "음성 인식 권한이 필요합니다 (시스템 설정 → 개인정보 보호 및 보안 → 음성 인식)"])
+    emit(["type": "error", "message": "Speech Recognition permission is required. Open System Settings → Privacy & Security → Speech Recognition and enable Listen K."])
     exit(3)
 }
 writeStderr("[init] speech authorized\n")
 
 if !ensureMicAuth() {
-    emit(["type": "error", "message": "마이크 권한이 거부되었습니다"])
+    emit(["type": "error", "message": "Microphone permission denied."])
     exit(3)
 }
 writeStderr("[init] mic authorized\n")
 
 guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeId)) else {
-    emit(["type": "error", "message": "언어 \(localeId) 에 대한 음성 인식기가 없습니다"])
+    emit(["type": "error", "message": "No speech recognizer is available for locale \(localeId)."])
     exit(1)
 }
 

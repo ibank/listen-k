@@ -329,11 +329,11 @@ struct TranscribeHelper {
             let granted = await AVCaptureDevice.requestAccess(for: .audio)
             writeStderr("[init] mic request → \(granted)\n")
             if !granted {
-                emit(["type": "error", "message": "마이크 권한이 거부되었습니다. 시스템 설정에서 허용해주세요."])
+                emit(["type": "error", "message": "Microphone permission denied. Open System Settings → Privacy & Security → Microphone and enable Listen K."])
                 exit(3)
             }
         } else if micStatus == .denied || micStatus == .restricted {
-            emit(["type": "error", "message": "마이크 권한 없음. 시스템 설정 → 개인정보 보호 및 보안 → 마이크에서 Listen K.app 또는 transcribe-helper 를 허용해주세요."])
+            emit(["type": "error", "message": "Microphone access is not granted. Enable Listen K.app (or transcribe-helper in dev) in System Settings → Privacy & Security → Microphone."])
             writeStderr("[init] mic denied — aborting\n")
             exit(3)
         }

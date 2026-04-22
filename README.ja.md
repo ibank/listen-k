@@ -9,11 +9,6 @@
 
 Apple Silicon Mac 向けの **ローカル AI 音声入力** アプリ。**韓国語・日本語・中国語のファーストクラス対応** と英語をサポート。Right Shift を 2 回タップすると HUD が表示され、話した内容がリアルタイムで表示されます。もう一度 2 回タップすると、フォーカスされていたアプリの入力欄に自動でペーストされます。
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Listen K デモ" width="720" />
-  <br />
-  <sub><i>デモアセット: <code>demo.gif</code> の追加方法は <a href="assets/README.md">assets/README.md</a> を参照。</i></sub>
-</p>
 
 - **エンジン**: WhisperKit (デフォルト, `openai_whisper-large-v3-turbo`) · Apple Speech · whisper.cpp · OpenAI API (BYOK)
 - **後処理**: ルールベース (デフォルト, 依存 0) · 無効 · Ollama (Gemma など) · OpenAI による文体整形
@@ -79,12 +74,12 @@ macOS 向けの音声入力アプリは既に良いものがいくつもあり�
 | キー | 値 | 説明 |
 |---|---|---|
 | `hotkey` | `rshift-double` (デフォルト) · `ropt-double` · `rctl-double` · `rcmd-double` · `fn` | グローバルホットキー |
-| `engine` | `whisperkit` (デフォルト) · `apple-speech` · `whisper-cpp` · `openai` | 文字起こしエンジン |
+| `engine` | `whisperkit` (デフォルト) · `apple` · `whisper.cpp` · `openai` | 文字起こしエンジン |
 | `language` | `ko-KR` · `en-US` · `ja-JP` · `zh-CN` | Whisper 言語ヒント |
-| `locale` | `ko` · `en` · `ja` · `zh-CN` | UI 言語 (デフォルトはシステムロケール) |
+| `uiLocale` | `ko` · `en` · `ja` · `zh-CN` | UI 言語 (デフォルトはシステムロケール) |
 | `theme` | `system` (デフォルト) · `light` · `dark` | テーマ |
 | `streaming` | `true` (デフォルト) · `false` | HUD でリアルタイム文字を表示するか |
-| `mode` | `rules` (デフォルト) · `off` · `ollama` · `openai` | 後処理 |
+| `mode` | `rules` (デフォルト) · `off` · `ollama` · `translate` | 後処理 |
 
 初回起動マーカー: 同じディレクトリの `.first-run-done` (削除すると再度ダッシュボードが自動で開きます)
 

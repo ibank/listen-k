@@ -352,6 +352,14 @@ const strings = {
     'toast.engineAppleFallback': 'Apple Speech 엔진 초기화 실패 — WhisperKit 으로 전환했습니다 (설치된 Listen K.app 에서만 Apple 엔진 정상 동작)',
     'toast.engineBusy': '녹음·처리 중에는 엔진을 전환할 수 없습니다',
 
+    // ── Tray native fallback menu (right-click) ──────────────────────
+    'tray.state.recording': '🔴 녹음 중',
+    'tray.state.processing': '⏳ 변환/정제 중',
+    'tray.state.idle': '⚪ 대기',
+    'tray.menu.open': '창 열기',
+    'tray.menu.toggleRecord': '녹음 토글',
+    'tray.menu.quit': '종료',
+
     // ── Stats page ────────────────────────────────────────────────────
     'stats.section.summary': '요약',
     'stats.section.byEngine': '엔진별',
@@ -706,6 +714,13 @@ const strings = {
     'toast.engineAppleFallback': 'Apple Speech engine failed to start — switched to WhisperKit (Apple engine only works in the installed Listen K.app)',
     'toast.engineBusy': 'Can\u2019t switch engine while recording or processing',
 
+    'tray.state.recording': '🔴 Recording',
+    'tray.state.processing': '⏳ Processing',
+    'tray.state.idle': '⚪ Idle',
+    'tray.menu.open': 'Open window',
+    'tray.menu.toggleRecord': 'Toggle record',
+    'tray.menu.quit': 'Quit',
+
     'stats.section.summary': 'Summary',
     'stats.section.byEngine': 'By engine',
     'stats.section.openaiCost': 'OpenAI cost',
@@ -1058,6 +1073,13 @@ const strings = {
     'toast.engineAppleFallback': 'Apple Speech エンジン初期化失敗 — WhisperKit に切り替えました (インストール済みの Listen K.app でのみ Apple エンジン動作)',
     'toast.engineBusy': '録音・処理中はエンジンを切り替えられません',
 
+    'tray.state.recording': '🔴 録音中',
+    'tray.state.processing': '⏳ 変換・整形中',
+    'tray.state.idle': '⚪ 待機',
+    'tray.menu.open': 'ウィンドウを開く',
+    'tray.menu.toggleRecord': '録音トグル',
+    'tray.menu.quit': '終了',
+
     'stats.section.summary': 'サマリー',
     'stats.section.byEngine': 'エンジン別',
     'stats.section.openaiCost': 'OpenAI コスト',
@@ -1409,6 +1431,13 @@ const strings = {
     'toast.engineCrashMax': '转录引擎反复崩溃。请重启应用。',
     'toast.engineAppleFallback': 'Apple Speech 引擎启动失败 — 已切换到 WhisperKit (Apple 引擎仅在已安装的 Listen K.app 中正常工作)',
     'toast.engineBusy': '录音·处理中无法切换引擎',
+
+    'tray.state.recording': '🔴 录音中',
+    'tray.state.processing': '⏳ 转换·整理中',
+    'tray.state.idle': '⚪ 待机',
+    'tray.menu.open': '打开窗口',
+    'tray.menu.toggleRecord': '切换录音',
+    'tray.menu.quit': '退出',
 
     'stats.section.summary': '摘要',
     'stats.section.byEngine': '按引擎',

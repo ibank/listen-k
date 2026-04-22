@@ -341,20 +341,22 @@ function createTray() {
 function updateTrayMenu() {
   if (!tray) return;
   const stateLabel = isRecording
-    ? '🔴 녹음 중'
+    ? tr('tray.state.recording')
     : isProcessing
-    ? '⏳ 변환/정제 중'
-    : '⚪ 대기';
+    ? tr('tray.state.processing')
+    : tr('tray.state.idle');
   tray.setToolTip(`Listen K · ${stateLabel}`);
   // Native fallback menu — right-click only. The primary UI is the
-  // custom popover (see tray.on('click') in createTray()).
+  // custom popover (see tray.on('click') in createTray()). Labels use
+  // the current UI locale so right-click doesn't ship a bilingual
+  // "창 열기 / Open window" fallback to users whose system isn't Korean.
   trayNativeMenu = Menu.buildFromTemplate([
     { label: `Listen K · ${stateLabel}`, enabled: false },
     { type: 'separator' },
-    { label: '창 열기 / Open window', click: () => showWindowNonIntrusive() },
-    { label: '녹음 토글 / Toggle record', click: () => handleFnPress() },
+    { label: tr('tray.menu.open'), click: () => showWindowNonIntrusive() },
+    { label: tr('tray.menu.toggleRecord'), click: () => handleFnPress() },
     { type: 'separator' },
-    { label: '종료 / Quit', click: () => { app.isQuitting = true; app.quit(); } },
+    { label: tr('tray.menu.quit'), click: () => { app.isQuitting = true; app.quit(); } },
   ]);
   if (trayWindow && trayWindow.isVisible()) sendTraySnapshot();
 }
@@ -988,7 +990,11 @@ function startFnListener() {
       if (t === 'FN_DOWN') {
         console.log('[fn-listener] FN_DOWN received → toggle');
         handleFnPress();
-      } else if (t === 'READY') {
+      } else if (t.startsWith('READY')) {
+        // fn-listener emits `READY mode=<hotkey>` — match the prefix, not
+        // the whole line. (The exact-match check was silently a no-op on
+        // every launch, though `fnListenerReady` is currently read-only
+        // downstream so it had no visible effect.)
         fnListenerReady = true;
         console.log('[fn-listener] READY');
       } else if (t) {

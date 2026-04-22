@@ -12,6 +12,42 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.5.4] — 2026-04-23
+
+### Fixed
+- Four READMEs advertised config keys that never matched the code. The
+  `engine` cell said `apple-speech` / `whisper-cpp` but the accepted
+  values are `apple` / `whisper.cpp` (silent fallback to `whisperkit`
+  if you wrote the advertised strings). The `mode` cell listed
+  `openai`, which is a separate BYOK engine, not a post-processing
+  mode — the actual fourth option is `translate`. The UI-locale key
+  was advertised as `locale`; code reads `uiLocale`. All four locale
+  READMEs corrected.
+- All four READMEs referenced `assets/demo.gif`, which does not exist
+  in the repo — the `<p align="center">` block has been removed so
+  the GitHub project page no longer renders a broken image. The
+  block will come back once a real asset ships.
+- `fn-listener` emits `READY mode=<hotkey>`, so `main.js`'s exact-match
+  `t === 'READY'` check was a no-op on every launch. Changed to
+  `t.startsWith('READY')`. (The `fnListenerReady` flag is currently
+  unused downstream, so nothing user-visible changed — but the intent
+  was broken.)
+- `renderer.js` emitted a hardcoded Korean toast
+  (`모델: <name> (재로딩 중)` / `자동 선택 (재로딩 중)`) when the
+  Whisper model picker changed, bypassing the existing
+  `toast.modelChange` / `toast.modelAuto` i18n keys. Fixed.
+- The tray's right-click native fallback menu hardcoded bilingual
+  Korean / English labels (`"창 열기 / Open window"`, `"🔴 녹음 중"`,
+  etc.) regardless of the user's selected locale. Added `tray.state.*`
+  and `tray.menu.*` keys across all four locales and routed
+  `updateTrayMenu()` through `tr()`.
+- Swift helpers (`transcribe-helper`, `apple-speech-helper`,
+  `paste-helper`) emitted Korean-only error messages that surfaced
+  directly in the renderer's status row for non-Korean users. Switched
+  to English. A more-complete code-based localisation (where the Swift
+  side emits stable codes and the JS side translates) is deferred to
+  a future release.
+
 ## [0.5.3] — 2026-04-22
 
 ### Security
@@ -234,7 +270,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/ibank/listen-k/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/ibank/listen-k/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/ibank/listen-k/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/ibank/listen-k/compare/v0.5.0...v0.5.1

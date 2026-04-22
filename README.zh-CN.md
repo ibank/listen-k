@@ -9,11 +9,6 @@
 
 面向 Apple Silicon Mac 的**本地 AI 语音听写**应用,在英语之外**一流支持韩语、日语、简体中文**。双击 Right Shift 即可呼出浮动 HUD,实时显示语音文本,再次双击便会自动粘贴到当前焦点的输入框。
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Listen K 演示" width="720" />
-  <br />
-  <sub><i>演示资源: 添加 <code>demo.gif</code> 的方法见 <a href="assets/README.md">assets/README.md</a>。</i></sub>
-</p>
 
 - **引擎**: WhisperKit (默认,`openai_whisper-large-v3-turbo`) · Apple Speech · whisper.cpp · OpenAI API (BYOK)
 - **后处理**: 规则式 (默认,零依赖) · 关闭 · Ollama (Gemma 等本地模型) · OpenAI 文体润色
@@ -79,12 +74,12 @@ macOS 上的听写应用已经有几款不错的产品。Listen K 占据的是�
 | 键 | 值 | 说明 |
 |---|---|---|
 | `hotkey` | `rshift-double` (默认) · `ropt-double` · `rctl-double` · `rcmd-double` · `fn` | 全局快捷键 |
-| `engine` | `whisperkit` (默认) · `apple-speech` · `whisper-cpp` · `openai` | 转录引擎 |
+| `engine` | `whisperkit` (默认) · `apple` · `whisper.cpp` · `openai` | 转录引擎 |
 | `language` | `ko-KR` · `en-US` · `ja-JP` · `zh-CN` | Whisper 语言提示 |
-| `locale` | `ko` · `en` · `ja` · `zh-CN` | 界面语言 (默认随系统区域) |
+| `uiLocale` | `ko` · `en` · `ja` · `zh-CN` | 界面语言 (默认随系统区域) |
 | `theme` | `system` (默认) · `light` · `dark` | 主题 |
 | `streaming` | `true` (默认) · `false` | HUD 是否实时显示文字 |
-| `mode` | `rules` (默认) · `off` · `ollama` · `openai` | 后处理 |
+| `mode` | `rules` (默认) · `off` · `ollama` · `translate` | 后处理 |
 
 首次运行标记: 同目录下 `.first-run-done` (删除后下次启动会再次自动打开仪表盘)
 

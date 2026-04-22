@@ -1,6 +1,6 @@
 {
   "name": "listen-k",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Listen K — AI voice dictation for macOS. Local Whisper + optional Ollama post-processing.",
   "author": "ibank <hello@listenk.com>",
   "license": "MIT",
