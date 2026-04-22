@@ -1,6 +1,6 @@
 {
   "name": "listen-k",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Listen K — AI voice dictation for macOS. Local Whisper + optional Ollama post-processing.",
   "author": "ibank <hello@listenk.com>",
   "license": "MIT",
@@ -31,8 +31,12 @@
   "engines": {
     "node": ">=20"
   },
-  "os": ["darwin"],
-  "cpu": ["arm64"],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
   "main": "main.js",
   "scripts": {
     "prestart": "bash scripts/patch-dev-electron-plist.sh",
@@ -89,7 +93,9 @@
       {
         "from": "bin",
         "to": "bin",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "models/whisperkit",
@@ -103,7 +109,12 @@
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
-        { "target": "dmg", "arch": ["arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
       "extendInfo": {
         "NSMicrophoneUsageDescription": "받아쓴 음성을 텍스트로 변환하는 데 마이크를 사용합니다.",
@@ -117,10 +128,22 @@
     "dmg": {
       "title": "Listen K ${version}",
       "contents": [
-        { "x": 140, "y": 200, "type": "file" },
-        { "x": 400, "y": 200, "type": "link", "path": "/Applications" }
+        {
+          "x": 140,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
       ],
-      "window": { "width": 540, "height": 380 }
+      "window": {
+        "width": 540,
+        "height": 380
+      }
     }
   }
 }
