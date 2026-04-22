@@ -12,6 +12,51 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.5.5] — 2026-04-23
+
+### Changed
+- `docs/architecture.md` rewritten to match v0.5.x reality: helper count
+  is 5 (added `apple-speech-helper.app` row), `open-url` IPC is gone,
+  history file is `history.jsonl` (newline-delimited JSON) not
+  `history.json`, the restart counter is `transcribeStreamRestarts` not
+  `crashCount`, the `get-openai-key` return shape is the status object
+  not `{set, masked}`, and the engine-selection diagram uses the real
+  engine keys `apple` / `whisper.cpp`. New sections document the
+  `safeSend` guard, the `--hf-cache` flag threaded through
+  `transcribe-helper`, and the 600 ms `lastStopAt` cooldown between
+  stop and the next start.
+- `docs/release-procedure.md` no longer links to the internal
+  `manual-*.md` runbooks (those are under local-only `ops/` and would
+  404 on the public repo). Replaced with inline instructions.
+- `package.json.description` now reflects the full engine set
+  (WhisperKit / Apple Speech / whisper.cpp / OpenAI BYOK) and
+  highlights first-class Korean / Japanese / Chinese.
+- `SECURITY.md` supported-versions table bumped from `0.3.x` to
+  `0.5.x`.
+- `CONTRIBUTING.md` translation-flow instructions reference the real
+  identifiers (`strings` / `LOCALES` in `i18n.js`) instead of
+  non-existent `MESSAGES` / `SUPPORTED_LOCALES`.
+- macOS usage-description strings in `package.json` `mac.extendInfo`
+  and `native/apple-speech-helper-Info.plist` translated from Korean
+  to English, so non-Korean users see an intelligible TCC prompt on
+  first launch.
+- `apple-speech-helper.swift` language map now includes `zh → zh-CN`
+  alongside ko / en / ja.
+- Onboarding banner title changed from "Two permissions, please" to
+  "Three permissions, please" — the onboarding step has listed three
+  rows (Microphone, Accessibility, Input Monitoring) since v0.3.0;
+  the string lagged. Applied to all four locales.
+- Ollama cleanup system prompt now has ko / en / ja / zh-CN variants
+  selected based on the transcription language hint (`langSel.value`).
+  Previously a Korean-only system prompt would tell the LLM (typically
+  a small gemma3:4b) to "keep the original language", which smaller
+  models tend to ignore — non-Korean users saw Korean artefacts in
+  the cleaned output.
+- `package.json.build.extraResources` now excludes `bin/translate-helper`
+  from the DMG. The binary weighed ~30 MB and was never invoked by
+  main.js — it shipped silently in every release since v0.2.0. The
+  source stays in `native/translate-helper/` for future work.
+
 ## [0.5.4] — 2026-04-23
 
 ### Fixed
@@ -270,7 +315,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/ibank/listen-k/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/ibank/listen-k/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/ibank/listen-k/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/ibank/listen-k/compare/v0.5.1...v0.5.2

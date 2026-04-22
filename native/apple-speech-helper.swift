@@ -40,7 +40,7 @@ if let i = args.firstIndex(of: "--language"), i + 1 < args.count {
     } else if raw.contains("-") {
         localeId = raw
     } else {
-        let map = ["ko": "ko-KR", "en": "en-US", "ja": "ja-JP"]
+        let map = ["ko": "ko-KR", "en": "en-US", "ja": "ja-JP", "zh": "zh-CN"]
         localeId = map[raw] ?? raw
     }
 }

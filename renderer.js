@@ -370,6 +370,50 @@ async function postProcessAndPaste(raw) {
   await cleanupWithOllama(raw);
 }
 
+// Map the Whisper language hint (ko-KR / en-US / ja-JP / zh-CN / auto) to
+// the 2-letter prompt bucket. `auto` and anything unrecognised fall through
+// to English — smaller Ollama models (gemma3:4b) follow the system prompt
+// more literally than they translate transcripts, so English instructions
+// + an explicit "keep the original language" rule is the safest default.
+function promptLocale() {
+  const hint = (langSel && langSel.value) || 'auto';
+  if (hint.startsWith('ko')) return 'ko';
+  if (hint.startsWith('ja')) return 'ja';
+  if (hint.startsWith('zh')) return 'zh';
+  return 'en';
+}
+
+const CLEANUP_TONE = {
+  ko: {
+    neutral: '자연스럽고 깔끔한 문어체로',
+    formal: '격식 있는 존댓말로',
+    casual: '친근한 구어체로',
+    email: '이메일에 적합한 정중하고 간결한 톤으로',
+    _default: '자연스럽게',
+  },
+  en: {
+    neutral: 'into clean, natural written prose',
+    formal: 'in a formal, respectful tone',
+    casual: 'in a friendly, conversational tone',
+    email: 'in a polite, concise tone suitable for email',
+    _default: 'naturally',
+  },
+  ja: {
+    neutral: '自然で整った文体で',
+    formal: '丁寧な敬語で',
+    casual: '親しみやすい口語で',
+    email: 'メールに適した丁寧で簡潔な文体で',
+    _default: '自然に',
+  },
+  zh: {
+    neutral: '改写成自然通顺的书面语',
+    formal: '改写成正式、恭敬的语气',
+    casual: '改写成亲切的口语',
+    email: '改写成适合邮件的礼貌且简洁的语气',
+    _default: '自然地',
+  },
+};
+
 function buildPrompt(raw, opts = {}) {
   if (opts.task === 'translate') {
     const target = opts.targetLang || 'English';
@@ -383,14 +427,12 @@ ${raw}
 ${target} translation:`;
   }
 
-  const toneInstruction = {
-    neutral: '자연스럽고 깔끔한 문어체로',
-    formal: '격식 있는 존댓말로',
-    casual: '친근한 구어체로',
-    email: '이메일에 적합한 정중하고 간결한 톤으로',
-  }[toneSel.value] || '자연스럽게';
+  const lang = promptLocale();
+  const tones = CLEANUP_TONE[lang];
+  const toneInstruction = tones[toneSel.value] || tones._default;
 
-  return `당신은 음성 받아쓰기 결과를 정제하는 편집기입니다. 아래 원문은 사용자의 발화를 받아쓴 것입니다.
+  if (lang === 'ko') {
+    return `당신은 음성 받아쓰기 결과를 정제하는 편집기입니다. 아래 원문은 사용자의 발화를 받아쓴 것입니다.
 
 규칙:
 1. "음", "어", "그", "뭐", "아", "그니까", "um", "uh", "you know" 같은 필러 단어 제거
@@ -408,6 +450,69 @@ ${raw}
 """
 
 정제된 텍스트:`;
+  }
+
+  if (lang === 'ja') {
+    return `あなたは音声入力の結果を整形する編集者です。以下は話者の発話をそのまま書き起こしたものです。
+
+ルール:
+1. 「えー」「あー」「そのー」「まあ」「um」「uh」「you know」などのフィラーを除去
+2. 繰り返しを整理
+3. 言い直しがある場合は最終的な意図に沿って文脈を合わせる
+4. 箇条書きや段階的な内容は改行で整える
+5. 句読点と大文字小文字を自然に復元
+6. ${toneInstruction} 仕上げ、意味と原文の言語は維持
+7. 翻訳しないこと。内容の要約や追加もしないこと。
+8. 解説をつけず、整形後のテキストだけを出力。
+
+原文:
+"""
+${raw}
+"""
+
+整形後のテキスト:`;
+  }
+
+  if (lang === 'zh') {
+    return `你是一个语音听写结果整理编辑。以下原文是用户口述的逐字稿。
+
+规则:
+1. 删除 "嗯"、"啊"、"这个"、"那个"、"就是"、"um"、"uh"、"you know" 等填充词
+2. 整理重复表述
+3. 若有中途改口,按最终意图顺畅地改写
+4. 如果讲到列表或步骤,用换行分隔
+5. 自然还原标点和大小写
+6. ${toneInstruction},但保留原意与原始语言
+7. 不要翻译。不要总结或添加内容。
+8. 不要加任何说明,只输出整理后的文本。
+
+原文:
+"""
+${raw}
+"""
+
+整理后的文本:`;
+  }
+
+  // default: English
+  return `You are an editor cleaning up a voice-dictation transcript. The text below is a word-for-word capture of the user speaking.
+
+Rules:
+1. Remove fillers like "um", "uh", "you know", "like", "so", "I mean".
+2. Collapse repeated phrases.
+3. When the speaker self-corrects mid-sentence, follow the final intent.
+4. If they enumerated items or steps, use line breaks.
+5. Restore punctuation and capitalisation naturally.
+6. Rewrite ${toneInstruction}, but keep the meaning and the original language intact.
+7. Do NOT translate. Do NOT summarise or add anything.
+8. Output only the cleaned-up text — no commentary, no quotes, no preamble.
+
+Source:
+"""
+${raw}
+"""
+
+Cleaned-up text:`;
 }
 
 async function cleanupWithOllama(raw, opts = {}) {

@@ -1,5 +1,5 @@
 ---
-updated: 2026-04-22
+updated: 2026-04-23
 scope: Listen K — contributor-facing architecture overview
 audience: new contributors, security reviewers, maintainers making cross-cutting changes
 ---
@@ -9,10 +9,10 @@ audience: new contributors, security reviewers, maintainers making cross-cutting
 This document is for people who want to **change** Listen K, not just use it.
 Read [README.md](../README.md) first for the user-facing description.
 
-Listen K is an Electron app (CommonJS main process) that drives four sandboxed
-Swift helpers over stdio. The central idea is that the **main process is the
-single source of truth** for app state, and every renderer surface (dashboard,
-HUD, tray popover) is a thin reflection pushed via IPC.
+Listen K is an Electron app (CommonJS main process) that drives five
+sandboxed Swift helpers over stdio. The central idea is that the **main
+process is the single source of truth** for app state, and every renderer
+surface (dashboard, HUD, tray popover) is a thin reflection pushed via IPC.
 
 ## 1. Process topology
 
@@ -26,19 +26,24 @@ HUD, tray popover) is a thin reflection pushed via IPC.
                        └──────────────────────────────────────────┘
                            │           │          │         │
                            ▼           ▼          ▼         ▼
-        BrowserWindow (3×)      child_process spawn (4×)
-        ┌──────────────┐       ┌──────────────────────────┐
-        │ index.html   │       │ bin/fn-listener          │  Swift
-        │ renderer.js  │       │  (CGEventTap)            │  CGEventTap
-        ├──────────────┤       ├──────────────────────────┤
-        │ hud.html     │       │ bin/transcribe-helper    │  WhisperKit
-        │ hud.js       │       │  (--stream / --audio)    │  Swift Package
-        ├──────────────┤       ├──────────────────────────┤
-        │ tray.html    │       │ bin/focus-helper         │  NSWorkspace
-        │ tray.js      │       ├──────────────────────────┤
-        └──────────────┘       │ bin/paste-helper         │  AXUIElement +
-                               │  (--check / <bundle>)    │  CGEventPost ⌘V
-                               └──────────────────────────┘
+        BrowserWindow (3×)      child_process spawn (up to 5×)
+        ┌──────────────┐       ┌───────────────────────────────┐
+        │ index.html   │       │ bin/fn-listener               │  CGEventTap
+        │ renderer.js  │       │  (global hotkey detector)     │  (always on)
+        ├──────────────┤       ├───────────────────────────────┤
+        │ hud.html     │       │ bin/transcribe-helper         │  WhisperKit
+        │ hud.js       │       │  (--stream / --audio          │  Swift SPM +
+        │              │       │   --hf-cache <dir>)           │  AVAudioEngine
+        ├──────────────┤       ├───────────────────────────────┤
+        │ tray.html    │       │ bin/apple-speech-helper.app   │  SFSpeechRecognizer
+        │ tray.js      │       │  (--stream --language <loc>)  │  bundle (on demand)
+        └──────────────┘       ├───────────────────────────────┤
+                               │ bin/focus-helper              │  NSWorkspace
+                               │  (save / restore frontmost)   │  (per paste)
+                               ├───────────────────────────────┤
+                               │ bin/paste-helper              │  AXUIElement +
+                               │  (--check / --bundle <id>)    │  CGEventPost ⌘V
+                               └───────────────────────────────┘
                                     │
                                     ▼
                              ┌──────────────────┐
@@ -47,18 +52,22 @@ HUD, tray popover) is a thin reflection pushed via IPC.
                              └──────────────────┘
 ```
 
-Each helper is a **separate binary** so permission scopes are narrow and a
+Each helper is a **separate binary** so permission scopes stay narrow and a
 misbehaving helper cannot crash the UI:
 
 | Helper | Why separate | Permission it asks for |
 |---|---|---|
-| `fn-listener` | CGEventTap must run with special rights and stays up for the app lifetime | Accessibility / Input Monitoring |
-| `transcribe-helper` | WhisperKit + Metal GPU; heavy to cold-start | Microphone |
-| `focus-helper` | Reads / restores frontmost app around a paste cycle | None (standard NSWorkspace) |
-| `paste-helper` | Synthesises ⌘V into the target app | Accessibility (AXIsProcessTrusted) |
+| `fn-listener` | CGEventTap must run with Input Monitoring and stays up for the app lifetime | Input Monitoring (Accessibility usually covers it) |
+| `transcribe-helper` | WhisperKit + Metal GPU, heavy cold-start; persistent stream process so AVAudioEngine can stay warm between toggles | Microphone |
+| `apple-speech-helper` | Alternate transcription engine (SFSpeechRecognizer); built as a `.app` bundle so macOS shows usage descriptions on first prompt | Microphone + Speech Recognition |
+| `focus-helper` | Reads / restores frontmost bundle id around the paste cycle | None (standard NSWorkspace) |
+| `paste-helper` | Synthesises ⌘V into the saved frontmost app | Accessibility (AXIsProcessTrusted) |
 
 The main process spawns these as child processes with strict `stdio: ['pipe',
-'pipe', 'pipe']` channels and kills them with SIGTERM on `will-quit`.
+'pipe', 'pipe']` channels and kills them with SIGTERM on `will-quit`. Only
+one of `transcribe-helper` or `apple-speech-helper` is streaming at a time —
+whichever one `currentEngine()` selects; the other is either idle or not
+spawned.
 
 ---
 
@@ -112,7 +121,14 @@ in `main.js`.
 `get-openai-model` / `set-openai-model`, `get-ollama-model` /
 `set-ollama-model`, `get-translate-target` / `set-translate-target`
 
-All persisted to `~/Library/Application Support/Listen K/config.json`.
+All persisted to `~/Library/Application Support/listen-k/config.json`.
+
+`get-openai-key` deserves a note: it never returns the plaintext key over IPC.
+The response is a status object
+`{hasKey, fromEnv, encrypted, legacyPlaintext, encryptionAvailable}` — and
+even that shape short-circuits and avoids touching Keychain at all when there
+is no stored key, so a user who never configured OpenAI never sees the
+Keychain ACL prompt on boot.
 
 ### 3.3 Data (history, stats, models)
 - `history-list`, `history-append`, `history-clear`
@@ -123,15 +139,31 @@ All persisted to `~/Library/Application Support/Listen K/config.json`.
 
 ### 3.4 OS bridges
 - `request-mic` — triggers AVAudioSession permission prompt
-- `open-url` — `shell.openExternal`
-- `show-in-finder` — `shell.showItemInFolder`
+- `show-in-finder` — gated by an allowlist of prefixes
+  (`process.resourcesPath`, `app.getPath('userData')`, `/Applications`,
+  and the repo root in dev); rejects any path outside them.
 - `clipboard-write` — `clipboard.writeText`
 - `paste-text` — invokes `bin/paste-helper` on the saved frontmost bundle
+
+An `open-url` IPC used to exist. It was removed in v0.5.3 because no
+renderer code called it and exposing `shell.openExternal(<arbitrary>)`
+was a latent footgun. New external-link features should add
+purpose-specific handlers that hard-code the URL on the main side (see
+`open-settings-pane` for the pattern).
 
 ### 3.5 Onboarding
 - `get-onboarding-done` / `set-onboarding-done`
 - `set-onboarding-hotkey-test` → pushed `onboarding-hotkey-fired` when the
   hotkey listener sees the test tap
+
+### 3.6 safeSend guard
+
+Every renderer-bound push in main.js goes through `safeSend(win, channel,
+...args)` rather than a raw `win.webContents.send(...)`. The helper
+short-circuits if the BrowserWindow reference is null or destroyed and
+try/catches the send — added in v0.4.3 after `stream-final` events arriving
+from `transcribe-helper` during shutdown killed the main process with a
+`TypeError: Object has been destroyed`. Do not reintroduce raw sends.
 
 ---
 
@@ -145,13 +177,18 @@ All persisted to `~/Library/Application Support/Listen K/config.json`.
 │                        │ switch on `engine`  │
 │                        └─────────────────────┘
 │                                   │
-│       ┌───────────────────┬───────┼───────────┬──────────────────┐
-│       ▼                   ▼       ▼           ▼                  ▼
-│  whisperkit          apple-speech  whisper-cpp   openai (BYOK)
-│  (default)                                          HTTPS → OpenAI
-│                                                     /v1/audio/transcriptions
-│  spawns transcribe-helper --stream   SFSpeechRecognizer     whisper.cpp binary
-│  respawnStream() on settings change
+│       ┌───────────────────┬───────┼──────────────┬────────────────────┐
+│       ▼                   ▼       ▼              ▼                    ▼
+│  whisperkit            apple                  whisper.cpp       openai (BYOK)
+│  (default)                                                       HTTPS → OpenAI
+│                                                                  /v1/audio/transcriptions
+│  spawns transcribe-helper   spawns apple-speech-helper.app   whisper-cli batch
+│  --stream --model-dir ...   --stream --language <locale>     process per utterance
+│  --hf-cache <userData>/     (SFSpeechRecognizer)
+│  huggingface-cache          — on-device or server model
+│
+│  respawnStream() on settings change tears down the live stream and brings
+│  up the new engine before any audio flows.
 ```
 
 Rules enforced in `main.js`:
@@ -161,6 +198,18 @@ Rules enforced in `main.js`:
   helper emits `{"type":"ready"}`.
 - `respawnStream()` tears down the current helper cleanly before starting a
   new one; audio frames in flight are discarded.
+- `transcribe-helper` receives `--hf-cache <userData>/huggingface-cache` so
+  its internal `swift-transformers` HubApi caches tokenizer / config under
+  the app's Application Support directory. Without that flag the default
+  would be `~/Documents/huggingface/`, which triggers the Documents-folder
+  TCC prompt under hardened runtime.
+- Between `stop` and the next `start`, `transcribe-helper`'s `StreamController`
+  enforces a **600 ms cooldown** (`lastStopAt`) so the detached
+  `stopStreamTranscription` can finish tearing down the shared
+  `AudioProcessor` / `AVAudioEngine` before a new stream stands it up.
+  Without it, rapid hotkey toggling (especially on first launch while
+  Core ML kernels were still JIT-compiling) would hand the new stream an
+  already-closed audio engine.
 
 ---
 
@@ -168,12 +217,18 @@ Rules enforced in `main.js`:
 
 | Path | Owner | Format |
 |---|---|---|
-| `~/Library/Application Support/Listen K/config.json` | `loadConfig` / `saveConfig` | JSON |
-| `~/Library/Application Support/Listen K/history.json` | `loadHistory` / `appendHistory` | JSON array |
-| `~/Library/Application Support/Listen K/stats.json` | `loadStats` / `saveStats` | JSON |
-| `~/Library/Application Support/Listen K/.first-run-done` | onboarding marker | empty |
+| `~/Library/Application Support/listen-k/config.json` | `loadConfig` / `saveConfig` | JSON object, atomic write via tmp+rename |
+| `~/Library/Application Support/listen-k/history.jsonl` | `loadHistory` / `appendHistory` | newline-delimited JSON — one entry per line |
+| `~/Library/Application Support/listen-k/stats.json` | `loadStats` / `saveStats` | JSON object, atomic write |
+| `~/Library/Application Support/listen-k/.first-run-done` | onboarding marker | empty |
+| `~/Library/Application Support/listen-k/huggingface-cache/` | swift-transformers HubApi, via `--hf-cache` | tokenizer/config blobs |
 | `~/Library/Caches/transcribe-helper/` | WhisperKit Core ML compile cache | Apple private |
 | OpenAI API key | `safeStorage.encryptString` → Keychain | base64 blob in config |
+
+The Application Support directory is keyed by the npm package `name`
+(`listen-k`), not the macOS bundle id — bundle-id renames (e.g. the
+`com.ibank.listenk` → `com.eazler.listenk` bump in v0.5.1) therefore do
+not invalidate any user data.
 
 Config edits are **always round-trip**: read, mutate in memory, write back.
 There is no in-memory `config` global — every handler calls `loadConfig()`.
@@ -212,9 +267,11 @@ app 'will-quit'      → unregisterAll globalShortcut
 ```
 
 Transcribe helper respects `{"cmd":"quit"}` on stdin; fn-listener terminates
-on SIGTERM.  If the transcribe helper exits with a non-SIGTERM/non-zero code,
-`crashCount++` and a backoff-respawn attempts up to N times, then surfaces a
-`toast.engineCrashMax`.
+on SIGTERM. If the transcribe helper exits with a non-SIGTERM/non-zero code,
+`transcribeStreamRestarts++` and a backoff-respawn attempts up to
+`MAX_STREAM_RESTARTS` times, then surfaces a `toast.engineCrashMax`.
+`respawnStream()` is also used on live `set-engine` changes — the current
+helper is torn down cleanly before the new engine's helper is spawned.
 
 ---
 
@@ -228,8 +285,23 @@ on SIGTERM.  If the transcribe helper exits with a non-SIGTERM/non-zero code,
 - Bundle IDs handed to `focus-helper` and `paste-helper` are **filtered
   through `safeBundleId()`** (`/^[a-zA-Z0-9._-]{1,255}$/`) before execFile.
 - OpenAI key is stored via `safeStorage` (Keychain-backed). Renderers never
-  see the plaintext key — they only get `{set: true, masked: "sk-…abcd"}` or
-  the last-set bool.
+  see the plaintext key — they only get a status object
+  `{hasKey, fromEnv, encrypted, legacyPlaintext, encryptionAvailable}` from
+  `get-openai-key`, and that handler short-circuits to a no-Keychain-access
+  path when there is no stored key.
+- Every Swift helper in `bin/` is Developer-ID signed with hardened runtime
+  and inherits the entitlements from
+  [`build/entitlements.mac.plist`](../build/entitlements.mac.plist) —
+  specifically `com.apple.security.device.audio-input` on the transcribe
+  and Apple Speech helpers, without which TCC silently denies microphone
+  access and never prompts.
+- All three BrowserWindows run with `contextIsolation: true`,
+  `nodeIntegration: false`, and `sandbox: true` (since v0.5.3). Renderer
+  navigation and `window.open` are both blocked by `will-navigate` /
+  `setWindowOpenHandler` guards.
+- Every renderer HTML ships a strict `Content-Security-Policy` meta pinning
+  `script-src` to self, `connect-src` to the needed endpoints, and
+  disallowing `object-src` / `base-uri` / `form-action`.
 
 For the full threat model see [SECURITY.md](../SECURITY.md).
 

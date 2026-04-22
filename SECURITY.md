@@ -7,8 +7,8 @@ to the latest minor release. Older versions receive no backports.
 
 | Version       | Supported          |
 |---------------|--------------------|
-| 0.3.x         | ✅                 |
-| < 0.3         | ❌                 |
+| 0.5.x         | ✅                 |
+| < 0.5         | ❌                 |
 
 ## Reporting a vulnerability
 

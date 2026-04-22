@@ -92,13 +92,13 @@ teardown. Signed-off-by: Your Name <you@example.com>
 ## Adding or updating a translation
 
 Listen K ships with four locales: `ko`, `en`, `ja`, `zh-CN`. Each lives inside
-the `MESSAGES` map in `i18n.js`. To add a new locale:
+the `strings` map in `i18n.js`. To add a new locale:
 
 1. Copy the `en` block verbatim and rename the outer key (e.g. `'es'`).
 2. Translate every value. Keep `{placeholder}` tokens unchanged.
-3. Add a matching block to `tray.js` (`STATE_LABELS`, `L10N`, `HOTKEY_LABEL`)
+3. Add the new code to the `LOCALES` array at the top of `i18n.js`.
+4. Add a matching block to `tray.js` (`STATE_LABELS`, `L10N`, `HOTKEY_LABEL`)
    and `hud.js` if it has its own label map.
-4. Add your locale to `SUPPORTED_LOCALES` in `renderer.js` if applicable.
 5. Open a PR with screenshots in at least the new locale.
 
 To update an existing translation, change the relevant strings and open a

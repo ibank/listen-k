@@ -1,7 +1,7 @@
 {
   "name": "listen-k",
-  "version": "0.5.4",
-  "description": "Listen K — AI voice dictation for macOS. Local Whisper + optional Ollama post-processing.",
+  "version": "0.5.5",
+  "description": "Listen K — AI voice dictation for macOS. Local WhisperKit / Apple Speech / whisper.cpp engines with optional OpenAI (BYOK) and Ollama post-processing. First-class Korean, Japanese, and Chinese.",
   "author": "ibank <hello@listenk.com>",
   "license": "MIT",
   "homepage": "https://listenk.com",
@@ -94,7 +94,8 @@
         "from": "bin",
         "to": "bin",
         "filter": [
-          "**/*"
+          "**/*",
+          "!translate-helper"
         ]
       },
       {
@@ -117,9 +118,9 @@
         }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "받아쓴 음성을 텍스트로 변환하는 데 마이크를 사용합니다.",
-        "NSSpeechRecognitionUsageDescription": "Apple Speech 엔진 사용 시 macOS 음성 인식을 통해 음성을 텍스트로 변환합니다. 시스템 설정에서 온디바이스 모드 선택 가능.",
-        "NSAppleEventsUsageDescription": "포커스된 다른 앱의 입력 필드에 정제된 텍스트를 자동으로 붙여넣기 위해 시스템 이벤트를 전송합니다.",
+        "NSMicrophoneUsageDescription": "Listen K uses the microphone to transcribe your voice into text.",
+        "NSSpeechRecognitionUsageDescription": "Listen K uses macOS Speech Recognition when the Apple Speech engine is selected. Choose on-device mode in System Settings to keep audio on this Mac.",
+        "NSAppleEventsUsageDescription": "Listen K sends Apple events to the focused app to paste the transcribed text into its input field.",
         "LSUIElement": true,
         "LSMinimumSystemVersion": "14.0"
       },

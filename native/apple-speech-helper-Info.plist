@@ -21,8 +21,8 @@
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>Listen K 가 Apple Speech 엔진으로 음성을 텍스트로 변환하는 데 사용합니다. 기기에서만 처리됩니다.</string>
+    <string>Listen K uses Apple Speech to convert your voice into text. Processing stays on this Mac.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Listen K 가 음성 받아쓰기를 위해 마이크에 접근합니다.</string>
+    <string>Listen K accesses the microphone for voice dictation.</string>
 </dict>
 </plist>

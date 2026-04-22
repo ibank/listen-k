@@ -13,11 +13,17 @@ on the Releases page. Target time: **~30 minutes of active work**, plus
 
 ## 0. Prerequisites (one-time)
 
-- [x] [Manual 1 — Developer ID](manual-developer-id.md) complete
-- [x] [Manual 2 — GitHub Secrets](manual-github-secrets.md) complete
-- [x] RC tag dry-run succeeded previously
-- [x] `npm ci` works on a clean checkout
-- [x] `bash scripts/smoke.sh` is green locally
+- [x] Apple Developer Program membership is active and a Developer ID
+      Application certificate exists locally (and the matching `.p12`
+      has been exported).
+- [x] The five GitHub Actions secrets are registered:
+      `MAC_CERTIFICATE_BASE64`, `MAC_CERTIFICATE_PASSWORD`, `APPLE_ID`,
+      `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` (see
+      [`.github/workflows/release.yml`](../.github/workflows/release.yml)
+      for the names expected by the workflow).
+- [x] An RC tag dry-run has succeeded at least once.
+- [x] `npm ci` works on a clean checkout.
+- [x] `bash scripts/smoke.sh` is green locally.
 
 If any of those are red, stop and fix them before releasing.
 
@@ -128,7 +134,7 @@ Typical steps and their red-flag signals:
 | `build:helper` | 1–2 min | Xcode CLT version mismatch |
 | `build:transcribe` | 2–3 min | WhisperKit SPM fetch failure — retry |
 | `model:whisperkit` | 2–4 min | CDN timeout — retry |
-| `Verify signing secrets` | instant | missing secret — see Manual 2 |
+| `Verify signing secrets` | instant | missing secret — re-check the five names in the workflow against Settings → Secrets and variables → Actions |
 | `electron-builder --mac dmg` | 5–8 min | notarisation timeout (see §9.2) |
 | `shasum` + `gh release create` | instant | auth error — regenerate `GITHUB_TOKEN` |
 
@@ -199,8 +205,9 @@ exceeds 30 minutes on the `electron-builder` step:
 
 1. Let it finish (it usually does) or cancel and re-run
 2. If two consecutive runs fail: check https://developer.apple.com/system-status/
-3. If Apple's service is up: verify the app-specific password is still valid
-   (rotate per [Manual 2 §6](manual-github-secrets.md))
+3. If Apple's service is up: verify the app-specific password is still
+   valid (rotate at appleid.apple.com → Sign-In and Security → App-Specific
+   Passwords, then update the `APPLE_APP_SPECIFIC_PASSWORD` secret).
 
 ### 9.3 Abort a release mid-flight
 If you realise something is wrong after pushing the tag:
