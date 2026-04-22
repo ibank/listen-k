@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Syntax and license check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install deps
+        run: npm ci
+      - name: JS syntax check
+        run: |
+          node -c main.js
+          node -c renderer.js
+          node -c i18n.js
+          node -c hud.js
+          node -c tray.js
+          node -c preload.js
+          node -c preload-hud.js
+          node -c preload-tray.js
+      - name: License check (no GPL/AGPL in production deps)
+        run: |
+          npx --yes license-checker --production --summary
+          npx --yes license-checker --production --onlyAllow \
+            "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;CC0-1.0;Unlicense;0BSD"
+
+  build:
+    name: Build helpers and app bundle (ad-hoc)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install deps
+        run: npm ci
+      - name: Build Swift helpers
+        run: |
+          npm run build:helper
+          npm run build:transcribe
+      - name: Smoke test (model steps skip automatically)
+        run: bash scripts/smoke.sh
+      - name: Package app bundle (ad-hoc, no DMG)
+        run: npm run dist:dir

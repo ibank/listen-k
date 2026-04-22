@@ -10,3 +10,15 @@ native/translate-helper/.build/
 native/translate-helper/Package.resolved
 *.log
 .DS_Store
+
+# Editor / tool local state
+.claude/
+.vscode/
+.idea/
+
+# Secrets / env
+.env
+.env.local
+*.p12
+*.provisionprofile
+*.mobileprovision

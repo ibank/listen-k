@@ -1,0 +1,85 @@
+name: Bug report
+description: Something isn't working the way it should
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill this in as
+        completely as you can — reproducible reports get fixed sooner.
+
+        For purchase, refund, or license-key questions, email hello@listenk.com
+        instead. For security issues, see [SECURITY.md](https://github.com/ibank/ListenK/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Listen K version
+      description: About panel or `Listen K.app/Contents/Info.plist` → CFBundleShortVersionString
+      placeholder: "0.3.0"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "14.5 (23F79)"
+    validations:
+      required: true
+  - type: dropdown
+    id: chip
+    attributes:
+      label: Chip
+      options:
+        - Apple Silicon (M1 / M2 / M3 / M4)
+        - Intel (not supported)
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Transcription engine in use
+      options:
+        - WhisperKit (default)
+        - Apple Speech
+        - whisper.cpp
+        - OpenAI (BYOK)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what did you see instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Listen K
+        2. Focus a text field in …
+        3. Double-tap Right Shift
+        4. Say …
+        5. See …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Main-process logs live at `~/Library/Application Support/Listen K/logs/`
+        (if present). Renderer logs are in the DevTools console (Cmd-Option-I
+        on the dashboard).
+      render: shell
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I am on macOS 14 (Sonoma) or newer
+          required: true

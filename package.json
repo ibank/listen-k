@@ -2,6 +2,29 @@
   "name": "listen-k",
   "version": "0.3.0",
   "description": "Listen K — AI voice dictation for macOS. Local Whisper + optional Ollama post-processing.",
+  "author": "ibank <hello@listenk.com>",
+  "license": "MIT",
+  "homepage": "https://listenk.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ibank/ListenK.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ibank/ListenK/issues",
+    "email": "hello@listenk.com"
+  },
+  "keywords": [
+    "whisper",
+    "dictation",
+    "macos",
+    "korean",
+    "japanese",
+    "whisperkit",
+    "electron",
+    "ollama",
+    "speech-to-text",
+    "local-first"
+  ],
   "main": "main.js",
   "scripts": {
     "prestart": "bash scripts/patch-dev-electron-plist.sh",
