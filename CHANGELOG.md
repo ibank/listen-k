@@ -12,6 +12,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.4.3] — 2026-04-22
+
+### Fixed
+- Uncaught `TypeError: Object has been destroyed` when a stream event (e.g.
+  `stream-final` from `transcribe-helper`) arrives after the main dashboard
+  window has been destroyed. The renderer references were kept around as
+  stale pointers because `close` was handled but `closed` was never
+  observed. Introduce a `safeSend(win, channel, ...)` helper that null-
+  checks, `isDestroyed()`-checks, and try/catches the send; wire
+  `closed` handlers on `mainWindow`, `hudWindow`, and `trayWindow` to
+  null the refs the moment the window is actually torn down.
+
 ## [0.4.2] — 2026-04-22
 
 ### Fixed
@@ -113,7 +125,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/ListenK/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/ibank/ListenK/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/ibank/ListenK/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/ibank/ListenK/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ibank/ListenK/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ibank/ListenK/compare/v0.3.0...v0.4.0

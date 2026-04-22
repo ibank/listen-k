@@ -126,6 +126,23 @@ function createWindow() {
       mainWindow.hide();
     }
   });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+// Send an IPC message to a renderer without crashing the main process if the
+// window has been destroyed (e.g. during shutdown, or after a force-quit but
+// before async subprocess events finish draining). Also swallows the race
+// where webContents is being torn down mid-send.
+function safeSend(win, channel, ...args) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    win.webContents.send(channel, ...args);
+  } catch (err) {
+    console.warn(`[ipc] send ${channel} failed:`, err.message);
+  }
 }
 
 const HUD_WIDTH = 260;
@@ -181,6 +198,10 @@ function createHudWindow() {
   hudWindow.setAlwaysOnTop(true, 'screen-saver');
   hudWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   hudWindow.loadFile('hud.html');
+
+  hudWindow.on('closed', () => {
+    hudWindow = null;
+  });
 }
 
 const ENGINE_LABELS_HUD = {
@@ -233,7 +254,7 @@ function sendHudContext(state) {
     modeLabel = STATE_CONTEXT.done[loc] || STATE_CONTEXT.done.en;
   }
 
-  hudWindow.webContents.send('hud-context', {
+  safeSend(hudWindow,'hud-context', {
     engine,
     engineLabel,
     mode,
@@ -251,7 +272,7 @@ function showHud(state) {
   // looking.
   positionHudOnActiveScreen();
   const s = state || 'recording';
-  hudWindow.webContents.send('hud-state', s);
+  safeSend(hudWindow,'hud-state', s);
   sendHudContext(s);
   if (!hudWindow.isVisible()) hudWindow.showInactive();
 }
@@ -262,7 +283,7 @@ function showHud(state) {
 let hudDoneTimer = null;
 function flashHudDone(durationMs = 900) {
   if (!hudWindow || !hudWindow.isVisible()) { hideHud(); return; }
-  hudWindow.webContents.send('hud-state', 'done');
+  safeSend(hudWindow,'hud-state', 'done');
   sendHudContext('done');
   if (hudDoneTimer) clearTimeout(hudDoneTimer);
   hudDoneTimer = setTimeout(() => { hideHud(); }, durationMs);
@@ -272,7 +293,7 @@ function hideHud() {
   if (hudDoneTimer) { clearTimeout(hudDoneTimer); hudDoneTimer = null; }
   if (!hudWindow) return;
   if (hudWindow.isVisible()) hudWindow.hide();
-  hudWindow.webContents.send('hud-reset');
+  safeSend(hudWindow,'hud-reset');
   cancelHudSafetyHide();
 }
 
@@ -342,7 +363,11 @@ function createTrayWindow() {
   trayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   // Hide when user clicks outside (normal popover behaviour on macOS).
   trayWindow.on('blur', () => {
-    if (trayWindow && trayWindow.isVisible()) trayWindow.hide();
+    if (trayWindow && !trayWindow.isDestroyed() && trayWindow.isVisible()) trayWindow.hide();
+  });
+
+  trayWindow.on('closed', () => {
+    trayWindow = null;
   });
 }
 
@@ -368,7 +393,7 @@ async function sendTraySnapshot() {
   const recents = loadHistory(5);
   const cfg = loadConfig();
   const theme = ['light', 'dark'].includes(cfg.theme) ? cfg.theme : 'system';
-  trayWindow.webContents.send('tray-snapshot', {
+  safeSend(trayWindow,'tray-snapshot', {
     locale: currentUiLocale(),
     hotkey: currentHotkey(),
     state: currentTrayState(),
@@ -398,18 +423,18 @@ ipcMain.handle('tray-cmd', (_e, payload) => {
       showWindowActive();
       // "Open dashboard" should actually land the user on the dashboard
       // page even if they were previously looking at History/Stats/etc.
-      mainWindow?.webContents.send('navigate-page', 'sec-status');
+      safeSend(mainWindow,'navigate-page', 'sec-status');
       return { ok: true };
     case 'record':
       handleFnPress();
       return { ok: true };
     case 'history':
       showWindowActive();
-      mainWindow?.webContents.send('navigate-page', 'sec-history');
+      safeSend(mainWindow,'navigate-page', 'sec-history');
       return { ok: true };
     case 'stats':
       showWindowActive();
-      mainWindow?.webContents.send('navigate-page', 'sec-stats');
+      safeSend(mainWindow,'navigate-page', 'sec-stats');
       return { ok: true };
     case 'paste-recent':
       if (payload.text) {
@@ -835,7 +860,7 @@ async function handleFnPress() {
   // works — no actual recording should start. Emit a dedicated event to
   // the renderer so the overlay can show "✓ detected".
   if (onboardingHotkeyTest) {
-    mainWindow?.webContents.send('onboarding-hotkey-fired');
+    safeSend(mainWindow,'onboarding-hotkey-fired');
     return;
   }
 
@@ -860,11 +885,11 @@ async function handleFnPress() {
   // audio can never be captured by both at once.
   if (streamingEnabled) {
     if (!transcribeStream) {
-      mainWindow.webContents.send('toast', tr('toast.engineInactive'));
+      safeSend(mainWindow,'toast', tr('toast.engineInactive'));
       return;
     }
     if (!transcribeStreamReady) {
-      mainWindow.webContents.send('toast', tr('toast.engineInit'));
+      safeSend(mainWindow,'toast', tr('toast.engineInit'));
       return;
     }
     if (!isRecording) {
@@ -874,12 +899,12 @@ async function handleFnPress() {
       showHud('recording');
       cancelHudSafetyHide();
       sendStreamCmd({ cmd: 'start', language: currentLanguage() });
-      mainWindow.webContents.send('stream-started');
+      safeSend(mainWindow,'stream-started');
     } else {
       isRecording = false;
       showHud('processing');
       sendStreamCmd({ cmd: 'stop' });
-      mainWindow.webContents.send('stream-stopping');
+      safeSend(mainWindow,'stream-stopping');
       scheduleHudSafetyHide();
     }
     updateTrayMenu();
@@ -894,12 +919,12 @@ async function handleFnPress() {
     isRecording = true;
     showHud('recording');
     cancelHudSafetyHide();
-    mainWindow.webContents.send('toggle-record');
+    safeSend(mainWindow,'toggle-record');
   } else {
     isRecording = false;
     showHud('processing');
     scheduleHudSafetyHide();
-    mainWindow.webContents.send('toggle-record');
+    safeSend(mainWindow,'toggle-record');
   }
   updateTrayMenu();
 }
@@ -1032,7 +1057,7 @@ function startTranscribeStream() {
       hideHud();
       updateTrayMenu();
       if (mainWindow) {
-        mainWindow.webContents.send('toast', tr('toast.engineCrash'));
+        safeSend(mainWindow,'toast', tr('toast.engineCrash'));
       }
     }
 
@@ -1046,7 +1071,7 @@ function startTranscribeStream() {
       if (currentEngine() === 'apple') {
         autoFallbackFromAppleOnCrash();
       } else if (mainWindow) {
-        mainWindow.webContents.send('toast', tr('toast.engineCrashMax'));
+        safeSend(mainWindow,'toast', tr('toast.engineCrashMax'));
       }
       return;
     }
@@ -1069,23 +1094,23 @@ function handleStreamEvent(event) {
       transcribeStreamReady = true;
       transcribeStreamRestarts = 0;
       if (mainWindow) {
-        mainWindow.webContents.send('toast', tr('toast.engineReady'));
-        mainWindow.webContents.send('stream-ready');
+        safeSend(mainWindow,'toast', tr('toast.engineReady'));
+        safeSend(mainWindow,'stream-ready');
       }
       break;
     case 'partial':
-      if (mainWindow) mainWindow.webContents.send('stream-partial', event.text || '');
+      if (mainWindow) safeSend(mainWindow,'stream-partial', event.text || '');
       // HUD live-text is gated by the user's "실시간 표시" preference —
       // when off, we still stream internally (so we can re-transcribe on
       // stop) but the pill stays on its waveform animation instead of
       // flashing partial text.
       if (hudWindow && hudWindow.isVisible() && currentStreamingEnabled()) {
-        hudWindow.webContents.send('hud-partial', event.text || '');
+        safeSend(hudWindow,'hud-partial', event.text || '');
       }
       break;
     case 'final':
       cancelHudSafetyHide();
-      if (mainWindow) mainWindow.webContents.send('stream-final', event.text || '');
+      if (mainWindow) safeSend(mainWindow,'stream-final', event.text || '');
       // Belt-and-suspenders: if the renderer's post-process + paste pipeline
       // never reports back within 15 s, force the HUD away.
       scheduleHudSafetyHide(15000);
@@ -1094,7 +1119,7 @@ function handleStreamEvent(event) {
       break;
     case 'error':
       console.error('[stream] error:', event.message);
-      if (mainWindow) mainWindow.webContents.send('stream-error', event.message || '');
+      if (mainWindow) safeSend(mainWindow,'stream-error', event.message || '');
       if (!isRecording) {
         isProcessing = false;
         hideHud();
@@ -1625,7 +1650,7 @@ ipcMain.handle('hud-cancel', () => {
   }
   hideHud();
   updateTrayMenu();
-  if (mainWindow) mainWindow.webContents.send('cancel-record');
+  if (mainWindow) safeSend(mainWindow,'cancel-record');
 });
 
 ipcMain.handle('hud-confirm', () => {
@@ -1633,7 +1658,7 @@ ipcMain.handle('hud-confirm', () => {
   isRecording = false;
   showHud('processing');
   updateTrayMenu();
-  if (mainWindow) mainWindow.webContents.send('toggle-record');
+  if (mainWindow) safeSend(mainWindow,'toggle-record');
 });
 
 ipcMain.handle('paste-text', async (_e, text) => {
@@ -1898,7 +1923,7 @@ function autoFallbackFromAppleOnCrash() {
   cfg.engine = 'whisperkit';
   saveConfig(cfg);
   if (mainWindow) {
-    mainWindow.webContents.send('toast', tr('toast.engineAppleFallback'));
+    safeSend(mainWindow,'toast', tr('toast.engineAppleFallback'));
   }
   transcribeStreamRestarts = 0;
   setTimeout(startTranscribeStream, 300);
