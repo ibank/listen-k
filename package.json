@@ -42,6 +42,7 @@
     "prestart": "bash scripts/patch-dev-electron-plist.sh",
     "start": "electron .",
     "icon": "node scripts/generate-icon.js",
+    "icon:dmg": "bash scripts/build-dmg-icon.sh",
     "build:helper": "bash scripts/build-helper.sh",
     "build:transcribe": "bash scripts/build-transcribe-helper.sh",
     "build:whisper": "bash scripts/build-whisper.sh",
@@ -138,6 +139,8 @@
     },
     "dmg": {
       "title": "Listen K ${version}",
+      "icon": "build/dmg-icon.icns",
+      "iconSize": 110,
       "contents": [
         {
           "x": 140,

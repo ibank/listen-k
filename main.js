@@ -101,9 +101,15 @@ function createWindow() {
   mainWindow.once('ready-to-show', async () => {
     const firstRunFlag = path.join(app.getPath('userData'), '.first-run-done');
     const isFirstRun = !fs.existsSync(firstRunFlag);
+    // Accessibility / Input Monitoring grants relaunch the app mid-flow.
+    // After the relaunch isFirstRun is false and isSetupComplete() is true,
+    // which previously suppressed the window before the user had reached
+    // the finish button. Fall back to the renderer-owned onboardingDone flag
+    // so the window stays visible until onboarding is explicitly completed.
+    const onboardingDone = Boolean(loadConfig().onboardingDone);
 
     const status = await collectStatus();
-    if (isFirstRun || !isSetupComplete(status)) {
+    if (isFirstRun || !onboardingDone || !isSetupComplete(status)) {
       mainWindow.show();
       mainWindow.focus();
     }
