@@ -668,6 +668,11 @@ window.listenk?.onStreamError?.((message) => {
   setStatus(t('status.streamError', { message }), 'error');
   cleanEl.textContent = message;
   window.listenk?.setState?.({ recording: false, processing: false });
+  // Auto-clear the chip back to idle/ready so a one-off error doesn't
+  // leave an angry red badge sitting in the titlebar for the rest of
+  // the session. 2.5 s is long enough to be readable but short enough
+  // that the next recording attempt starts from a clean slate.
+  setTimeout(() => setStatusIdleOrReady(), 2500);
 });
 
 copyBtn?.addEventListener('click', async () => {
