@@ -12,6 +12,44 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.6.3] — 2026-04-23
+
+### Changed
+- **Default engine is now Apple Speech** instead of WhisperKit for
+  fresh installs. On-device, zero model download, and the existing
+  `autoFallbackFromAppleOnCrash()` safety net already covers the
+  "Apple helper won't stay up" case by flipping back to WhisperKit.
+  Existing users are unaffected — their persisted `cfg.engine` is
+  authoritative; only the first-boot fallback and the `set-engine`
+  input sanitiser changed.
+- **Brand-aligned menubar icon.** The tray was using macOS's generic
+  `NSStatusAvailable` green-dot glyph — users reported not being
+  able to find Listen K in their menubar. The new 16×16 template
+  image is the same five-bar equalizer as the app icon at 4/8/12/8/4
+  px heights, emitted as a grayscale + alpha PNG so macOS handles
+  light/dark menubar tinting natively. `scripts/generate-tray-icon.js`
+  + `npm run icon:tray` produces both 1x and 2x variants; they ship
+  in `resources/icons/`.
+- **HUD window widened from 260 px to 720 px** so long partial
+  transcripts no longer clip. The pill's own max-width (680 px when
+  live text is present) was already correct; the transparent
+  containing BrowserWindow was the bottleneck. The extra 40 px of
+  window width is invisible breathing room for the pill's glow
+  drop-shadow.
+
+### Fixed
+- **Dashboard "Record now" button now takes the same path as the
+  hotkey and the tray menu.** Previously it routed through a legacy
+  renderer-owned batch-capture pipeline that bypassed the streaming
+  engine, never showed the HUD, and guarded itself against re-click
+  so there was no visible way to stop mid-recording from the
+  dashboard. The click now invokes the new `trigger-record` IPC,
+  which calls `handleFnPress()` — the canonical entry point — and
+  the button reacts to a new `record-state` push event with three
+  states (idle / recording / processing), complete with a stop-
+  square icon, pulse, spinner, and "Processing…" label so the user
+  always knows what to do next.
+
 ## [0.6.2] — 2026-04-23
 
 ### Added
@@ -464,7 +502,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/ibank/listen-k/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/ibank/listen-k/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/ibank/listen-k/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/ibank/listen-k/compare/v0.5.6...v0.6.0
