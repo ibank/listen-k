@@ -2933,6 +2933,13 @@ window.listenk?.onOnboardingPracticeFinal?.((text) => {
   streamingActive = false;
   latestPartial = '';
   transcribeStartMs = null;
+  // Reset the main-window status chip. While the practice recording
+  // was live, stream-partial (delivered to this window unchanged) set
+  // the chip to "듣는 중..." — the corresponding stream-final is
+  // diverted to *this* handler, so the reset that normally runs
+  // inside onStreamFinal never fires. Without this the dashboard
+  // lands with a stale "listening" chip when onboarding closes.
+  setStatusIdleOrReady();
 
   if (onboardStep !== 3) return;
   const card = $('onboardPracticeCard');
