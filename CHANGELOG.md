@@ -12,6 +12,53 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.5] — 2026-04-23
+
+### Changed
+- **Input Monitoring is no longer a required permission.** The
+  hotkey helper (`fn-listener`) only ever subscribed to
+  `.flagsChanged` events on a `listen-only` event tap, which macOS
+  does *not* gate behind Input Monitoring — that permission
+  protects keystroke content, not modifier state. The defensive
+  `IOHIDCheckAccess` exit at the top of the helper was blocking
+  startup even though the tap would have worked fine, and the
+  onboarding / dashboard surfaced an "Input Monitoring: ✕"
+  warning that was actively misleading. The gate is removed; the
+  onboarding permission list and the dashboard hotkey-detection
+  row are dropped. Users now grant only **Microphone +
+  Accessibility** for a full first-run setup. `--check` on the
+  helper remains for diagnostic callers that want the explicit
+  TCC state. (Paste still needs Accessibility because
+  `CGEvent.post` injects keystrokes — that protection path is
+  unchanged.)
+- **Ollama recommended-models list shows real download sizes.**
+  The sidebar was rendering hand-transcribed size strings (e.g.
+  `'3.4 GB'` from ollama.com/library) that drifted out of sync
+  with what actually pulls. The renderer now fetches each
+  model's manifest from `registry.ollama.ai` in the background,
+  sums the layer bytes, and swaps in the exact size using the
+  same `fmtBytes` formatter the installed-models list uses. The
+  hardcoded strings remain as the first-paint fallback so the
+  list doesn't flash placeholders, and results are cached for
+  the lifetime of the renderer so repeat tab visits don't
+  re-request.
+
+### Fixed
+- **HUD no longer stays stuck on "Listening" after exiting the
+  onboarding practice step.** Two specific paths could leave the
+  recording HUD visible after the user bailed out of Step 4:
+  (a) the deferred turn-off branch wrote `stop` to the
+  transcribe helper's stdin and waited for a `final` event —
+  when the helper was gone or not ready, the write silently
+  failed (try/catch) and `final` never arrived, so
+  `onboardingPracticeMode` and `isRecording` stayed set
+  forever; (b) the non-deferred branch only flipped the flag
+  with no HUD cleanup. The handler now tracks whether the
+  `stop` actually went through and, if not, runs the same
+  reset path the `final` handler would have (clear flags,
+  `hideHud`, refresh tray). On the non-deferred path,
+  `hideHud()` runs as an idempotent safety net.
+
 ## [0.7.4] — 2026-04-23
 
 ### Fixed
