@@ -1549,6 +1549,120 @@ button.primary:hover {
   text-align: right;
 }
 
+/* ========== WhisperKit model catalog (Engine page) ========== */
+/* Same bones as .ollama-model so the two lists read as a family.
+   Colour-coded by tag for a quick visual sort between speed/quality. */
+.wk-model {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-hairline);
+}
+.wk-model:last-child { border-bottom: none; }
+.wk-model .ico {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, #475569, #334155);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+.wk-model[data-tag='base']     .ico { background: linear-gradient(135deg, #64748b, #475569); }
+.wk-model[data-tag='small']    .ico { background: linear-gradient(135deg, #10b981, #059669); }
+.wk-model[data-tag='turbo']    .ico { background: linear-gradient(135deg, #2b7efe, #0a66ff); }
+.wk-model[data-tag='accurate'] .ico { background: linear-gradient(135deg, #b367ff, #8f4ede); }
+.wk-model .info { flex: 1; min-width: 0; }
+.wk-model .n {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.005em;
+}
+.wk-model .badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+}
+.wk-model .badge--bundled {
+  background: rgba(100, 116, 139, 0.18);
+  color: var(--text-2);
+}
+.wk-model .meta {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.wk-model .actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.wk-model .actions button {
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-3);
+  color: var(--text-2);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
+}
+.wk-model .actions button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-1); }
+.wk-model .actions button:disabled { opacity: 0.55; cursor: not-allowed; }
+.wk-model .actions button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+.wk-model .actions button.primary:hover:not(:disabled) { background: #7a9fff; color: #fff; }
+.wk-model .actions button.danger {
+  color: var(--err);
+  border-color: rgba(244, 63, 94, 0.35);
+}
+.wk-model .actions button.danger:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--err);
+  border-color: var(--err);
+}
+.wk-progress {
+  flex-shrink: 0;
+  width: 120px;
+  height: 5px;
+  background: var(--bg-3);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+.wk-progress .bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #b367ff);
+  border-radius: inherit;
+  transition: width 220ms ease-out;
+}
+.wk-progress-label {
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  min-width: 48px;
+  text-align: right;
+}
+
 /* ========== Usage page ========== */
 
 .usage {

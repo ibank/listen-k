@@ -56,7 +56,7 @@
     "model:ggml:base": "bash scripts/download-model.sh base",
     "model:ggml:small": "bash scripts/download-model.sh small",
     "smoke": "bash scripts/smoke.sh",
-    "predist": "npm run build:helper && npm run build:transcribe && npm run model:whisperkit",
+    "predist": "npm run build:helper && npm run build:transcribe && npm run model:whisperkit:base",
     "dist": "electron-builder --mac dmg",
     "dist:dir": "electron-builder --mac --dir"
   },
@@ -120,8 +120,7 @@
         "from": "models/whisperkit",
         "to": "models/whisperkit",
         "filter": [
-          "openai_whisper-base/**",
-          "openai_whisper-large-v3-v20240930_turbo_632MB/**"
+          "openai_whisper-base/**"
         ]
       }
     ],

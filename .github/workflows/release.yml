@@ -51,8 +51,12 @@ jobs:
           npm run build:helper
           npm run build:transcribe
 
-      - name: Download default Whisper model
-        run: npm run model:whisperkit
+      - name: Download bundled Whisper model (base only)
+        # v0.7.0 moved turbo / accurate / small to in-app download so the
+        # signed bundle stays small. Only the ~150 MB base model ships
+        # as the always-available fallback that Apple Speech → WhisperKit
+        # can fall back on without internet.
+        run: npm run model:whisperkit:base
 
       - name: Verify signing secrets are present
         run: |

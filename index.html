@@ -218,6 +218,18 @@
             </div>
           </div>
         </div>
+
+        <!-- WhisperKit model catalog. Shown only when WhisperKit is the
+             active engine. Populated by renderer.js from whisperkit-catalog
+             IPC; each row has install / delete / cancel actions depending
+             on current state, with an inline progress bar mid-download. -->
+        <div class="fields" id="wkCatalogBox" data-engine-only="whisperkit" data-engine-group>
+          <div class="fields-head">
+            <h3 data-i18n="page.whisperkit.catalog.title">WhisperKit models</h3>
+            <span class="card-head-sub" data-i18n="page.whisperkit.catalog.sub">Download larger models for higher accuracy</span>
+          </div>
+          <div id="wkCatalogList"></div>
+        </div>
       </section>
 
       <section class="card page" id="sec-input" hidden>

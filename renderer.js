@@ -1943,6 +1943,214 @@ statsClearBtn?.addEventListener('click', async () => {
 refreshStats();
 refreshStatsCharts();
 
+// ── WhisperKit model catalog (Engine page) ───────────────────────────
+// Tracks in-flight downloads so the UI can show a progress bar + cancel
+// button instead of the default install action. Keyed by model name;
+// value shape: { fraction, status }. Progress events stream from main.
+const wkPulling = new Map();
+
+function fmtMB(mb) {
+  if (!mb) return '—';
+  if (mb < 1024) return `${mb} MB`;
+  return `${(mb / 1024).toFixed(1)} GB`;
+}
+
+function wkInitials(tag) {
+  // Short, distinct 1-2 letter label in the circle icon. Matches tag.
+  return String(tag || '').slice(0, 1).toUpperCase();
+}
+
+function renderWkCatalog(entries) {
+  const listEl = $('wkCatalogList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  for (const m of entries) {
+    const row = document.createElement('div');
+    row.className = 'wk-model';
+    row.setAttribute('data-tag', m.tag);
+
+    const ico = document.createElement('div');
+    ico.className = 'ico';
+    ico.textContent = wkInitials(m.tag);
+    row.appendChild(ico);
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    const n = document.createElement('div');
+    n.className = 'n';
+    const labelText = t(`page.whisperkit.label.${m.tag}`) || m.label;
+    n.textContent = labelText;
+    if (m.isActive) {
+      const used = document.createElement('span');
+      used.className = 'badge';
+      used.textContent = t('page.whisperkit.badge.active');
+      n.appendChild(used);
+    } else if (m.bundled) {
+      const b = document.createElement('span');
+      b.className = 'badge badge--bundled';
+      b.textContent = t('page.whisperkit.badge.bundled');
+      n.appendChild(b);
+    }
+    info.appendChild(n);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const descKey = `page.whisperkit.desc.${m.tag}`;
+    const descText = t(descKey) || m.recommendedFor;
+    meta.textContent = `${fmtMB(m.sizeMB)} · ${descText}`;
+    info.appendChild(meta);
+    row.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    const pulling = wkPulling.get(m.name);
+    if (pulling && pulling.status === 'downloading') {
+      // In-flight: progress bar + cancel
+      const bar = document.createElement('div');
+      bar.className = 'wk-progress';
+      const fill = document.createElement('div');
+      fill.className = 'bar';
+      fill.style.width = `${Math.round((pulling.fraction || 0) * 100)}%`;
+      bar.appendChild(fill);
+      actions.appendChild(bar);
+
+      const pct = document.createElement('span');
+      pct.className = 'wk-progress-label';
+      pct.textContent = `${Math.round((pulling.fraction || 0) * 100)}%`;
+      actions.appendChild(pct);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.textContent = t('page.whisperkit.cancel');
+      cancelBtn.addEventListener('click', () => wkCancel(m.name));
+      actions.appendChild(cancelBtn);
+    } else if (m.installed) {
+      // Installed: "Use this" (if not active) + Delete (if not bundled)
+      if (!m.isActive) {
+        const useBtn = document.createElement('button');
+        useBtn.type = 'button';
+        useBtn.className = 'primary';
+        useBtn.textContent = t('page.whisperkit.use');
+        useBtn.addEventListener('click', () => wkSelect(m.name));
+        actions.appendChild(useBtn);
+      }
+      if (!m.bundled) {
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'danger';
+        delBtn.textContent = t('page.whisperkit.delete');
+        delBtn.addEventListener('click', () => wkDelete(m.name, labelText));
+        actions.appendChild(delBtn);
+      }
+    } else {
+      // Not installed: Install button
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'primary';
+      btn.textContent = t('page.whisperkit.install');
+      btn.addEventListener('click', () => wkDownload(m.name));
+      actions.appendChild(btn);
+    }
+
+    row.appendChild(actions);
+    listEl.appendChild(row);
+  }
+}
+
+async function refreshWkCatalog() {
+  if (!window.listenk?.whisperkitCatalog) return;
+  try {
+    const data = await window.listenk.whisperkitCatalog();
+    if (data?.catalog) renderWkCatalog(data.catalog);
+  } catch (err) {
+    console.warn('[wk] catalog refresh failed', err);
+  }
+}
+
+async function wkDownload(name) {
+  wkPulling.set(name, { fraction: 0, status: 'downloading' });
+  refreshWkCatalog();
+  try {
+    const res = await window.listenk.whisperkitDownload(name);
+    if (res?.ok) {
+      toast(t('page.whisperkit.installed', { name }));
+    } else if (res?.cancelled) {
+      toast(t('page.whisperkit.cancelled'));
+    } else {
+      toast(t('page.whisperkit.installFail', { message: res?.reason || '?' }));
+    }
+  } catch (err) {
+    toast(t('page.whisperkit.installFail', { message: err.message }));
+  } finally {
+    wkPulling.delete(name);
+    refreshWkCatalog();
+    // Status dashboard + whisper model dropdown may now reflect new install.
+    setTimeout(() => { refresh(); }, 100);
+  }
+}
+
+async function wkCancel(name) {
+  try { await window.listenk.whisperkitCancel(name); } catch {}
+}
+
+async function wkDelete(name, labelText) {
+  if (!confirm(t('page.whisperkit.confirmDelete', { name: labelText }))) return;
+  try {
+    const res = await window.listenk.whisperkitDelete(name);
+    if (res?.ok) {
+      toast(t('page.whisperkit.deleted', { name: labelText }));
+      refreshWkCatalog();
+      setTimeout(() => refresh(), 100);
+    } else if (res?.reason === 'busy') {
+      toast(t('page.whisperkit.deleteBusy'));
+    } else if (res?.reason === 'bundled') {
+      toast(t('page.whisperkit.deleteBundled'));
+    } else {
+      toast(t('page.whisperkit.deleteFail', { message: res?.reason || '?' }));
+    }
+  } catch (err) {
+    toast(t('page.whisperkit.deleteFail', { message: err.message }));
+  }
+}
+
+async function wkSelect(name) {
+  try {
+    await window.listenk.setWhisperModel?.(name);
+    toast(t('page.whisperkit.switched', { name }));
+    refreshWkCatalog();
+    setTimeout(() => refresh(), 200);
+  } catch (err) {
+    toast(t('page.whisperkit.installFail', { message: err.message }));
+  }
+}
+
+window.listenk?.onWhisperkitDownloadProgress?.((payload) => {
+  if (!payload || !payload.name) return;
+  if (payload.status === 'downloading') {
+    const prev = wkPulling.get(payload.name) || {};
+    wkPulling.set(payload.name, {
+      ...prev,
+      fraction: payload.fraction || 0,
+      completed: payload.completed,
+      total: payload.total,
+      status: 'downloading',
+    });
+    // Throttle UI re-renders: fraction ticks frequently but we only need
+    // the bar to advance visibly. 200 ms feels fluid without thrashing.
+    if (!window.__wkRenderScheduled) {
+      window.__wkRenderScheduled = true;
+      setTimeout(() => {
+        window.__wkRenderScheduled = false;
+        refreshWkCatalog();
+      }, 200);
+    }
+  } else if (payload.status === 'complete' || payload.status === 'error' || payload.status === 'cancelled') {
+    wkPulling.delete(payload.name);
+    refreshWkCatalog();
+  }
+});
+
 function applyModeVisibility(mode) {
   document.querySelectorAll('[data-mode-only]').forEach((el) => {
     const allowed = el.dataset.modeOnly.split(',').map((s) => s.trim());
@@ -2231,6 +2439,7 @@ engineSel?.addEventListener('change', async () => {
   // When coming back to OpenAI, the password input might be stale — refresh
   // its placeholder to reflect whether a key is currently stored/encrypted.
   if (engine === 'openai') refreshOpenAiKeyHint();
+  if (engine === 'whisperkit') refreshWkCatalog();
   const label = engineSel.options[engineSel.selectedIndex]?.textContent || engine;
   toast(t('toast.engineChange', { label }));
   lastStatusFingerprint = '';
@@ -2762,6 +2971,7 @@ $('ollamaRefreshBtn')?.addEventListener('click', () => {
   refresh();
   refreshNavCounts();
   refreshOllamaPage();
+  refreshWkCatalog();
   setInterval(() => {
     refresh();
     refreshStats();
