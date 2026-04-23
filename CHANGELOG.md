@@ -12,6 +12,55 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.7] — 2026-04-23
+
+### Fixed
+- **Titlebar status chip no longer stays stuck on "듣는 중..." when
+  the dashboard appears after onboarding.** While the practice
+  step's recording is live, `stream-partial` events are delivered
+  to the main window unchanged and the standard partial-handler
+  sets the chip to `status.listening`. In practice mode, the
+  matching `stream-final` is diverted to
+  `onboarding-practice-final` so the transcript doesn't reach the
+  normal paste pipeline — which means the reset that normally
+  runs inside `onStreamFinal` (clearing back to idle / ready)
+  never fires. The practice-final handler now mirrors that reset
+  so the chip starts clean the moment the overlay closes.
+- **Onboarding permission list now updates the instant focus
+  returns from System Settings.** The step-1 screen was painting a
+  snapshot of `getStatus()` at entry time and never re-polling
+  unless the user navigated away and back. Granting Accessibility
+  (or Microphone, past the initial prompt) in System Settings
+  left the checkmark stale. Hooked `onboardRenderPermissions()`
+  to the window `focus` event, gated on the overlay being
+  visible and the current step being the permissions step — so
+  Cmd-Tabbing back from System Settings refreshes the list
+  automatically, without needing a visible "Refresh" button or
+  step shuffling.
+- **Top-right status chip no longer gets stuck on "스트리밍 오류: No
+  speech detected" (or other transient engine errors).** Two
+  mutually-reinforcing fixes:
+  - `apple-speech-helper` used to suppress only `kAFAssistantErrorDomain`
+    code 216 (cancelled stops) and let every other recognition
+    error leak through as `type: error`. That included every
+    "no speech detected" / "session ended without a result"
+    variant SFSpeechRecognizer has invented across OS versions
+    (203, 1101, 1107, 1110…). None of them are actionable — in
+    user terms they're identical to an empty transcript. The
+    helper now treats the whole domain as an empty
+    `type: final`, which the renderer's empty-final path
+    handles gracefully (brief "음성이 감지되지 않음" flash,
+    1.2 s auto-clear). Real errors — permission denied, audio
+    engine failure, unknown error domains — still surface.
+  - The renderer's `onStreamError` handler was lighting the
+    chip red and never touching it again, so anything that
+    *did* reach it (a WhisperKit model-load failure, an OpenAI
+    network blip, an unknown macOS version error code) sat
+    pinned until the next recording. Added a 2.5 s
+    `setStatusIdleOrReady` timeout matching what the
+    empty-final path already does — long enough to read, short
+    enough that the next attempt starts from a clean chip.
+
 ## [0.7.6] — 2026-04-23
 
 ### Changed

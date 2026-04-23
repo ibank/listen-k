@@ -1,6 +1,6 @@
 {
   "name": "listen-k",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "description": "Listen K — AI voice dictation for macOS. Local WhisperKit / Apple Speech / whisper.cpp engines with optional OpenAI (BYOK) and Ollama post-processing. First-class Korean, Japanese, and Chinese.",
   "author": "ibank <hello@listenk.com>",
   "license": "MIT",
