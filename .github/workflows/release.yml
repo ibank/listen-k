@@ -66,29 +66,35 @@ jobs:
           test -n "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" || (echo "::error::APPLE_APP_SPECIFIC_PASSWORD not set" && exit 1)
           test -n "${{ secrets.APPLE_TEAM_ID }}"              || (echo "::error::APPLE_TEAM_ID not set" && exit 1)
 
-      - name: Build, sign, notarise, and publish DMG
+      - name: Build, sign, notarise, and publish DMG + ZIP
         env:
           # electron-builder reads these directly. CSC_* triggers Developer ID
           # signing; APPLE_* triggers notarisation via @electron/notarize.
           # `--publish always` tells electron-builder to create the GitHub
           # Release (as a draft per package.json `mac.publish.releaseType`),
-          # upload the DMG + blockmap, and — critically for auto-update —
+          # upload every artifact, and — critically for auto-update —
           # upload `latest-mac.yml` so electron-updater clients can see the
           # new version.
+          #
+          # We emit BOTH dmg and zip. The DMG is the user-facing download
+          # (drag into /Applications), the ZIP is what Squirrel.Mac —
+          # electron-updater's macOS backend — actually consumes. Omitting
+          # the zip makes auto-update throw ERR_UPDATER_ZIP_FILE_NOT_FOUND
+          # and silently give up (regression present in v0.6.0–v0.7.1).
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder --mac dmg --publish always
+        run: npx electron-builder --mac dmg zip --publish always
 
       - name: Compute checksum and attach
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd dist
-          shasum -a 256 ListenK-*.dmg > SHA256SUMS
+          shasum -a 256 ListenK-*.dmg ListenK-*.zip > SHA256SUMS
           TAG="${GITHUB_REF#refs/tags/}"
           # electron-builder already created the draft release in the
           # previous step; just append the checksum file.

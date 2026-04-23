@@ -57,7 +57,7 @@
     "model:ggml:small": "bash scripts/download-model.sh small",
     "smoke": "bash scripts/smoke.sh",
     "predist": "npm run build:helper && npm run build:transcribe && npm run model:whisperkit:base",
-    "dist": "electron-builder --mac dmg",
+    "dist": "electron-builder --mac dmg zip",
     "dist:dir": "electron-builder --mac --dir"
   },
   "devDependencies": {
@@ -129,6 +129,12 @@
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "arm64"
           ]

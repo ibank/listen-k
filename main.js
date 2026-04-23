@@ -1559,8 +1559,15 @@ function setupAutoUpdater() {
 
   // First check 10 s after launch (let the model load and mic permission
   // settle first). Subsequent checks every 4 h while the app stays open.
-  setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 10_000);
-  setInterval(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 4 * 60 * 60 * 1000);
+  // Errors are logged to console but not surfaced to the user — transient
+  // network failures shouldn't alarm first-run / offline users. But we
+  // stopped silently eating them completely: the swallow here was masking
+  // the ZIP-file-not-provided bug that made auto-update DOA for v0.6.0–v0.7.1.
+  const logCheckErr = (err) => {
+    console.warn('[updater] checkForUpdates rejected:', (err && err.message) || err);
+  };
+  setTimeout(() => { autoUpdater.checkForUpdates().catch(logCheckErr); }, 10_000);
+  setInterval(() => { autoUpdater.checkForUpdates().catch(logCheckErr); }, 4 * 60 * 60 * 1000);
 }
 
 // Let the renderer pull the current update state on boot (covers the
