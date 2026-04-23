@@ -560,7 +560,11 @@ function currentEngine() {
   const cfg = loadConfig();
   const e = cfg.engine;
   if (e === 'apple' || e === 'whisper.cpp' || e === 'openai' || e === 'whisperkit') return e;
-  return 'whisperkit';
+  // New installs land on Apple Speech — on-device by default, no model
+  // download, and autoFallbackFromAppleOnCrash() catches the "helper won't
+  // stay up" dev-mode case by flipping back to WhisperKit. Existing users
+  // already have `cfg.engine` persisted, so this only affects first boots.
+  return 'apple';
 }
 
 function currentUiLocale() {
@@ -1944,7 +1948,10 @@ ipcMain.handle('set-engine', (_e, engine) => {
   }
   const cfg = loadConfig();
   const allowed = ['apple', 'whisper.cpp', 'openai', 'whisperkit'];
-  cfg.engine = allowed.includes(engine) ? engine : 'whisperkit';
+  // Sanitiser fallback matches the first-boot default in currentEngine().
+  // autoFallbackFromAppleOnCrash() still catches the rare case where Apple
+  // Speech is configured but its helper won't come up.
+  cfg.engine = allowed.includes(engine) ? engine : 'apple';
   saveConfig(cfg);
   respawnStream();
   return { ok: true, engine: cfg.engine };
