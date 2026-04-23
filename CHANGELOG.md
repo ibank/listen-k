@@ -12,6 +12,40 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.2] — 2026-04-23
+
+### Fixed
+- **Auto-update was completely broken since v0.6.0 — now actually
+  works.** electron-updater's macOS backend (Squirrel.Mac) only
+  consumes `.zip` files; we had only been shipping `.dmg`, which made
+  `MacUpdater.js` throw `ERR_UPDATER_ZIP_FILE_NOT_FOUND` and bail out.
+  The `.catch(() => {})` on the scheduled `checkForUpdates()` ate the
+  error silently, so every one of the v0.6.0 → v0.7.1 releases
+  happily logged `[updater] update available` and then downloaded
+  nothing — no cache directory, no install, no banner. Users who sat
+  on v0.6.0 for days never got an update because there was no update
+  path to take.
+  - `package.json.build.mac.target` now includes both `dmg` and
+    `zip` (arm64). electron-builder signs + notarises the `.app`
+    inside both containers, and the published `latest-mac.yml`
+    lists both — electron-updater picks the `.zip`, humans grab
+    the `.dmg`.
+  - `npm run dist` and the GitHub Actions release job both pass
+    `--mac dmg zip`. `SHA256SUMS` covers both artifacts.
+  - The scheduled `checkForUpdates()` `.catch()` is no longer
+    silent — a `console.warn` line surfaces the error if
+    something similar ever slips through again. Still not user-
+    visible (transient network failures shouldn't alarm anyone),
+    but a terminal-run launch will now show it.
+
+### Upgrade
+v0.6.x / v0.7.x installs should auto-update to v0.7.2 on their next
+4-hour check once this release is live. The client-side
+electron-updater was working correctly all along; it was just waiting
+for a `.zip` we never shipped. Once the download completes, v0.7.1's
+new dashboard banner takes over and offers **Restart & install** as
+a single click.
+
 ## [0.7.1] — 2026-04-23
 
 ### Fixed
@@ -573,7 +607,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/ibank/listen-k/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/ibank/listen-k/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/ibank/listen-k/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/ibank/listen-k/compare/v0.6.2...v0.6.3
