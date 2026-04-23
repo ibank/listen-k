@@ -1000,6 +1000,28 @@ async function refresh() {
       setStatusIdleOrReady();
     }
 
+    // Track whisper.cpp bundle presence so the engine-cards filter can
+    // drop the card on a packaged build (where neither whisper-cli nor a
+    // ggml model is shipped) while keeping it on dev machines that have
+    // them built. Re-render if the availability flipped so the user sees
+    // the card appear/disappear without needing to reload.
+    const nowAvailable = Boolean(status.whisperCppBin);
+    if (nowAvailable !== whisperCppAvailable) {
+      whisperCppAvailable = nowAvailable;
+      renderEngineCards(engineSel?.value || status.selectedEngine || 'whisperkit');
+    }
+    // Rescue users whose persisted config still points at whisper.cpp on
+    // a build that can't run it — every recording would otherwise fail
+    // with a missing-binary error and there'd be no visible card to
+    // switch away from. Fall back to WhisperKit (the recommended
+    // default) and let the normal change-handler persist it.
+    if (!whisperCppAvailable && status.selectedEngine === 'whisper.cpp' && settingsReady) {
+      if (engineSel) {
+        engineSel.value = 'whisperkit';
+        engineSel.dispatchEvent(new Event('change'));
+      }
+    }
+
     const fp = JSON.stringify(status);
     if (fp === lastStatusFingerprint) return;
     lastStatusFingerprint = fp;
@@ -2507,10 +2529,22 @@ const ENGINE_CARDS = [
   },
 ];
 
+// Track whether the bundle actually ships a usable whisper.cpp install
+// (whisper-cli binary). Packaged builds never bundle these, so on the
+// DMG install the whisper.cpp engine is guaranteed to fail with a
+// cryptic "binary missing" error. Hide the card when it can't work —
+// dev builds (where `npm run build:whisper` created bin/whisper-cli)
+// still see it. Default true so the first paint before refresh() runs
+// doesn't briefly drop the card on dev machines.
+let whisperCppAvailable = true;
+
 function renderEngineCards(selectedEngine) {
   if (!engineGridEl) return;
   engineGridEl.innerHTML = '';
-  for (const spec of ENGINE_CARDS) {
+  const cards = ENGINE_CARDS.filter((spec) =>
+    spec.id !== 'whisper.cpp' || whisperCppAvailable
+  );
+  for (const spec of cards) {
     const card = document.createElement('div');
     card.className = 'engine-card' + (selectedEngine === spec.id ? ' selected' : '');
     card.setAttribute('data-engine', spec.id);
