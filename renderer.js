@@ -1604,6 +1604,22 @@ const OLLAMA_RECOMMENDED = [
   { name: 'phi4-mini:3.8b', size: '2.5 GB', note: 'notePhi4',         kind: 'phi' },
 ];
 
+// Live sizes fetched from the Ollama registry manifest. Populated lazily
+// on Ollama-tab visits so the recommended list shows the actual download
+// volume instead of the hardcoded approximation above. Value is bytes or
+// null (null = fetch attempted, nothing usable came back — don't retry).
+const ollamaSizeCache = new Map();
+async function ensureOllamaSize(name) {
+  if (ollamaSizeCache.has(name)) return ollamaSizeCache.get(name);
+  let bytes = null;
+  try {
+    const res = await window.listenk?.ollamaRegistrySize?.(name);
+    if (typeof res === 'number' && res > 0) bytes = res;
+  } catch {}
+  ollamaSizeCache.set(name, bytes);
+  return bytes;
+}
+
 function fmtBytes(n) {
   const v = Number(n) || 0;
   if (v === 0) return '—';
@@ -1815,6 +1831,10 @@ async function refreshOllamaPage(opts = {}) {
   const installedNames = new Set(installed.map((m) => m.name));
   const notInstalled = OLLAMA_RECOMMENDED.filter((r) => !installedNames.has(r.name));
   if (recommendedBox) recommendedBox.hidden = !running || notInstalled.length === 0;
+  const sizeText = (spec) => {
+    const bytes = ollamaSizeCache.get(spec.name);
+    return typeof bytes === 'number' && bytes > 0 ? fmtBytes(bytes) : spec.size;
+  };
   notInstalled.forEach((spec) => {
     const pull = ollamaPulling.get(spec.name);
     if (pull) {
@@ -1825,7 +1845,7 @@ async function refreshOllamaPage(opts = {}) {
         name: spec.name,
         kind: spec.kind,
         meta: [
-          { text: spec.size, cls: 'size' },
+          { text: sizeText(spec), cls: 'size' },
           { text: pull.status || '…' },
         ],
         progress: { pct, label: total > 0 ? `${pct}%` : '…' },
@@ -1840,7 +1860,7 @@ async function refreshOllamaPage(opts = {}) {
       name: spec.name,
       kind: spec.kind,
       meta: [
-        { text: spec.size, cls: 'size' },
+        { text: sizeText(spec), cls: 'size' },
         { text: t(`page.ollama.${spec.note}`) },
       ],
       actions: [{
@@ -1859,6 +1879,20 @@ async function refreshOllamaPage(opts = {}) {
       }],
     }));
   });
+
+  // Kick off registry lookups for any recommended specs we haven't sized
+  // yet, then repaint so the real numbers replace the hardcoded ones.
+  // Skip on progress-tick renders so in-flight pulls don't thrash.
+  if (!opts.skipListFetch) {
+    const pending = notInstalled.filter((s) => !ollamaSizeCache.has(s.name));
+    if (pending.length) {
+      Promise.all(pending.map((s) => ensureOllamaSize(s.name))).then((results) => {
+        if (results.some((b) => typeof b === 'number' && b > 0)) {
+          refreshOllamaPage({ skipListFetch: true });
+        }
+      });
+    }
+  }
 }
 
 // History count badge in the sidebar. Hidden until we have a count to show.

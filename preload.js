@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('listenk', {
   onOnboardingPracticeFinal: (cb) => ipcRenderer.on('onboarding-practice-final', (_e, text) => cb(text)),
   openOllamaDownload: () => ipcRenderer.invoke('open-ollama-download'),
   ollamaList: () => ipcRenderer.invoke('ollama-list'),
+  ollamaRegistrySize: (name) => ipcRenderer.invoke('ollama-registry-size', name),
   ollamaPull: (name) => ipcRenderer.invoke('ollama-pull', name),
   ollamaPullCancel: (name) => ipcRenderer.invoke('ollama-pull-cancel', name),
   ollamaDelete: (name) => ipcRenderer.invoke('ollama-delete', name),

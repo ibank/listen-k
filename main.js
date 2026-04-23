@@ -1360,7 +1360,41 @@ async function ollamaDeleteModel(name) {
   return { ok: true };
 }
 
+// Ollama's public registry serves OCI-ish manifests that list each blob
+// layer with a byte size. Summing the layers gives the exact download
+// volume — which is what we want to show next to "Install" on the
+// Ollama tab, instead of a stale hand-rolled estimate from the library
+// page. Cached per-process because manifests change only on re-publish.
+const ollamaRegistrySizeCache = new Map(); // "name:tag" → bytes | null
+async function ollamaRegistrySize(spec) {
+  if (!spec) return null;
+  if (ollamaRegistrySizeCache.has(spec)) return ollamaRegistrySizeCache.get(spec);
+  const [full, tag = 'latest'] = String(spec).split(':');
+  if (!full) { ollamaRegistrySizeCache.set(spec, null); return null; }
+  const parts = full.split('/');
+  const ns = parts.length === 2 ? parts[0] : 'library';
+  const name = parts.length === 2 ? parts[1] : full;
+  const url = `https://registry.ollama.ai/v2/${encodeURIComponent(ns)}/${encodeURIComponent(name)}/manifests/${encodeURIComponent(tag)}`;
+  let bytes = null;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json',
+      },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const layers = Array.isArray(json.layers) ? json.layers : [];
+      const total = layers.reduce((s, l) => s + (Number(l.size) || 0), 0);
+      if (total > 0) bytes = total;
+    }
+  } catch {}
+  ollamaRegistrySizeCache.set(spec, bytes);
+  return bytes;
+}
+
 ipcMain.handle('ollama-list', () => ollamaListDetailed());
+ipcMain.handle('ollama-registry-size', (_e, name) => ollamaRegistrySize(name));
 
 ipcMain.handle('ollama-pull', async (event, name) => {
   try {
