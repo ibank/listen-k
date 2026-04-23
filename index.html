@@ -103,6 +103,23 @@
         <div class="banner-spinner"></div>
       </section>
 
+      <!-- Persistent update-ready notice. Shown when electron-updater has
+           finished pulling a newer build in the background. Toasts were
+           the only cue before v0.7.1 and disappeared within seconds; this
+           stays visible until the user either restarts or dismisses. -->
+      <section class="banner banner-update" id="updateReadyBanner" hidden>
+        <div class="banner-body">
+          <div class="banner-title" id="updateReadyTitle" data-i18n="banner.update.title">Update ready to install</div>
+          <div class="banner-desc" id="updateReadyDesc" data-i18n="banner.update.desc">
+            A newer version has been downloaded in the background. Restart Listen K to apply it.
+          </div>
+        </div>
+        <div class="banner-actions">
+          <button class="btn-hero rec" id="updateInstallBtn" type="button" data-i18n="banner.update.install">Restart &amp; install</button>
+          <button class="btn-hero ghost" id="updateDismissBtn" type="button" data-i18n="banner.update.dismiss">Later</button>
+        </div>
+      </section>
+
       <section class="page" id="sec-status">
         <div class="hero">
           <div class="hero-row">

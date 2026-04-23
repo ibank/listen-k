@@ -66,6 +66,15 @@ const strings = {
     'banner.elapsed': '경과: {sec}초',
     'banner.elapsedHint': '경과: {sec}초 · 터미널 로그의 [stream stderr] 줄을 확인해 주세요',
 
+    // ── Update-ready banner (dashboard) ────────────────────────────────
+    'banner.update.title': '업데이트 준비 완료',
+    'banner.update.desc': '새 버전이 백그라운드에서 다운로드됐습니다. Listen K 를 재시작하면 적용됩니다.',
+    'banner.update.descWithVersion': 'v{version} 이 백그라운드에서 다운로드됐습니다. 지금 재시작하면 바로 적용됩니다.',
+    'banner.update.install': '재시작하여 설치',
+    'banner.update.installing': '재시작 중…',
+    'banner.update.installFail': '재시작 실패: {reason}',
+    'banner.update.dismiss': '나중에',
+
     // ── Page titles / actions ──────────────────────────────────────────
     'page.status.title': '설정 상태',
     'page.status.refresh': '↻ 새로고침',
@@ -278,6 +287,7 @@ const strings = {
     'usage.about.title': '정보',
     'usage.about.sub': '버전 및 업데이트',
     'usage.about.check': '업데이트 확인',
+    'usage.about.restartInstall': 'v{version} 재시작하여 설치',
     'usage.about.checking': '확인 중…',
     'usage.about.upToDate': '최신 버전입니다 (v{version}).',
     'usage.about.updateAvailable': '업데이트 사용 가능 · v{version} — 앱 종료 시 자동 설치됩니다.',
@@ -398,7 +408,7 @@ const strings = {
     'toast.engineAppleFallback': 'Apple Speech 엔진 초기화 실패 — WhisperKit 으로 전환했습니다 (설치된 Listen K.app 에서만 Apple 엔진 정상 동작)',
     'toast.engineBusy': '녹음·처리 중에는 엔진을 전환할 수 없습니다',
     'toast.updateAvailable': '새 버전 {version} 이 있습니다 — 백그라운드에서 다운로드 중',
-    'toast.updateReady': '업데이트 {version} 준비 완료 — Listen K 를 종료하면 자동 설치됩니다',
+    'toast.updateReady': '업데이트 {version} 준비 완료 — 대시보드에서 "재시작하여 설치" 를 누르거나 Listen K 를 종료하면 설치됩니다',
 
     // ── Tray native fallback menu (right-click) ──────────────────────
     'tray.state.recording': '🔴 녹음 중',
@@ -482,6 +492,14 @@ const strings = {
     'banner.desc': 'Compiling the WhisperKit model to Core ML. First run after (re)install takes 30–90 seconds; after that it\'s cached and ready in seconds.',
     'banner.elapsed': 'Elapsed: {sec}s',
     'banner.elapsedHint': 'Elapsed: {sec}s · Check [stream stderr] lines in the terminal log',
+
+    'banner.update.title': 'Update ready to install',
+    'banner.update.desc': "A newer version has been downloaded in the background. Restart Listen K to apply it.",
+    'banner.update.descWithVersion': 'v{version} has been downloaded in the background. Restart now to apply it immediately.',
+    'banner.update.install': 'Restart & install',
+    'banner.update.installing': 'Restarting…',
+    'banner.update.installFail': "Couldn't restart: {reason}",
+    'banner.update.dismiss': 'Later',
 
     'page.status.title': 'Setup status',
     'page.status.refresh': '↻ Refresh',
@@ -690,6 +708,7 @@ const strings = {
     'usage.about.title': 'About',
     'usage.about.sub': 'Version and updates',
     'usage.about.check': 'Check for updates',
+    'usage.about.restartInstall': 'Restart & install v{version}',
     'usage.about.checking': 'Checking…',
     'usage.about.upToDate': "You're on the latest version (v{version}).",
     'usage.about.updateAvailable': 'Update available · v{version} — will install automatically the next time you quit.',
@@ -807,7 +826,7 @@ const strings = {
     'toast.engineAppleFallback': 'Apple Speech engine failed to start — switched to WhisperKit (Apple engine only works in the installed Listen K.app)',
     'toast.engineBusy': 'Can\u2019t switch engine while recording or processing',
     'toast.updateAvailable': 'New version {version} is available — downloading in the background',
-    'toast.updateReady': 'Update {version} ready — Listen K will install it when you quit',
+    'toast.updateReady': 'Update {version} ready — click "Restart & install" on the dashboard or quit Listen K to apply',
 
     'tray.state.recording': '🔴 Recording',
     'tray.state.processing': '⏳ Processing',
@@ -888,6 +907,14 @@ const strings = {
     'banner.desc': 'WhisperKit モデルを Core ML にコンパイル中。再インストール直後は 30〜90 秒かかることがあり、以降はキャッシュされ数秒で準備完了します。',
     'banner.elapsed': '経過: {sec} 秒',
     'banner.elapsedHint': '経過: {sec} 秒 · ターミナルログの [stream stderr] 行を確認してください',
+
+    'banner.update.title': 'アップデートの準備ができました',
+    'banner.update.desc': '新しいバージョンがバックグラウンドでダウンロードされました。Listen K を再起動すると適用されます。',
+    'banner.update.descWithVersion': 'v{version} がバックグラウンドでダウンロードされました。今すぐ再起動すると適用されます。',
+    'banner.update.install': '再起動してインストール',
+    'banner.update.installing': '再起動中…',
+    'banner.update.installFail': '再起動失敗: {reason}',
+    'banner.update.dismiss': '後で',
 
     'page.status.title': 'セットアップ状態',
     'page.status.refresh': '↻ 更新',
@@ -1096,6 +1123,7 @@ const strings = {
     'usage.about.title': '情報',
     'usage.about.sub': 'バージョンとアップデート',
     'usage.about.check': 'アップデートを確認',
+    'usage.about.restartInstall': 'v{version} を再起動してインストール',
     'usage.about.checking': '確認中…',
     'usage.about.upToDate': '最新バージョンです (v{version})。',
     'usage.about.updateAvailable': 'アップデート利用可能 · v{version} — 次回終了時に自動でインストールされます。',
@@ -1213,7 +1241,7 @@ const strings = {
     'toast.engineAppleFallback': 'Apple Speech エンジン初期化失敗 — WhisperKit に切り替えました (インストール済みの Listen K.app でのみ Apple エンジン動作)',
     'toast.engineBusy': '録音・処理中はエンジンを切り替えられません',
     'toast.updateAvailable': '新しいバージョン {version} が利用可能です — バックグラウンドでダウンロード中',
-    'toast.updateReady': 'アップデート {version} の準備ができました — Listen K を終了すると自動でインストールされます',
+    'toast.updateReady': 'アップデート {version} の準備ができました — ダッシュボードの「再起動してインストール」または Listen K 終了で適用',
 
     'tray.state.recording': '🔴 録音中',
     'tray.state.processing': '⏳ 変換・整形中',
@@ -1294,6 +1322,14 @@ const strings = {
     'banner.desc': '正在将 WhisperKit 模型编译为 Core ML。重装后首次需 30-90 秒,之后有缓存可在几秒内就绪。',
     'banner.elapsed': '经过: {sec} 秒',
     'banner.elapsedHint': '经过: {sec} 秒 · 请查看终端日志的 [stream stderr] 行',
+
+    'banner.update.title': '更新准备就绪',
+    'banner.update.desc': '新版本已在后台下载完成。重启 Listen K 即可应用。',
+    'banner.update.descWithVersion': 'v{version} 已在后台下载完成。立即重启即可应用。',
+    'banner.update.install': '重启并安装',
+    'banner.update.installing': '重启中…',
+    'banner.update.installFail': '重启失败: {reason}',
+    'banner.update.dismiss': '稍后',
 
     'page.status.title': '设置状态',
     'page.status.refresh': '↻ 刷新',
@@ -1502,6 +1538,7 @@ const strings = {
     'usage.about.title': '关于',
     'usage.about.sub': '版本与更新',
     'usage.about.check': '检查更新',
+    'usage.about.restartInstall': '重启并安装 v{version}',
     'usage.about.checking': '检查中…',
     'usage.about.upToDate': '已是最新版本 (v{version})。',
     'usage.about.updateAvailable': '有新版本 · v{version} — 下次退出时自动安装。',
@@ -1619,7 +1656,7 @@ const strings = {
     'toast.engineAppleFallback': 'Apple Speech 引擎启动失败 — 已切换到 WhisperKit (Apple 引擎仅在已安装的 Listen K.app 中正常工作)',
     'toast.engineBusy': '录音·处理中无法切换引擎',
     'toast.updateAvailable': '新版本 {version} 已可用 — 正在后台下载',
-    'toast.updateReady': '更新 {version} 已就绪 — 退出 Listen K 后将自动安装',
+    'toast.updateReady': '更新 {version} 已就绪 — 点击仪表板的「重启并安装」或退出 Listen K 即可应用',
 
     'tray.state.recording': '🔴 录音中',
     'tray.state.processing': '⏳ 转换·整理中',

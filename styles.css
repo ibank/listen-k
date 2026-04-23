@@ -1107,6 +1107,22 @@ body {
   font-family: var(--font-mono);
   margin-top: 6px;
 }
+.banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+/* Update-ready variant: accent-tinted instead of the blue first-run
+   stripe so users can tell the two banners apart at a glance. */
+.banner-update {
+  background: linear-gradient(180deg, rgba(74, 222, 128, 0.15) 0%, rgba(74, 222, 128, 0.05) 100%);
+  border-color: rgba(74, 222, 128, 0.32);
+}
+.banner-update .banner-title::before {
+  content: '✓ ';
+  color: var(--ok);
+  font-weight: 700;
+}
 .banner-spinner {
   flex-shrink: 0;
   width: 22px;

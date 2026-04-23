@@ -1516,6 +1516,18 @@ app.whenReady().then(async () => {
 // uploaded `latest-mac.yml` alongside the DMG when it published the
 // release (see `mac.publish` in package.json and `release.yml`).
 // Silently no-ops in dev builds (autoUpdater checks `app.isPackaged`).
+// Non-null once electron-updater has finished downloading a new build —
+// the signal the dashboard banner and Usage-page button both key off to
+// offer the "Restart & install" path.
+let pendingUpdateVersion = null;
+
+function pushUpdateState() {
+  safeSend(mainWindow, 'update-state', {
+    pendingUpdateVersion,
+    currentVersion: app.getVersion(),
+  });
+}
+
 function setupAutoUpdater() {
   if (!app.isPackaged) {
     console.log('[updater] dev build — skipping');
@@ -1535,6 +1547,8 @@ function setupAutoUpdater() {
   });
   autoUpdater.on('update-downloaded', (info) => {
     console.log('[updater] update downloaded:', info.version);
+    pendingUpdateVersion = info.version;
+    pushUpdateState();
     safeSend(mainWindow, 'toast', tr('toast.updateReady', { version: info.version }));
   });
   autoUpdater.on('error', (err) => {
@@ -1548,6 +1562,32 @@ function setupAutoUpdater() {
   setTimeout(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 10_000);
   setInterval(() => { autoUpdater.checkForUpdates().catch(() => {}); }, 4 * 60 * 60 * 1000);
 }
+
+// Let the renderer pull the current update state on boot (covers the
+// case where the user opens the dashboard after the download already
+// finished in the background).
+ipcMain.handle('get-update-state', () => ({
+  pendingUpdateVersion,
+  currentVersion: app.getVersion(),
+}));
+
+// Triggered by the dashboard banner's "Restart & install" button or the
+// Usage-page "Check for updates" button when an update is ready. Bypasses
+// the "wait for normal quit" delay of autoInstallOnAppQuit — the app
+// immediately quits and relaunches into the new version.
+ipcMain.handle('install-update-now', () => {
+  if (!app.isPackaged) return { ok: false, reason: 'dev' };
+  if (!pendingUpdateVersion) return { ok: false, reason: 'not-downloaded' };
+  // quitAndInstall(isSilent, isForceRunAfter) — the defaults (true, false)
+  // leave the new app *not* launched. We explicitly want forceRunAfter
+  // so the user lands back in the dashboard, same as a normal cold boot.
+  setImmediate(() => {
+    try { autoUpdater.quitAndInstall(true, true); } catch (err) {
+      console.warn('[updater] quitAndInstall failed:', err && err.message);
+    }
+  });
+  return { ok: true, version: pendingUpdateVersion };
+});
 
 // Renderer can invoke this from a Settings "Check for updates" button.
 // Returns the UpdateCheckResult from electron-updater or null on failure.

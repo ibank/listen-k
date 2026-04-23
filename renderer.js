@@ -2912,6 +2912,18 @@ async function runUpdateCheck() {
   const btn = $('aboutUpdateBtn');
   const status = $('aboutUpdateStatus');
   if (!btn || !status) return;
+
+  // If a build has already been downloaded in the background, the button
+  // reads as "Restart & install" and this click should trigger the
+  // restart path instead of hitting the network again.
+  try {
+    const state = await window.listenk?.getUpdateState?.();
+    if (state && state.pendingUpdateVersion) {
+      await installUpdateNow();
+      return;
+    }
+  } catch {}
+
   btn.disabled = true;
   status.dataset.state = 'checking';
   status.textContent = t('usage.about.checking');
@@ -2943,7 +2955,85 @@ async function runUpdateCheck() {
   }
 }
 
+// When main pushes a fresh update-state event, flip the Usage-page
+// button label so it reads as "Restart & install" to match behaviour.
+function syncAboutUpdateBtn({ pendingUpdateVersion }) {
+  const btn = $('aboutUpdateBtn');
+  if (!btn) return;
+  if (pendingUpdateVersion) {
+    btn.textContent = t('usage.about.restartInstall', { version: pendingUpdateVersion });
+  } else {
+    btn.textContent = t('usage.about.check');
+  }
+}
+
 $('aboutUpdateBtn')?.addEventListener('click', runUpdateCheck);
+
+// ── Update-ready banner (dashboard) ──────────────────────────────────
+// v0.6.0 already pulled new builds in the background via electron-updater
+// but only advertised them via a toast that vanished in seconds, and
+// install was gated on the user happening to quit the app — easy to miss
+// for a menubar-only app they never explicitly quit. This banner stays
+// pinned to the top of the dashboard until the user either restarts to
+// apply or dismisses for the current session.
+let updateDismissedForSession = false;
+
+function applyUpdateBanner({ pendingUpdateVersion }) {
+  const banner = $('updateReadyBanner');
+  if (!banner) return;
+  if (!pendingUpdateVersion || updateDismissedForSession) {
+    banner.hidden = true;
+    return;
+  }
+  const descEl = $('updateReadyDesc');
+  if (descEl) descEl.textContent = t('banner.update.descWithVersion', {
+    version: pendingUpdateVersion,
+  });
+  banner.hidden = false;
+}
+
+async function installUpdateNow() {
+  const btn = $('updateInstallBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t('banner.update.installing');
+  }
+  try {
+    const res = await window.listenk?.installUpdateNow?.();
+    if (res && res.ok === false) {
+      toast(t('banner.update.installFail', { reason: res.reason || '?' }));
+      if (btn) { btn.disabled = false; btn.textContent = t('banner.update.install'); }
+    }
+    // Success path: main quits the app immediately — no UI follow-up needed.
+  } catch (err) {
+    toast(t('banner.update.installFail', { reason: err.message || '?' }));
+    if (btn) { btn.disabled = false; btn.textContent = t('banner.update.install'); }
+  }
+}
+
+$('updateInstallBtn')?.addEventListener('click', installUpdateNow);
+$('updateDismissBtn')?.addEventListener('click', () => {
+  updateDismissedForSession = true;
+  const banner = $('updateReadyBanner');
+  if (banner) banner.hidden = true;
+});
+
+window.listenk?.onUpdateState?.((state) => {
+  applyUpdateBanner(state);
+  syncAboutUpdateBtn(state);
+});
+
+// Seed the banner on boot in case the download already completed before
+// the dashboard mounted (auto-updater check fires 10 s after launch).
+(async () => {
+  try {
+    const s = await window.listenk?.getUpdateState?.();
+    if (s) {
+      applyUpdateBanner(s);
+      syncAboutUpdateBtn(s);
+    }
+  } catch {}
+})();
 
 // ── Ollama empty-state banner action buttons ─────────────────────────
 // Both the button and the inline link open the same Ollama download page
