@@ -12,6 +12,49 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.0] — 2026-04-23
+
+### Added
+- **In-app WhisperKit model picker.** New card on the Engine page
+  lists the full WhisperKit variant catalog (`base` / `small` /
+  `turbo` / `accurate`) with per-row status (Bundled · Installed ·
+  In use) and action buttons that drive install, switch, and delete
+  through new IPCs — no more "open a terminal and run
+  `npm run model:whisperkit:turbo`". Progress streams live from the
+  download with a throttled bar + percent label + cancel, and the
+  Cancel button cleans up any partial directory so a retry starts
+  clean rather than resuming a half-downloaded shard tree. Models
+  downloaded in-app land in `userData/models/whisperkit/` and the
+  finder merges them with the bundled set (user directory wins,
+  bundled models can't be deleted because the bundle is read-only).
+  i18n `page.whisperkit.*` added across ko / en / ja / zh-CN.
+
+### Changed
+- **DMG shrunk from ~592 MB → under 200 MB.** The `turbo` (632 MB)
+  model is no longer bundled; only the ~150 MB `base` model ships
+  as an always-available fallback for the Apple-Speech → WhisperKit
+  safety net. Users who want the larger variants grab them via the
+  new picker on first use. `predist` and the GitHub Actions release
+  workflow both switched from `npm run model:whisperkit` (turbo by
+  default) to `npm run model:whisperkit:base`.
+- **transcribe-helper `--download` now supports `--json-progress`.**
+  Without the flag the old contract is preserved (human text on
+  stderr, final path on stdout — `scripts/download-whisperkit-model.sh`
+  keeps working). With the flag the helper emits NDJSON
+  `download-progress` / `download-complete` / `download-error`
+  events, throttled to 150 ms or 1 % fraction deltas so the IPC
+  boundary doesn't flood. Main process parses them and forwards to
+  the renderer as `whisperkit-download-progress`.
+
+### Upgrade notes
+Users on v0.6.x who had explicitly pinned `cfg.whisperKitModel` to
+the turbo variant will silently fall back to the bundled `base`
+after updating — `findWhisperKitModel()`'s preferred list already
+handles "explicit choice missing" by falling through to the next
+available option. Quality will drop on non-English transcripts until
+the user installs turbo via the new picker. Engine settings and
+every other preference are untouched.
+
 ## [0.6.3] — 2026-04-23
 
 ### Changed
@@ -502,7 +545,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ibank/listen-k/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/ibank/listen-k/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/ibank/listen-k/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/ibank/listen-k/compare/v0.6.0...v0.6.1
