@@ -2164,6 +2164,12 @@ ipcMain.handle('whisperkit-download', async (_e, name) => {
 
     let stdoutBuf = '';
     let lastError = '';
+    // `download-complete` reports the actual on-disk path, which sits
+    // inside HubApi's HuggingFace-style cache tree
+    // (<userRoot>/models/argmaxinc/whisperkit-coreml/<variant>/). We
+    // remember it so the close-handler can move it up to the flat
+    // <userRoot>/<variant>/ layout that whisperKitModelPath() expects.
+    let completedPath = null;
 
     proc.stdout.on('data', (chunk) => {
       stdoutBuf += chunk.toString('utf8');
@@ -2186,6 +2192,7 @@ ipcMain.handle('whisperkit-download', async (_e, name) => {
             status: 'downloading',
           });
         } else if (evt.type === 'download-complete') {
+          completedPath = evt.path || null;
           safeSend(mainWindow, 'whisperkit-download-progress', {
             name, fraction: 1, status: 'complete', path: evt.path,
           });
@@ -2214,8 +2221,10 @@ ipcMain.handle('whisperkit-download', async (_e, name) => {
       if (state.aborted) {
         // User-initiated cancel; remove any partial directory so a retry
         // starts clean rather than resuming a half-complete shard tree.
+        // Clean both the flat target and the HubApi nested tree.
         const partial = path.join(userRoot, name);
         try { fs.rmSync(partial, { recursive: true, force: true }); } catch {}
+        try { fs.rmSync(path.join(userRoot, 'models'), { recursive: true, force: true }); } catch {}
         safeSend(mainWindow, 'whisperkit-download-progress', {
           name, status: 'cancelled',
         });
@@ -2223,7 +2232,34 @@ ipcMain.handle('whisperkit-download', async (_e, name) => {
         return;
       }
       if (code === 0) {
-        resolve({ ok: true, path: path.join(userRoot, name) });
+        const target = path.join(userRoot, name);
+        // WhisperKit's HubApi lands files at
+        // <userRoot>/models/argmaxinc/whisperkit-coreml/<variant>/.
+        // Flatten to <userRoot>/<variant>/ so findWhisperKitModel /
+        // whisperKitModelPath can locate it without having to
+        // understand the HF cache layout. Build-time
+        // download-whisperkit-model.sh does the same mv — this
+        // mirrors it at runtime for in-app installs.
+        try {
+          const src = completedPath && fs.existsSync(completedPath)
+            ? completedPath
+            : path.join(userRoot, 'models', 'argmaxinc', 'whisperkit-coreml', name);
+          if (fs.existsSync(src) && src !== target) {
+            fs.rmSync(target, { recursive: true, force: true });
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.renameSync(src, target);
+            // Drop the now-empty models/argmaxinc/... tree.
+            fs.rmSync(path.join(userRoot, 'models'), { recursive: true, force: true });
+          }
+        } catch (err) {
+          console.error('[whisperkit] flatten failed:', err);
+          safeSend(mainWindow, 'whisperkit-download-progress', {
+            name, status: 'error', message: `install failed: ${err.message}`,
+          });
+          resolve({ ok: false, reason: `install failed: ${err.message}` });
+          return;
+        }
+        resolve({ ok: true, path: target });
       } else {
         safeSend(mainWindow, 'whisperkit-download-progress', {
           name, status: 'error', message: lastError || `exit ${code}`,
