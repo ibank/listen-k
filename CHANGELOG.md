@@ -12,6 +12,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.3] — 2026-04-23
+
+### Added
+- **Hands-on practice step in onboarding.** The flow taught users
+  *configuration* (permissions, hotkey binding) but then dropped
+  them into a dashboard with no idea what record → HUD → paste
+  actually feels like. A new Step 4 "Try it out" runs one real
+  record-and-transcribe round-trip inside the overlay: press the
+  just-configured hotkey → the real HUD appears at the bottom of
+  the screen (so the user learns what to look for) → speak →
+  press again → transcript lands as a quoted result inside the
+  onboarding card. Paste is skipped (the overlay isn't a paste
+  target) and post-processing is bypassed (so a missing-Ollama
+  config doesn't turn training into a failure). "Try again"
+  rewinds the card; "Done · Start" closes the overlay.
+- A new `set-onboarding-practice` IPC + `onboarding-practice-final`
+  push event lets the overlay route real stream audio through the
+  normal recorder without the normal post-process / paste
+  side-effects. Bailing out of the step mid-recording (Back / Skip
+  while speaking) arms a one-shot discard latch so the
+  async-arriving transcript gets dropped rather than accidentally
+  pasted into a previously focused app.
+- i18n: `onboard.practice.*` added across ko / en / ja / zh-CN.
+
 ## [0.7.2] — 2026-04-23
 
 ### Fixed
@@ -607,7 +631,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/ibank/listen-k/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/ibank/listen-k/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/ibank/listen-k/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/ibank/listen-k/compare/v0.6.3...v0.7.0
