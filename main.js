@@ -368,6 +368,11 @@ function createTray() {
 }
 
 function updateTrayMenu() {
+  // Mirror the state into the renderer's dashboard button on every
+  // tray-menu refresh. Every callsite that flips `isRecording` /
+  // `isProcessing` already calls updateTrayMenu(), so folding the push
+  // in here keeps the two UI surfaces in lockstep for free.
+  pushRecordState();
   if (!tray) return;
   const stateLabel = isRecording
     ? tr('tray.state.recording')
@@ -1775,6 +1780,25 @@ ipcMain.handle('set-state', (_e, { recording, processing, pasted }) => {
   }
   updateTrayMenu();
 });
+
+// Dashboard "Record now" button. Intentionally the same entry point as
+// the hotkey + tray "toggle record" — so the user gets identical HUD,
+// streaming engine, and focus-restore behaviour no matter where they
+// start. Previously the button took a legacy batch-capture path that
+// bypassed the HUD and had no visible way to stop mid-recording.
+ipcMain.handle('trigger-record', async () => {
+  await handleFnPress();
+  return { ok: true, isRecording, isProcessing };
+});
+
+// Pushed to the renderer whenever main-side recording state changes so
+// the dashboard's Record button can reflect reality (idle / recording /
+// processing) without polling.
+function pushRecordState() {
+  safeSend(mainWindow, 'record-state', { isRecording, isProcessing });
+}
+
+ipcMain.handle('get-record-state', () => ({ isRecording, isProcessing }));
 
 ipcMain.handle('hud-cancel', () => {
   if (!isRecording && !isProcessing) return;

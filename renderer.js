@@ -1877,17 +1877,55 @@ async function refreshNavCounts() {
   } catch {}
 }
 
-// Hero action buttons route to in-app behaviour rather than invent new
-// flows — "Record now" = trigger the same toggle the hotkey fires,
-// "Change hotkey" = switch to the input settings page.
+// Hero action buttons. "Record now" now goes through the same main-side
+// entry point as the hotkey and the tray "toggle record" item
+// (`trigger-record` → `handleFnPress()` on main). That's the branch that
+// handles HUD display, streaming-vs-batch routing, and focus restore.
+// The previous version called `toggleRecord()` directly, which entered
+// the legacy batch-only path and left the user without a HUD or a
+// reachable stop control.
 const heroRecBtn = $('heroRecBtn');
+const heroRecLabel = heroRecBtn?.querySelector('.hero-rec-label');
 const heroHotkeyBtn = $('heroHotkeyBtn');
-heroRecBtn?.addEventListener('click', () => {
-  if (streamingActive || recording) return;
-  // If a streaming engine is ready, trigger the same path the hotkey uses;
-  // otherwise fall back to the legacy batch capture.
-  toggleRecord();
+heroRecBtn?.addEventListener('click', async () => {
+  if (heroRecBtn.dataset.state === 'processing') return;
+  try { await window.listenk?.triggerRecord?.(); } catch {}
 });
+
+// Mirror main.js's recording state into the button. Three states:
+//   idle       → red dot + "Record now"
+//   recording  → red stop square + "Stop" + pulse
+//   processing → spinner + "Processing…" + disabled
+function setHeroRecState(state) {
+  if (!heroRecBtn) return;
+  heroRecBtn.dataset.state = state;
+  heroRecBtn.disabled = (state === 'processing');
+  if (!heroRecLabel) return;
+  if (state === 'recording')       heroRecLabel.textContent = t('hero.recStop');
+  else if (state === 'processing') heroRecLabel.textContent = t('hero.recProcessing');
+  else                             heroRecLabel.textContent = t('hero.recNow');
+}
+setHeroRecState('idle');
+
+window.listenk?.onRecordState?.(({ isRecording, isProcessing }) => {
+  if (isProcessing)     setHeroRecState('processing');
+  else if (isRecording) setHeroRecState('recording');
+  else                  setHeroRecState('idle');
+});
+
+// Initial sync on boot — covers the case where the dashboard mounts
+// while a recording is already in flight (rare, but avoids a stale
+// "Record now" flash before the first push event).
+(async () => {
+  try {
+    const s = await window.listenk?.getRecordState?.();
+    if (s) {
+      if (s.isProcessing)     setHeroRecState('processing');
+      else if (s.isRecording) setHeroRecState('recording');
+    }
+  } catch {}
+})();
+
 heroHotkeyBtn?.addEventListener('click', () => {
   const link = document.querySelector('.nav-item[data-section="sec-input"]');
   if (link) link.click();

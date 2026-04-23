@@ -113,9 +113,11 @@
                 Double-tap the hotkey anywhere — text streams into the HUD and auto-pastes into the focused app.
               </p>
               <div class="hero-actions">
-                <button class="btn-hero rec" id="heroRecBtn" type="button">
-                  <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>
-                  <span data-i18n="hero.recNow">Record now</span>
+                <button class="btn-hero rec" id="heroRecBtn" type="button" data-state="idle">
+                  <svg class="hero-rec-ico-idle"   width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>
+                  <svg class="hero-rec-ico-stop"   width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" rx="1" fill="currentColor"/></svg>
+                  <span class="hero-rec-spinner"   aria-hidden="true"></span>
+                  <span class="hero-rec-label" data-i18n="hero.recNow">Record now</span>
                 </button>
                 <button class="btn-hero ghost" id="heroHotkeyBtn" type="button" data-i18n="hero.changeHotkey">Change hotkey</button>
               </div>

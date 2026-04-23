@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('listenk', {
   onToggleRecord: (cb) => ipcRenderer.on('toggle-record', cb),
   onCancelRecord: (cb) => ipcRenderer.on('cancel-record', cb),
+  triggerRecord: () => ipcRenderer.invoke('trigger-record'),
+  getRecordState: () => ipcRenderer.invoke('get-record-state'),
+  onRecordState: (cb) => ipcRenderer.on('record-state', (_e, s) => cb(s)),
   transcribe: (payload) => ipcRenderer.invoke('transcribe', payload),
   paste: (text) => ipcRenderer.invoke('paste-text', text),
   setState: (state) => ipcRenderer.invoke('set-state', state),
