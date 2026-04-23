@@ -2387,16 +2387,31 @@ ipcMain.handle('set-onboarding-practice', (_e, enabled) => {
     // flight and will emit a `final`. Keep the divert on, mark it for
     // discard, and send `stop` so the final lands quickly.
     onboardingPracticeDiscardNextFinal = true;
+    let stopSent = false;
     if (transcribeStream && transcribeStreamReady) {
       try {
         transcribeStream.stdin.write(JSON.stringify({ cmd: 'stop' }) + '\n');
+        stopSent = true;
       } catch {}
     }
-    return { ok: true, deferred: true };
+    if (stopSent) return { ok: true, deferred: true };
+    // Stream helper is gone / not ready — no `final` is coming. Clear
+    // state now so the HUD doesn't stay stuck on "listening" after the
+    // user leaves the practice step.
+    onboardingPracticeMode = false;
+    onboardingPracticeDiscardNextFinal = false;
+    isRecording = false;
+    isProcessing = false;
+    hideHud();
+    updateTrayMenu();
+    return { ok: true };
   }
 
   onboardingPracticeMode = Boolean(enabled);
   onboardingPracticeDiscardNextFinal = false;
+  // Safety net: on any practice-off transition, force the HUD back to a
+  // clean state. Idempotent when HUD is already hidden.
+  if (!enabled) hideHud();
   return { ok: true };
 });
 ipcMain.handle('set-ui-locale', (_e, loc) => {
