@@ -330,9 +330,25 @@ let trayWindow = null;
 let trayNativeMenu = null;
 
 function createTray() {
-  const icon = nativeImage
-    .createFromNamedImage('NSStatusAvailable', [-1, 0, 1])
-    .resize({ width: 16, height: 16 });
+  // Brand-aligned menubar icon — miniaturised 5-bar equalizer that mirrors
+  // the app icon so users can actually find us in the menubar. Template
+  // mode lets macOS handle light/dark tint + hover/active states without
+  // us shipping four variants. The @2x file is picked up automatically by
+  // Electron from the same directory when display scale is Retina.
+  const iconPath = resPath('icons', 'trayIconTemplate.png');
+  let icon;
+  if (fs.existsSync(iconPath)) {
+    icon = nativeImage.createFromPath(iconPath);
+    icon.setTemplateImage(true);
+  } else {
+    // Dev-mode fallback: if the PNG hasn't been generated yet (first
+    // checkout before `npm run icon:tray`), fall back to the system
+    // placeholder so the tray still appears.
+    console.warn('[tray] custom icon missing at', iconPath, '- using system placeholder');
+    icon = nativeImage
+      .createFromNamedImage('NSStatusAvailable', [-1, 0, 1])
+      .resize({ width: 16, height: 16 });
+  }
   tray = new Tray(icon);
   updateTrayMenu();
   // On macOS, `tray.setContextMenu(menu)` hijacks left-click (it opens

@@ -43,6 +43,7 @@
     "start": "electron .",
     "icon": "node scripts/generate-icon.js",
     "icon:dmg": "bash scripts/build-dmg-icon.sh",
+    "icon:tray": "node scripts/generate-tray-icon.js",
     "build:helper": "bash scripts/build-helper.sh",
     "build:transcribe": "bash scripts/build-transcribe-helper.sh",
     "build:whisper": "bash scripts/build-whisper.sh",
@@ -106,6 +107,14 @@
           "**/*",
           "!translate-helper"
         ]
+      },
+      {
+        "from": "build/trayIconTemplate.png",
+        "to": "icons/trayIconTemplate.png"
+      },
+      {
+        "from": "build/trayIconTemplate@2x.png",
+        "to": "icons/trayIconTemplate@2x.png"
       },
       {
         "from": "models/whisperkit",
