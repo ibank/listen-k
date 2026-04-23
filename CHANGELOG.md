@@ -12,6 +12,150 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.9] — 2026-04-24
+
+A broad hardening + polish release based on a code-review pass. No
+user-facing feature changes; every item below is a bug fix,
+reliability improvement, or defence-in-depth. Existing installs will
+auto-update.
+
+### Fixed
+- **The "mic gets tangled on initial launch" / engine-crash-loop thread
+  should finally stop.** `startTranscribeStream` now captures each
+  child process in a closure, so a superseded helper's exit handler
+  can no longer null out its successor in the module slot or schedule
+  a competing restart. `respawnStream` (hit by engine / model swaps)
+  and `autoFallbackFromAppleOnCrash` mark the old child `__superseded`
+  before kill, so a non-SIGTERM exit (helper self-abort, SIGPIPE from
+  our own stdin close) stops at the exit handler instead of waking up
+  a second helper that then fights the first one for the microphone.
+- **config.json / stats.json / history.jsonl writes are now actually
+  atomic.** The previous `writeFileSync(tmp) → renameSync(tmp, p)`
+  sequence had no fsync, so a hard crash or power loss between rename
+  and flush could leave the new inode visible with zero bytes — which
+  silently turned config.json into `{}` and cost the user their
+  encrypted OpenAI key, engine selection, and hotkey on next boot. A
+  new `atomicWriteFileSync` now runs
+  openSync → writeSync → fsyncSync → closeSync → renameSync →
+  parent-directory fsync, matching the POSIX durable-rename recipe.
+- **fn-listener auto-recovers from a dead event tap.** Two fixes:
+  (1) on non-SIGTERM exit or `spawn` error, main.js restarts the
+  helper with exponential backoff (5 attempts) and surfaces a
+  localized `toast.hotkeyDead` on give-up. Previously a helper crash
+  silently killed the hotkey for the rest of the session. (2) inside
+  the helper, `.tapDisabledByTimeout` / `.tapDisabledByUserInput` now
+  call `CGEvent.tapEnable(true)` in place via a module-level tapRef,
+  fixing the hotkey silently dying after a sleep/wake cycle. The
+  previous "will be re-enabled by main" comment was aspirational —
+  nothing in Electron ever did.
+- **handleFnPress re-entry guard.** A reflexive double-tap on
+  `rshift-double` used to race through the `await
+  getFrontmostBundleId()` window twice, with both runs overwriting
+  `savedFrontmostBundleId` before `isRecording` had flipped. Result:
+  the paste landed in whatever app ended up frontmost last (sometimes
+  Listen K itself). An `inFlightFnPress` guard at the top of the
+  handler serialises presses so only one flows through the focus-
+  capture window at a time.
+- **apple-speech-helper's kAFAssistantErrorDomain filter narrowed
+  from "everything in this domain" to known-benign codes only**
+  (203, 216, 1101, 1110, 1700). Unexpected codes — on-device model
+  not downloaded, locale model missing, network unreachable on a
+  non-on-device session — now surface as `type: error` events with
+  the AF code embedded in the message, instead of being silently
+  swallowed as empty finals. Every AF-domain code also logs to
+  stderr for operators to see which one actually fired.
+- **SFSpeechRecognitionTask callback's state mutations are serialised
+  under the helper's existing NSLock.** The callback fires on an
+  arbitrary queue, so without the lock a user-initiated stop racing
+  the recognizer's own termination could observe half-reset state
+  and skip the `audioEngine.stop()` / tap-removal cleanup entirely.
+- **apple-speech-helper and transcribe-helper detect parent death.**
+  Previously, if the Electron parent crashed ungracefully, the mic
+  indicator stayed lit in the menu bar and the audio device stayed
+  held until the helper hit its next syscall. Both helpers now
+  interpret stdin EOF (parent closed the pipe) as a shutdown signal
+  and exit cleanly.
+- **HUD state machine gains explicit `idle` / `error` states.** The
+  old handler only accepted `recording` / `processing` / `done` and
+  silently held whatever state it had on anything else, so a stray
+  value could freeze the pill mid-animation. Unknown states now fall
+  back to `idle` (clear text, clear decoration) defensively.
+- **Four sticky error paths now auto-clear the status chip.** The
+  titlebar chip stayed red on `noSpeech`, `whisperError`, `pasteFail`,
+  and `ollamaError` until the user's next recording — now it fades
+  back to idle/ready 2.5 s after the error, matching the pattern
+  already used for streaming errors in v0.7.7.
+- **`finalizePaste` wraps its body in try/finally** so the terminal
+  `setState({recording:false, processing:false})` always fires even
+  if an unexpected throw slips through. Prevents the HUD from sitting
+  on the "processing" spinner forever.
+- **`engineSel` rollback no longer pins the select to the rejected
+  value.** When main returns `{ok:false, reason:'busy'}` on an engine
+  switch during recording, the UI now falls back to
+  `lastAcceptedEngine` (pre-change value) instead of the rejected new
+  value, which used to leave the selector stuck until the user picked
+  yet another engine.
+
+### Changed
+- **Ollama, WhisperKit, and IPC inputs now have allow-lists.** Every
+  `ollama-pull` / `ollama-delete` / `ollama-registry-size` call
+  validates the model reference against
+  `[a-zA-Z0-9._-]+(/[a-zA-Z0-9._-]+)?(:[a-zA-Z0-9._-]+)?` (max 200
+  chars). `set-whisper-model` validates folder names similarly so
+  `../` can't end up in a --model-dir path. `paste-text`, `tray-cmd`,
+  `transcribe`, and `install-update-now` reject IPC from any
+  webContents that isn't the main / HUD / tray window.
+- **Config reads moved to a cached raw-string layer.** Every HUD
+  push, tray snapshot, and hotkey callback used to re-read
+  config.json with `readFileSync` on the main thread — easily 30
+  reads/sec during a live recording. `loadConfig` now caches the raw
+  string and invalidates on `saveConfig`.
+- **History IPC polling collapsed from three calls to one.** The
+  renderer's 4 s refresh tick used to fire `historyList(200)` +
+  `historyList(500)` + `historyList(1000)` in parallel. A shared
+  `fetchHistoryShared` layer with a 2 s TTL serves all three from a
+  single request, with explicit invalidation after `historyAppend`
+  and `historyClear` so edits stay immediately visible.
+- **Stream-error payload is truncated at 200 chars before logging.**
+  Helpers are supposed to emit short diagnostic strings, but nothing
+  in the schema prevents a future variant from dropping partial user
+  speech into `error.message`. Packaged builds log to a persistent
+  console file, so a short prefix is the conservative default.
+- **`will-quit` now aborts in-flight Ollama model pulls and kills
+  WhisperKit download helpers.** Both used to linger past app quit
+  until they hit a broken-pipe write.
+
+### Added
+- **CJK font fallbacks in the UI font stacks** (`Apple SD Gothic
+  Neo`, `Hiragino Sans`, `PingFang SC`, `PingFang TC`) so transcripts
+  mixing Latin and Korean / Japanese / Chinese glyphs don't jump
+  baseline and x-height between the Inter family and whichever
+  family Webkit happens to guess for CJK characters.
+- **HUD cancel / confirm aria-labels + `document.lang` now track UI
+  locale.** Previously the HUD announced "취소" / "확정" to VoiceOver
+  regardless of the user's chosen language. `ARIA_LABELS` in hud.js
+  re-labels both buttons on every `hud-context` event across ko / en
+  / ja / zh-CN.
+- **Engine cards expose `aria-pressed`** so VoiceOver announces
+  which engine is currently selected. The selected-state checkmark
+  glyph is aria-hidden, so without this attribute screen readers
+  only heard "button" with no state context.
+- **Tray status chip's error label is localized**
+  (`STATE_LABELS.error` per locale) instead of the English "Error"
+  literal that previously slipped through under ko/ja/zh-CN.
+- **Four localized error keys** (`error.pasteHelperMissing`,
+  `error.invalidModelName`, `error.ollamaPullStatus`,
+  `error.ollamaDeleteStatus`) replace raw English `new Error(...)`
+  strings that used to surface in Korean/Japanese/Chinese toasts.
+- **`translate-helper --max-tokens` is now actually wired into
+  `GenerateParameters(maxTokens:)`.** The CLI flag was parsed into a
+  local that was never passed to MLX — translation silently used the
+  runtime default regardless of what the caller requested.
+- **Project layout section in README.ja.md and README.zh-CN.md** to
+  match the English and Korean versions.
+- **New `toast.hotkeyDead` string** for when the fn-listener
+  auto-restart backoff gives up.
+
 ## [0.7.8] — 2026-04-23
 
 ### Fixed
