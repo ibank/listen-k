@@ -109,6 +109,28 @@ bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_626M
 ```
 应用会自动选择 `models/whisperkit/` 下质量优先级最高的模型。
 
+## 项目结构
+
+```
+main.js                         Electron 主进程: IPC, 状态, 托盘, 辅助进程生命周期
+preload*.js                     contextIsolation 桥接 (main / HUD / tray)
+index.html + renderer.js        仪表板 (状态、设置、统计、历史)
+hud.html + hud.js               悬浮 HUD (波形 / 实时文本 / ✕ / ✓)
+tray.html + tray.js             菜单栏弹出窗口
+i18n.js                         4 语言字典 (ko/en/ja/zh-CN) + t(key, params)
+styles.css / hud.css / tray.css 设计系统
+
+native/fn-listener.swift        CGEventTap (双击修饰键 / fn)
+native/paste-helper.swift       辅助功能检查 + CGEventPost ⌘V
+native/focus-helper.swift       NSWorkspace 前台应用保存/恢复
+native/transcribe-helper/       WhisperKit AudioStreamTranscriber Swift 包
+native/translate-helper/        基于 MLX 的翻译 Swift 包 (实验性)
+
+scripts/build-*.sh              Swift 辅助进程构建
+scripts/smoke.sh                检查二进制存在 + 流启动验证
+scripts/after-pack.js           electron-builder afterPack (临时签名或 Developer ID)
+```
+
 ## 故障排除
 
 - **HUD 出现但没有文字**: 在终端用 `npm start` 启动并查看 `[audio] buf=` 日志。如果 buf 始终为 0,说明缺少麦克风权限。

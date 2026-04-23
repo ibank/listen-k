@@ -109,6 +109,28 @@ bash scripts/download-whisperkit-model.sh openai_whisper-large-v3-v20240930_626M
 ```
 `models/whisperkit/` 以下のフォルダから品質優先順位順に自動選択されます。
 
+## プロジェクト構成
+
+```
+main.js                         Electron メイン: IPC, 状態, トレイ, ヘルパー管理
+preload*.js                     contextIsolation ブリッジ (main / HUD / tray)
+index.html + renderer.js        ダッシュボード (ステータス, 設定, 統計, 履歴)
+hud.html + hud.js               フローティング HUD (波形 / ライブテキスト / ✕ / ✓)
+tray.html + tray.js             メニューバー ポップオーバー
+i18n.js                         4ロケール辞書 (ko/en/ja/zh-CN) + t(key, params)
+styles.css / hud.css / tray.css デザインシステム
+
+native/fn-listener.swift        CGEventTap (修飾キー二重タップ / fn)
+native/paste-helper.swift       アクセシビリティ確認 + CGEventPost ⌘V
+native/focus-helper.swift       NSWorkspace フロントモストの保存/復元
+native/transcribe-helper/       WhisperKit AudioStreamTranscriber Swift パッケージ
+native/translate-helper/        MLX ベース翻訳 Swift パッケージ (実験的)
+
+scripts/build-*.sh              Swift ヘルパーのビルド
+scripts/smoke.sh                バイナリ存在確認 + ストリーム起動チェック
+scripts/after-pack.js           electron-builder afterPack (アドホック or Developer ID)
+```
+
 ## トラブルシューティング
 
 - **HUD が出るがテキストが表示されない**: ターミナルで `npm start` を実行し `[audio] buf=` ログを確認。buf が 0 のままならマイク権限が不足。

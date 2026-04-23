@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+# translate-helper — experimental MLX-Swift + Gemma 3 batch translator.
+#
+# Status (2026-04): wired up as a CLI and buildable, but *not yet* called
+# from main.js / renderer.js. Kept in the tree as a placeholder for the
+# Meetings feature (see ops/meeting-feature-design.md) which plans to
+# use it for real-time transcript translation. The npm `dist` config
+# explicitly excludes this binary from the packaged DMG via
+# `extraResources[].filter: ["!translate-helper"]` so end-users don't
+# pay for ~600 MB of MLX runtime in a feature that isn't shipped yet.
+# Run this script locally when hacking on the Meetings branch.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

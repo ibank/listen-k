@@ -193,6 +193,10 @@ async function stopRecognition() {
     } else {
       setStatus(t('status.noSpeech'), 'error');
       window.listenk?.setState?.({ recording: false, processing: false });
+      // Matches the onStreamError pattern: auto-clear so a one-off
+      // empty recording doesn't leave a red chip for the rest of the
+      // session.
+      setTimeout(() => setStatusIdleOrReady(), 2500);
     }
   } catch (err) {
     console.error('transcribe failed', err);
@@ -200,6 +204,7 @@ async function stopRecognition() {
     showRecent();
     cleanEl.textContent = err.message;
     window.listenk?.setState?.({ recording: false, processing: false });
+    setTimeout(() => setStatusIdleOrReady(), 2500);
   } finally {
     if (audioContext) {
       try { await audioContext.close(); } catch {}
@@ -315,37 +320,45 @@ function cleanupWithRules(text) {
 }
 
 async function finalizePaste(cleanedText) {
-  cleanEl.textContent = cleanedText;
-  setStatus(t('status.pasting'));
   let pasted = true;
   try {
-    if (cleanedText && window.listenk?.paste) {
-      await window.listenk.paste(cleanedText);
-    }
-    setStatus(t('status.done'), 'ok');
-  } catch (pasteErr) {
-    pasted = false;
-    setStatus(t('status.pasteFail', { message: pasteErr.message }), 'error');
-  }
-
-  if (cleanedText) {
+    cleanEl.textContent = cleanedText;
+    setStatus(t('status.pasting'));
     try {
-      await window.listenk?.historyAppend?.({
-        at: new Date().toISOString(),
-        raw: (finalTranscript || '').trim(),
-        clean: cleanedText,
-        mode: modeSel?.value || 'off',
-        language: langSel?.value || 'ko-KR',
-        pasted,
-      });
-      refreshHistory();
-    } catch {}
-  }
+      if (cleanedText && window.listenk?.paste) {
+        await window.listenk.paste(cleanedText);
+      }
+      setStatus(t('status.done'), 'ok');
+    } catch (pasteErr) {
+      pasted = false;
+      setStatus(t('status.pasteFail', { message: pasteErr.message }), 'error');
+    }
 
-  // Flash the HUD's "done" state for a beat on success; cancel/error paths
-  // just hide via setState without the green checkmark.
-  window.listenk?.setState?.({ recording: false, processing: false, pasted });
-  setTimeout(() => setStatusIdleOrReady(), 1500);
+    if (cleanedText) {
+      try {
+        await window.listenk?.historyAppend?.({
+          at: new Date().toISOString(),
+          raw: (finalTranscript || '').trim(),
+          clean: cleanedText,
+          mode: modeSel?.value || 'off',
+          language: langSel?.value || 'ko-KR',
+          pasted,
+        });
+        // The append we just made is not yet visible through the 2 s
+        // shared-history cache — force-invalidate so the UI picks it up
+        // on the immediate refresh below.
+        historyFetchCache = { data: null, at: 0 };
+        refreshHistory();
+      } catch {}
+    }
+  } finally {
+    // Always tell main we're done so the HUD can't get stuck in the
+    // "processing" spinner if anything above throws unexpectedly (DOM
+    // torn down mid-paste, setStatus failing, etc.). Flash the green
+    // checkmark on success; cancel/error paths just hide.
+    window.listenk?.setState?.({ recording: false, processing: false, pasted });
+    setTimeout(() => setStatusIdleOrReady(), 1500);
+  }
 }
 
 async function postProcessAndPaste(raw) {
@@ -569,6 +582,7 @@ async function cleanupWithOllama(raw, opts = {}) {
     cleanEl.textContent = t('error.ollamaHint', { message: err.message, model });
     setStatus(t('status.ollamaError'), 'error');
     window.listenk?.setState?.({ recording: false, processing: false });
+    setTimeout(() => setStatusIdleOrReady(), 2500);
   }
 }
 
@@ -1041,6 +1055,38 @@ async function refresh() {
 const historyListEl = $('historyList');
 const historyClearBtn = $('historyClearBtn');
 
+// Short-lived cache around the history IPC. Before this, a single 4 s
+// refresh tick would fire historyList(200) + historyList(500) +
+// historyList(1000) in parallel — three separate IPCs that each
+// serialise the JSONL back to the renderer. All three callers want the
+// same underlying data capped at different limits, so serve them from a
+// single in-flight fetch + 2 s cached result.
+let historyFetchCache = { data: null, at: 0 };
+let historyFetchInFlight = null;
+async function fetchHistoryShared(limit) {
+  const CACHE_MS = 2000;
+  const wantedMax = Math.max(limit || 50, 1000);
+  const fresh = Date.now() - historyFetchCache.at < CACHE_MS;
+  if (fresh && historyFetchCache.data) {
+    return historyFetchCache.data.slice(0, limit);
+  }
+  if (!historyFetchInFlight) {
+    historyFetchInFlight = (async () => {
+      try {
+        const data = await window.listenk.historyList(wantedMax);
+        historyFetchCache = { data: data || [], at: Date.now() };
+      } catch (err) {
+        historyFetchCache = { data: [], at: Date.now() };
+        throw err;
+      } finally {
+        historyFetchInFlight = null;
+      }
+    })();
+  }
+  await historyFetchInFlight;
+  return (historyFetchCache.data || []).slice(0, limit);
+}
+
 function formatHistoryTimestamp(iso) {
   try {
     const d = new Date(iso);
@@ -1183,7 +1229,7 @@ function renderHistoryList() {
 async function refreshHistory() {
   if (!historyListEl) return;
   try {
-    historyCache = await window.listenk.historyList(200);
+    historyCache = await fetchHistoryShared(200);
     renderHistoryList();
   } catch (err) {
     console.warn('[history] refresh failed', err);
@@ -1193,6 +1239,7 @@ async function refreshHistory() {
 historyClearBtn?.addEventListener('click', async () => {
   if (!confirm(t('page.history.confirmClear'))) return;
   await window.listenk.historyClear();
+  historyFetchCache = { data: null, at: 0 };
   refreshHistory();
   toast(t('toast.historyCleared'));
 });
@@ -1402,7 +1449,7 @@ async function refreshStatsCharts() {
   if (!statsBarChartEl && !statsDonutEl && !statsKpiTilesEl) return;
   let payload, history = [];
   try { payload = await window.listenk?.statsGet?.(); } catch {}
-  try { history = await window.listenk?.historyList?.(500) || []; } catch {}
+  try { history = await fetchHistoryShared(500); } catch {}
   const stats = payload?.stats;
   if (!stats) return;
 
@@ -1905,7 +1952,7 @@ const navCountHistoryEl = $('navCountHistory');
 async function refreshNavCounts() {
   if (!navCountHistoryEl || !window.listenk?.historyList) return;
   try {
-    const entries = await window.listenk.historyList(1000);
+    const entries = await fetchHistoryShared(1000);
     const n = entries?.length || 0;
     if (n > 0) {
       navCountHistoryEl.textContent = fmtNum(n);
@@ -2460,18 +2507,25 @@ translateTargetSel?.addEventListener('change', async () => {
   toast(t('toast.translateTarget', { label: translateTargetSel.options[translateTargetSel.selectedIndex].textContent }));
 });
 
+// Tracks the last *accepted* engine value so a rejected change (main
+// returns {busy}) can roll the select back to a known-good value
+// instead of pinning it to the rejected selection.
+let lastAcceptedEngine = engineSel?.value || '';
 engineSel?.addEventListener('change', async () => {
   if (!settingsReady) return;
   const engine = engineSel.value;
   const res = await api.setEngine?.(engine);
-  // Main rejects the switch when a recording is live. Roll the UI back
-  // so the user doesn't see a card marked active that isn't really active.
   if (res && res.ok === false && res.reason === 'busy') {
-    engineSel.value = res.engine || engine;
+    // IMPORTANT: fall back to lastAcceptedEngine (pre-change value),
+    // not engine (the rejected one) — without this the UI stays stuck
+    // on the rejected selection whenever main can't tell us what the
+    // real engine is.
+    engineSel.value = res.engine || lastAcceptedEngine || engine;
     renderEngineCards(engineSel.value);
     toast(t('toast.engineBusy'));
     return;
   }
+  lastAcceptedEngine = engine;
   applyEngineVisibility(engine);
   renderEngineCards(engine);
   updateEngineChip(engine);
@@ -2551,10 +2605,16 @@ function renderEngineCards(selectedEngine) {
   );
   for (const spec of cards) {
     const card = document.createElement('div');
-    card.className = 'engine-card' + (selectedEngine === spec.id ? ' selected' : '');
+    const isSelected = selectedEngine === spec.id;
+    card.className = 'engine-card' + (isSelected ? ' selected' : '');
     card.setAttribute('data-engine', spec.id);
     card.setAttribute('role', 'button');
     card.setAttribute('tabindex', '0');
+    // Screen readers otherwise only see "button" — the checkmark glyph
+    // is aria-hidden. aria-pressed turns each card into a toggle-style
+    // button so VoiceOver announces whether this engine is currently
+    // active.
+    card.setAttribute('aria-pressed', String(isSelected));
     card.innerHTML = `
       <div class="top">
         <span class="name"></span>

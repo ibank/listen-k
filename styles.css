@@ -64,8 +64,15 @@
 
   --sidebar-w: 228px;
 
-  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
-  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  /* CJK fallbacks at the end so transcripts with Korean / Japanese /
+     Chinese characters fall through to the OS script-specific family
+     (matching x-height/baseline) instead of whatever Webkit happens to
+     guess. Inter has no CJK glyphs, so the order of fallbacks here is
+     the only signal the renderer has. */
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue',
+    'Apple SD Gothic Neo', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'PingFang SC', 'PingFang TC', sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+    'Apple SD Gothic Neo', 'Hiragino Sans', 'PingFang SC', 'PingFang TC', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
 
   /* Recording accent (distinct from the general blue accent so the titlebar

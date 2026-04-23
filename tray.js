@@ -9,10 +9,10 @@ const api = window.listenkTray;
 if (!api) console.warn('[tray] listenkTray bridge missing');
 
 const STATE_LABELS = {
-  ko: { idle: '대기', recording: '녹음 중', processing: '처리 중', ready: '준비됨' },
-  en: { idle: 'Idle', recording: 'Recording', processing: 'Processing', ready: 'Ready' },
-  ja: { idle: '待機', recording: '録音中', processing: '処理中', ready: '準備完了' },
-  'zh-CN': { idle: '待机', recording: '录音中', processing: '处理中', ready: '就绪' },
+  ko: { idle: '대기', recording: '녹음 중', processing: '처리 중', ready: '준비됨', error: '오류' },
+  en: { idle: 'Idle', recording: 'Recording', processing: 'Processing', ready: 'Ready', error: 'Error' },
+  ja: { idle: '待機', recording: '録音中', processing: '処理中', ready: '準備完了', error: 'エラー' },
+  'zh-CN': { idle: '待机', recording: '录音中', processing: '处理中', ready: '就绪', error: '错误' },
 };
 const L10N = {
   ko: {
@@ -69,7 +69,7 @@ function setStatus(kind /* 'idle' | 'rec' | 'processing' | 'ready' | 'error' */)
   if (kind === 'rec')        { label = labels.recording; data = 'rec'; }
   else if (kind === 'processing') { label = labels.processing; data = ''; }
   else if (kind === 'ready') { label = labels.ready; data = 'ok'; }
-  else if (kind === 'error') { label = 'Error';     data = 'error'; }
+  else if (kind === 'error') { label = labels.error; data = 'error'; }
   if (data) chip.setAttribute('data-kind', data);
   else chip.removeAttribute('data-kind');
   textEl.textContent = label;

@@ -15,6 +15,16 @@ const DONE_MSG = {
   ja: '貼り付けました',
   'zh-CN': '已粘贴',
 };
+// Per-locale aria-labels for the HUD's cancel / confirm buttons.
+// The HTML ships with Korean placeholders; we rewrite them on the first
+// hud-context event so a VoiceOver user on an English (or JA/ZH) system
+// doesn't hear "취소" / "확정" read aloud.
+const ARIA_LABELS = {
+  ko: { cancel: '취소', confirm: '확정' },
+  en: { cancel: 'Cancel', confirm: 'Confirm' },
+  ja: { cancel: 'キャンセル', confirm: '確定' },
+  'zh-CN': { cancel: '取消', confirm: '确认' },
+};
 let hudLocale = 'en';
 function resolveLocale(loc) {
   if (DONE_MSG[loc]) return loc;
@@ -23,6 +33,14 @@ function resolveLocale(loc) {
   return 'en';
 }
 function doneText() { return DONE_MSG[hudLocale] || DONE_MSG.en; }
+function applyAriaLabels() {
+  const L = ARIA_LABELS[hudLocale] || ARIA_LABELS.en;
+  if (cancelBtn) cancelBtn.setAttribute('aria-label', L.cancel);
+  if (confirmBtn) confirmBtn.setAttribute('aria-label', L.confirm);
+  // Keep <html lang> in sync too so font fallback + screen readers pick
+  // the right voice/script.
+  document.documentElement.setAttribute('lang', hudLocale);
+}
 
 cancelBtn.addEventListener('click', () => {
   api?.cancel?.();
@@ -33,18 +51,25 @@ confirmBtn.addEventListener('click', () => {
 });
 
 api?.onState?.((state) => {
-  if (state === 'recording' || state === 'processing' || state === 'done') {
-    pill.dataset.state = state;
-    if (state === 'recording') {
-      if (liveTextBody) liveTextBody.textContent = '';
-      pill.dataset.hasText = 'false';
-    }
-    if (state === 'done') {
-      // Show the success line in place of live text. hasText=true makes
-      // the live-text element visible; CSS paints it green + prepends ✓.
-      if (liveTextBody) liveTextBody.textContent = doneText();
-      pill.dataset.hasText = 'true';
-    }
+  // Accept the four active states we paint. Anything else (including an
+  // empty string or a typo introduced in a future refactor) falls into
+  // the 'idle' branch so the HUD can't end up frozen on a stale state
+  // the way it used to when main sent a value we didn't recognise.
+  const known = new Set(['recording', 'processing', 'done', 'idle', 'error']);
+  const effective = known.has(state) ? state : 'idle';
+  pill.dataset.state = effective;
+
+  if (effective === 'recording' || effective === 'idle' || effective === 'error') {
+    // Whatever partial was on screen is no longer relevant — clear it
+    // so the next recording starts from a blank pill.
+    if (liveTextBody) liveTextBody.textContent = '';
+    pill.dataset.hasText = 'false';
+  }
+  if (effective === 'done') {
+    // Show the success line in place of live text. hasText=true makes
+    // the live-text element visible; CSS paints it green + prepends ✓.
+    if (liveTextBody) liveTextBody.textContent = doneText();
+    pill.dataset.hasText = 'true';
   }
 });
 
@@ -74,7 +99,10 @@ api?.onReset?.(() => {
 const hudContextEl = document.getElementById('hudContext');
 api?.onContext?.((ctx) => {
   if (!hudContextEl || !ctx) return;
-  if (ctx.locale) hudLocale = resolveLocale(ctx.locale);
+  if (ctx.locale) {
+    hudLocale = resolveLocale(ctx.locale);
+    applyAriaLabels();
+  }
   const text = ctx.engineLabel
     ? (ctx.modeLabel ? `${ctx.engineLabel} · ${ctx.modeLabel}` : ctx.engineLabel)
     : '';

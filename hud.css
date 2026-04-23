@@ -4,7 +4,8 @@ html, body {
   background: transparent;
   overflow: hidden;
   -webkit-user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'Apple SD Gothic Neo', 'Hiragino Sans', 'PingFang SC', 'PingFang TC', sans-serif;
 }
 
 body {
