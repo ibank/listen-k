@@ -12,6 +12,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.4] — 2026-04-23
+
+### Fixed
+- **"Restart & install" button now actually restarts.** The banner
+  introduced in v0.7.1 called `autoUpdater.quitAndInstall()`, which
+  dispatches `app.quit()` internally. Our close handler
+  (`main.js:146`) prevents window close unless `app.isQuitting` is
+  already set — a convention the tray Quit handler follows
+  (`app.isQuitting = true; app.quit()`) but `quitAndInstall` does
+  not. The result: the window vanished, the app kept running the
+  OLD version in the tray, and reopening the dashboard showed the
+  button frozen on "Restarting…" with the old build still active.
+  The only way out was to quit manually via the tray.
+  - `install-update-now` now flips `app.isQuitting = true` before
+    invoking `quitAndInstall`, matching the tray Quit pattern.
+  - Client-side safety: if the quit somehow doesn't happen within
+    5 seconds, the banner button restores itself and a toast
+    points the user at the tray-menu Quit recovery path, so the
+    button can never be permanently stuck.
+  - i18n `banner.update.installStuck` added across all four locales.
+
 ## [0.7.3] — 2026-04-23
 
 ### Added
@@ -631,7 +652,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.4...HEAD
+[0.7.4]: https://github.com/ibank/listen-k/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/ibank/listen-k/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/ibank/listen-k/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/ibank/listen-k/compare/v0.7.0...v0.7.1
