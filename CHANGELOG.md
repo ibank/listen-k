@@ -12,6 +12,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.8] — 2026-04-23
+
+### Fixed
+- **First-launch "Listen K wants to receive keystrokes" dialog
+  finally actually disappears.** The v0.7.5 and v0.7.6 attempts
+  were working from a wrong assumption about *where* macOS gates
+  CGEvent.tapCreate. After verifying against current docs and
+  community-confirmed behaviour: the TCC service is picked by the
+  `options` flag, not the tap location. `.listenOnly` →
+  `kTCCServiceListenEvent` (Input Monitoring); `.defaultTap` →
+  `kTCCServicePostEvent` (Accessibility). Moving to
+  `.cgSessionEventTap` in v0.7.6 had no effect because the kernel
+  doesn't care about tap location for this decision. fn-listener
+  now creates its tap with `.defaultTap`, which funnels us through
+  the same TCC service paste-helper already requires. The callback
+  continues to return events unchanged, so nothing about event
+  flow changes — we're just asking macOS for a slot where we
+  *could* filter and choosing not to. Net effect for end users:
+  one first-launch Accessibility disclosure (tied to a visible
+  action — the first paste) instead of a mysterious startup
+  Input Monitoring prompt on top of it.
+
 ## [0.7.7] — 2026-04-23
 
 ### Fixed
