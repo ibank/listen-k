@@ -38,25 +38,64 @@ function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
 }
 
-function loadConfig() {
+// Durable write-through-rename: write temp, fsync the file, rename over the
+// target, then fsync the parent dir. Without this, a hard crash or power
+// loss between writeFileSync and the disk flush can leave the rename'd
+// inode visible but with zero bytes — turning config.json into "{}" and
+// losing the user's encrypted OpenAI key, engine, and hotkey.
+function atomicWriteFileSync(p, data) {
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  const tmp = `${p}.tmp.${process.pid}`;
+  const fd = fs.openSync(tmp, 'w');
   try {
-    return JSON.parse(fs.readFileSync(configPath(), 'utf8'));
-  } catch {
-    return {};
+    fs.writeSync(fd, data);
+    fs.fsyncSync(fd);
+  } finally {
+    try { fs.closeSync(fd); } catch {}
   }
+  fs.renameSync(tmp, p);
+  let dirFd = -1;
+  try {
+    dirFd = fs.openSync(path.dirname(p), 'r');
+    fs.fsyncSync(dirFd);
+  } catch {
+    // Some filesystems reject directory fsync — the file-level fsync still
+    // covers the data-corruption case, so swallow and continue.
+  } finally {
+    if (dirFd >= 0) { try { fs.closeSync(dirFd); } catch {} }
+  }
+}
+
+// Cached JSON string, not the parsed object, so every loadConfig()
+// still hands back a fresh object callers are free to mutate without
+// polluting the cache. The expensive part we want to avoid is the
+// synchronous disk read — every HUD state push + tray snapshot +
+// hotkey callback used to readFileSync, which on a spinning session
+// was ~30 reads/sec on the main thread.
+let configRawCache = null;
+function loadConfig() {
+  if (configRawCache === null) {
+    try {
+      configRawCache = fs.readFileSync(configPath(), 'utf8');
+    } catch {
+      configRawCache = '{}';
+    }
+  }
+  try { return JSON.parse(configRawCache); }
+  catch { return {}; }
 }
 
 function saveConfig(cfg) {
   const p = configPath();
+  const serialized = JSON.stringify(cfg, null, 2);
   try {
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    // Atomic write: write to temp, then rename. Guards against corruption
-    // if the process dies mid-write.
-    const tmp = p + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2));
-    fs.renameSync(tmp, p);
+    atomicWriteFileSync(p, serialized);
+    configRawCache = serialized;
   } catch (err) {
     console.warn('[config] save failed:', err.message);
+    // Write failed — force a re-read on next access so we don't hand
+    // out the would-be-new state that never hit disk.
+    configRawCache = null;
   }
 }
 
@@ -166,6 +205,24 @@ function safeSend(win, channel, ...args) {
   } catch (err) {
     console.warn(`[ipc] send ${channel} failed:`, err.message);
   }
+}
+
+// Defence-in-depth on the IPC surface. Every legitimate ipcMain.handle
+// call should come from one of our three renderers (main / HUD / tray).
+// A message from any other webContents (e.g. a rogue <webview>, a dev-
+// tools extension, or a yet-to-be-discovered injection vector) means
+// the bridge has been reached from somewhere we didn't intend — refuse
+// to honour it. Applied to high-blast-radius handlers (paste-text,
+// tray-cmd, transcribe, install-update-now) where a stolen call could
+// type into the frontmost app, trigger an update, or transcribe audio
+// silently.
+function isTrustedSender(event) {
+  const wc = event && event.sender;
+  if (!wc) return false;
+  if (mainWindow && !mainWindow.isDestroyed() && wc === mainWindow.webContents) return true;
+  if (hudWindow && !hudWindow.isDestroyed() && wc === hudWindow.webContents) return true;
+  if (trayWindow && !trayWindow.isDestroyed() && wc === trayWindow.webContents) return true;
+  return false;
 }
 
 // The pill itself is constrained by CSS (min 240 px / max 680 px with
@@ -477,7 +534,8 @@ function toggleTrayWindow() {
   setTimeout(() => sendTraySnapshot(), 30);
 }
 
-ipcMain.handle('tray-cmd', (_e, payload) => {
+ipcMain.handle('tray-cmd', (event, payload) => {
+  if (!isTrustedSender(event)) return { ok: false, reason: 'untrusted' };
   const cmd = payload && payload.cmd;
   if (trayWindow) trayWindow.hide();
   switch (cmd) {
@@ -530,7 +588,7 @@ async function pasteToFrontmost(text) {
   // it posts the ⌘V event. focus-helper has already restored the correct
   // frontmost by the time we get here, so the flag was pure noise.
   const paste = resPath('bin', 'paste-helper');
-  if (!fs.existsSync(paste)) throw new Error('paste-helper missing');
+  if (!fs.existsSync(paste)) throw new Error(tr('error.pasteHelperMissing'));
   clipboard.writeText(text);
   // Give the user's target app a beat to regain focus after the popover
   // hides, then fire ⌘V via the helper.
@@ -732,9 +790,7 @@ function appendHistory(entry) {
     if (stats.size > 2 * 1024 * 1024) {
       const lines = fs.readFileSync(p, 'utf8').split('\n').filter(Boolean);
       const trimmed = lines.slice(-HISTORY_MAX).join('\n') + '\n';
-      const tmp = p + '.tmp';
-      fs.writeFileSync(tmp, trimmed);
-      fs.renameSync(tmp, p);
+      atomicWriteFileSync(p, trimmed);
     }
   } catch (err) {
     console.warn('[history] append failed:', err.message);
@@ -816,10 +872,7 @@ function loadStats() {
 function saveStats(stats) {
   const p = statsPath();
   try {
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    const tmp = p + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(stats, null, 2));
-    fs.renameSync(tmp, p);
+    atomicWriteFileSync(p, JSON.stringify(stats, null, 2));
   } catch (err) {
     console.warn('[stats] save failed:', err.message);
   }
@@ -929,7 +982,25 @@ function cancelHudSafetyHide() {
   if (hudSafetyTimer) { clearTimeout(hudSafetyTimer); hudSafetyTimer = null; }
 }
 
+// Re-entry guard. The streaming-path branches below await
+// getFrontmostBundleId() before flipping isRecording, and rshift-double
+// users reflexively double-tap their hotkey "to make sure it fired" —
+// without this, the second tap lands inside the same unflipped window,
+// overwrites savedFrontmostBundleId with whatever's frontmost now (which
+// may be Listen K itself), and pastes into the wrong app.
+let inFlightFnPress = false;
+
 async function handleFnPress() {
+  if (inFlightFnPress) return;
+  inFlightFnPress = true;
+  try {
+    await handleFnPressInner();
+  } finally {
+    inFlightFnPress = false;
+  }
+}
+
+async function handleFnPressInner() {
   // During onboarding step 3 we're just confirming the user's hotkey
   // works — no actual recording should start. Emit a dedicated event to
   // the renderer so the overlay can show "✓ detected".
@@ -1010,6 +1081,24 @@ async function handleFnPress() {
   updateTrayMenu();
 }
 
+let fnListenerRestarts = 0;
+const MAX_FN_LISTENER_RESTARTS = 5;
+
+function scheduleFnListenerRestart(reason) {
+  if (app.isQuitting) return;
+  if (fnListenerRestarts >= MAX_FN_LISTENER_RESTARTS) {
+    console.error(`[fn-listener] max restarts reached (${reason}), giving up`);
+    if (mainWindow) {
+      safeSend(mainWindow, 'toast', tr('toast.hotkeyDead'));
+    }
+    return;
+  }
+  const backoff = 1000 * Math.pow(2, fnListenerRestarts);
+  fnListenerRestarts++;
+  console.log(`[fn-listener] restarting in ${backoff}ms (attempt ${fnListenerRestarts}/${MAX_FN_LISTENER_RESTARTS}) — ${reason}`);
+  setTimeout(startFnListener, backoff);
+}
+
 function startFnListener() {
   const helperPath = resPath('bin', 'fn-listener');
   const mode = currentHotkey();
@@ -1022,7 +1111,15 @@ function startFnListener() {
   fnListener = spawn(helperPath, [mode], { stdio: ['ignore', 'pipe', 'pipe'] });
 
   fnListener.on('spawn', () => console.log('[fn-listener] spawned, pid=', fnListener.pid));
-  fnListener.on('error', (err) => console.error('[fn-listener] spawn error:', err));
+  fnListener.on('error', (err) => {
+    // A spawn-time error (exec bit stripped, quarantine xattr, missing
+    // framework) otherwise leaves fnListener as a half-dead object that
+    // no longer delivers FN_DOWN — the user loses their hotkey silently
+    // until next reboot. Schedule a restart with backoff.
+    console.error('[fn-listener] spawn error:', err);
+    fnListener = null;
+    scheduleFnListenerRestart(`spawn error: ${err && err.message}`);
+  });
 
   let buf = '';
   fnListener.stdout.on('data', (chunk) => {
@@ -1036,7 +1133,10 @@ function startFnListener() {
         handleFnPress();
       } else if (t.startsWith('READY')) {
         // fn-listener emits `READY mode=<hotkey>` — match the prefix.
+        // A successful boot resets the restart counter so intermittent
+        // crashes over a long session don't accumulate toward the cap.
         console.log('[fn-listener] READY');
+        fnListenerRestarts = 0;
       } else if (t) {
         console.log('[fn-listener] stdout:', t);
       }
@@ -1050,6 +1150,13 @@ function startFnListener() {
   fnListener.on('exit', (code, signal) => {
     console.error('[fn-listener] exited code=', code, 'signal=', signal);
     fnListener = null;
+    // SIGTERM = we asked for it (restartFnListener / will-quit). Any
+    // other exit is unexpected — try to recover so the hotkey doesn't
+    // go silently dead mid-session (common trigger: user revoking
+    // Accessibility, the CGEventTap gets invalidated, the helper
+    // aborts).
+    if (signal === 'SIGTERM') return;
+    scheduleFnListenerRestart(`exit code=${code} signal=${signal}`);
   });
 }
 
@@ -1058,6 +1165,9 @@ function restartFnListener() {
     try { fnListener.kill('SIGTERM'); } catch {}
     fnListener = null;
   }
+  // Explicit user-initiated restart (hotkey mode change) — clear the
+  // backoff counter so a prior failure streak doesn't delay this boot.
+  fnListenerRestarts = 0;
   startFnListener();
 }
 
@@ -1101,11 +1211,12 @@ function startTranscribeStream() {
 
   console.log(`[stream] spawning ${engine} engine:`, helper, args.join(' '));
   transcribeStreamBuffer = '';
-  transcribeStream = spawn(helper, args, {
+  const child = spawn(helper, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+  transcribeStream = child;
 
-  transcribeStream.stdout.on('data', (chunk) => {
+  child.stdout.on('data', (chunk) => {
     transcribeStreamBuffer += chunk.toString();
     const lines = transcribeStreamBuffer.split('\n');
     transcribeStreamBuffer = lines.pop();
@@ -1118,18 +1229,26 @@ function startTranscribeStream() {
     }
   });
 
-  transcribeStream.stderr.on('data', (data) => {
+  child.stderr.on('data', (data) => {
     console.error('[stream stderr]', data.toString().trim());
   });
 
-  transcribeStream.on('exit', (code, signal) => {
+  child.on('exit', (code, signal) => {
     console.error('[stream] helper exited', code, signal);
-    transcribeStream = null;
-    transcribeStreamReady = false;
+
+    // If respawnStream()/autoFallbackFromAppleOnCrash() tore us down to
+    // bring a different helper up, or a newer helper already replaced us
+    // in the module slot, stay quiet: don't null out the successor, don't
+    // schedule a competing restart.
+    const superseded = child.__superseded || transcribeStream !== child;
+    if (!superseded) {
+      transcribeStream = null;
+      transcribeStreamReady = false;
+    }
 
     // Release any UI state that assumed the helper was alive, so the HUD
     // doesn't sit spinning after a crash.
-    const wasActive = isRecording || isProcessing;
+    const wasActive = !superseded && (isRecording || isProcessing);
     if (wasActive) {
       isRecording = false;
       isProcessing = false;
@@ -1141,7 +1260,8 @@ function startTranscribeStream() {
     }
 
     // Clean exit (code 0 or SIGTERM from will-quit) → don't resurrect.
-    if (code === 0 || signal === 'SIGTERM') return;
+    // Likewise if we've been superseded, the replacement is already on its way.
+    if (superseded || code === 0 || signal === 'SIGTERM') return;
 
     if (transcribeStreamRestarts >= MAX_STREAM_RESTARTS) {
       console.error('[stream] max restarts reached, giving up');
@@ -1160,7 +1280,7 @@ function startTranscribeStream() {
     setTimeout(startTranscribeStream, backoff);
   });
 
-  transcribeStream.on('spawn', () => {
+  child.on('spawn', () => {
     // Successful spawn → reset backoff counter after the helper reports
     // ready (done in handleStreamEvent for correctness).
   });
@@ -1218,7 +1338,16 @@ function handleStreamEvent(event) {
     case 'stopped':
       break;
     case 'error':
-      console.error('[stream] error:', event.message);
+      // Truncate to 200 chars when logging: helpers are *supposed* to
+      // emit short diagnostic strings here, but nothing in the schema
+      // prevents a future variant from dropping partial user speech
+      // into the message field. Packaged builds log to a persistent
+      // console file, so a short prefix is the conservative default.
+      {
+        const msg = event.message || '';
+        const snippet = msg.length > 200 ? `${msg.slice(0, 200)}…(+${msg.length - 200})` : msg;
+        console.error('[stream] error:', snippet);
+      }
       if (mainWindow) safeSend(mainWindow,'stream-error', event.message || '');
       if (!isRecording) {
         isProcessing = false;
@@ -1270,6 +1399,19 @@ function checkOllama() {
   });
 }
 
+// Allow-list for Ollama model references accepted from the renderer.
+// Ollama's own registry rules permit [namespace/]name[:tag] where each
+// segment is alnum + `.`, `_`, `-`. Rejecting anything outside that
+// shape closes a class of abuses where a compromised renderer pushes
+// arbitrary paths into the local Ollama daemon (e.g. `../` tricks,
+// whitespace, or long attacker-controlled strings).
+const OLLAMA_NAME_RE = /^[a-zA-Z0-9._-]+(\/[a-zA-Z0-9._-]+)?(:[a-zA-Z0-9._-]+)?$/;
+function isValidOllamaName(name) {
+  if (typeof name !== 'string') return false;
+  if (name.length === 0 || name.length > 200) return false;
+  return OLLAMA_NAME_RE.test(name);
+}
+
 // Full list with size/modified timestamp — used by the model-manager
 // page so we can render disk usage and "last used" hints.
 async function ollamaListDetailed() {
@@ -1295,7 +1437,7 @@ async function ollamaListDetailed() {
 // Ollama's JSON lines: { status, completed, total }.
 const activeOllamaPulls = new Map(); // name → AbortController
 async function ollamaPullModel(name, onProgress) {
-  if (!name) throw new Error('name required');
+  if (!isValidOllamaName(name)) throw new Error(tr('error.invalidModelName'));
   const controller = new AbortController();
   activeOllamaPulls.set(name, controller);
   let res;
@@ -1312,7 +1454,7 @@ async function ollamaPullModel(name, onProgress) {
   }
   if (!res.ok) {
     activeOllamaPulls.delete(name);
-    throw new Error(`ollama pull ${res.status}`);
+    throw new Error(tr('error.ollamaPullStatus', { status: res.status }));
   }
   const reader = res.body.getReader();
   const dec = new TextDecoder();
@@ -1340,6 +1482,7 @@ async function ollamaPullModel(name, onProgress) {
 }
 
 async function ollamaDeleteModel(name) {
+  if (!isValidOllamaName(name)) throw new Error(tr('error.invalidModelName'));
   const res = await fetch('http://localhost:11434/api/delete', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
@@ -1347,7 +1490,7 @@ async function ollamaDeleteModel(name) {
   });
   if (!res.ok && res.status !== 404) {
     const txt = await res.text().catch(() => '');
-    throw new Error(`ollama delete ${res.status}: ${txt.slice(0, 200)}`);
+    throw new Error(tr('error.ollamaDeleteStatus', { status: res.status, detail: txt.slice(0, 200) }));
   }
   return { ok: true };
 }
@@ -1359,7 +1502,7 @@ async function ollamaDeleteModel(name) {
 // page. Cached per-process because manifests change only on re-publish.
 const ollamaRegistrySizeCache = new Map(); // "name:tag" → bytes | null
 async function ollamaRegistrySize(spec) {
-  if (!spec) return null;
+  if (!isValidOllamaName(spec)) return null;
   if (ollamaRegistrySizeCache.has(spec)) return ollamaRegistrySizeCache.get(spec);
   const [full, tag = 'latest'] = String(spec).split(':');
   if (!full) { ollamaRegistrySizeCache.set(spec, null); return null; }
@@ -1622,7 +1765,8 @@ ipcMain.handle('get-update-state', () => ({
 // Usage-page "Check for updates" button when an update is ready. Bypasses
 // the "wait for normal quit" delay of autoInstallOnAppQuit — the app
 // immediately quits and relaunches into the new version.
-ipcMain.handle('install-update-now', () => {
+ipcMain.handle('install-update-now', (event) => {
+  if (!isTrustedSender(event)) return { ok: false, reason: 'untrusted' };
   if (!app.isPackaged) return { ok: false, reason: 'dev' };
   if (!pendingUpdateVersion) return { ok: false, reason: 'not-downloaded' };
   // CRITICAL: flip the "actually quitting" flag so mainWindow's
@@ -1687,6 +1831,22 @@ app.on('will-quit', () => {
       transcribeStream.kill('SIGTERM');
     } catch {}
   }
+  // Abort any in-flight Ollama model pulls so the renderer's progress
+  // stream doesn't outlive the app and keep a connection to the local
+  // daemon open.
+  for (const ctrl of activeOllamaPulls.values()) {
+    try { ctrl.abort(); } catch {}
+  }
+  activeOllamaPulls.clear();
+  // Kill any running WhisperKit download helpers — otherwise they
+  // become orphaned after Electron exits and linger writing to a
+  // broken pipe until they hit the next syscall.
+  for (const state of activeWhisperKitPulls.values()) {
+    if (state && state.proc) {
+      try { state.proc.kill('SIGTERM'); } catch {}
+    }
+  }
+  activeWhisperKitPulls.clear();
 });
 
 function findTranscribeHelper() {
@@ -1786,7 +1946,8 @@ function findModel() {
   return findWhisperKitModel();
 }
 
-ipcMain.handle('transcribe', async (_e, { wavBuffer, language }) => {
+ipcMain.handle('transcribe', async (event, { wavBuffer, language }) => {
+  if (!isTrustedSender(event)) throw new Error('untrusted sender');
   const buf = Buffer.from(wavBuffer);
   if (buf.length < 44 + 16000 * 0.2 * 2) {
     throw new Error(tr('error.recordingTooShort'));
@@ -1943,7 +2104,8 @@ ipcMain.handle('hud-confirm', () => {
   if (mainWindow) safeSend(mainWindow,'toggle-record');
 });
 
-ipcMain.handle('paste-text', async (_e, text) => {
+ipcMain.handle('paste-text', async (event, text) => {
+  if (!isTrustedSender(event)) return { ok: false, reason: 'untrusted' };
   if (!text) return;
   const trimmed = text.trim();
   clipboard.writeText(trimmed);
@@ -2192,9 +2354,22 @@ ipcMain.handle('whisperkit-download', async (_e, name) => {
             status: 'downloading',
           });
         } else if (evt.type === 'download-complete') {
-          completedPath = evt.path || null;
+          // Only trust evt.path when it resolves inside our own
+          // userRoot — defence-in-depth in case the (bundled) helper
+          // is ever tampered with or replaced by a malicious variant
+          // that tries to fs.renameSync an arbitrary file into the
+          // app's model directory.
+          const raw = typeof evt.path === 'string' ? evt.path : null;
+          const resolved = raw ? path.resolve(raw) : null;
+          const rootWithSep = userRoot.endsWith(path.sep) ? userRoot : userRoot + path.sep;
+          if (resolved && resolved.startsWith(rootWithSep)) {
+            completedPath = resolved;
+          } else if (resolved) {
+            console.warn('[whisperkit] ignoring completed path outside userRoot:', resolved);
+            completedPath = null;
+          }
           safeSend(mainWindow, 'whisperkit-download-progress', {
-            name, fraction: 1, status: 'complete', path: evt.path,
+            name, fraction: 1, status: 'complete', path: completedPath,
           });
         } else if (evt.type === 'download-error') {
           lastError = String(evt.message || 'unknown');
@@ -2310,10 +2485,21 @@ ipcMain.handle('whisperkit-delete', (_e, name) => {
   return { ok: true };
 });
 
+// WhisperKit model folder names follow the pattern `openai_whisper-<variant>`
+// — alnum + `.`, `_`, `-` only. Reject anything else so a compromised
+// renderer can't smuggle `../` segments into the name that later get
+// joined into a --model-dir path that walks outside whisperKitUserRoot().
+const WHISPERKIT_MODEL_RE = /^[a-zA-Z0-9._-]+$/;
 ipcMain.handle('set-whisper-model', (_e, name) => {
   const cfg = loadConfig();
-  if (name) cfg.whisperKitModel = name;
-  else delete cfg.whisperKitModel;
+  if (name) {
+    if (typeof name !== 'string' || !WHISPERKIT_MODEL_RE.test(name)) {
+      return { ok: false, reason: 'invalid model name' };
+    }
+    cfg.whisperKitModel = name;
+  } else {
+    delete cfg.whisperKitModel;
+  }
   saveConfig(cfg);
   respawnStream();
   return { ok: true };
@@ -2501,7 +2687,13 @@ ipcMain.handle('set-ollama-model', (_e, name) => {
 
 function respawnStream() {
   if (transcribeStream) {
+    // Mark the old child as superseded so its exit handler won't race our
+    // replacement: otherwise a non-SIGTERM exit (helper self-abort, SIGPIPE
+    // from stdin close) would schedule a competing startTranscribeStream and
+    // two helpers would end up fighting for the mic.
+    transcribeStream.__superseded = true;
     try { transcribeStream.kill('SIGTERM'); } catch {}
+    transcribeStream = null;
   }
   transcribeStreamRestarts = 0;
   transcribeStreamReady = false;
@@ -2520,7 +2712,15 @@ function autoFallbackFromAppleOnCrash() {
   if (mainWindow) {
     safeSend(mainWindow,'toast', tr('toast.engineAppleFallback'));
   }
+  // Tear down any lingering helper the same way respawnStream() does so the
+  // fallback doesn't race the existing crash-restart path.
+  if (transcribeStream) {
+    transcribeStream.__superseded = true;
+    try { transcribeStream.kill('SIGTERM'); } catch {}
+    transcribeStream = null;
+  }
   transcribeStreamRestarts = 0;
+  transcribeStreamReady = false;
   setTimeout(startTranscribeStream, 300);
 }
 
