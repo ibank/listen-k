@@ -104,8 +104,19 @@ let callback: CGEventTapCallBack = { (_, type, event, _) in
 
 let mask = CGEventMask(1 << CGEventType.flagsChanged.rawValue)
 
+// Session-level tap instead of HID-level, to sidestep the first-launch
+// "Listen K wants to receive keystrokes" macOS TCC disclosure dialog.
+// The kernel shows that prompt whenever any process calls
+// CGEvent.tapCreate at `.cghidEventTap`, independent of the
+// eventsOfInterest mask — it fires even though our listen-only
+// modifier-only tap doesn't actually need Input Monitoring to work.
+// `.cgSessionEventTap` operates at the user's login session after
+// events pass through the HID subsystem; listen-only session taps for
+// modifier-flag events work without an IM prompt on macOS 13+.
+// (We still don't need Input Monitoring in either case; this is
+// purely about whether the OS shows the disclosure dialog.)
 guard let tap = CGEvent.tapCreate(
-    tap: .cghidEventTap,
+    tap: .cgSessionEventTap,
     place: .headInsertEventTap,
     options: .listenOnly,
     eventsOfInterest: mask,
