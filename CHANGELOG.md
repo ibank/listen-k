@@ -12,6 +12,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.6] — 2026-04-23
+
+### Changed
+- **No more "Listen K wants to receive keystrokes" prompt on first
+  launch.** v0.7.5 removed Input Monitoring from the required-
+  permissions list because the tap we actually create (listen-only
+  + `flagsChanged`-only) never needed it to work. But the macOS
+  kernel still popped a TCC disclosure dialog the first time
+  `CGEvent.tapCreate` ran at `.cghidEventTap`, regardless of what
+  events we actually subscribed to — that prompt is hardwired to
+  the HID tap location. The hotkey helper now creates its tap at
+  `.cgSessionEventTap` instead; session-level listen-only taps on
+  modifier flags don't fire that disclosure and still receive
+  every double-tap event the HID tap saw. A side note for the
+  paranoid: session taps don't see events while macOS is in Secure
+  Input mode (e.g. while a system password prompt is focused), but
+  the OS intercepts everything there anyway, so the practical
+  reach of the hotkey is unchanged.
+- **whisper.cpp is no longer offered on builds that can't run it.**
+  The packaged DMG doesn't ship `whisper-cli` or a ggml model
+  (only WhisperKit base), yet the engine-selection grid kept
+  rendering a whisper.cpp card. Users who picked it got a useless
+  error toast pointing at `npm run build:whisper` — an instruction
+  aimed at developers, not a real recovery path for end users.
+  The card is now gated on `status.whisperCppBin`: dev machines
+  that actually built it still see the option, packaged installs
+  don't. If a stale config still pins the engine at whisper.cpp
+  on a build that can't execute it, the refresh cycle catches
+  that and switches the selection back to WhisperKit so the next
+  recording isn't just a silent failure.
+
+### Fixed
+- **WhisperKit in-app model install now actually registers.** The
+  Engine page's "Install" button would run a full download, show
+  100 % progress, then flip back to "Install" — because
+  WhisperKit's downloader (via swift-transformers' HubApi) lays
+  blobs out in a HuggingFace-style cache tree (`<userRoot>/models/
+  argmaxinc/whisperkit-coreml/<variant>/`) while the app's model
+  resolver checks the flat `<userRoot>/<variant>/` layout. The
+  build-time download script had always flattened it with a post-
+  download `mv`; the runtime IPC never got that step. Now the
+  `whisperkit-download` handler tracks the `download-complete`
+  event's reported path, `renameSync`s it up to the expected
+  location, and sweeps the HubApi skeleton directory so a retry
+  from cancel doesn't inherit a half-populated cache. Flatten
+  failures surface as an install error toast rather than resolving
+  ok with a non-existent path.
+
 ## [0.7.5] — 2026-04-23
 
 ### Changed
