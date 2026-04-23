@@ -2712,7 +2712,7 @@ const onboardStepDots = onboardEl?.querySelectorAll('.step-dot');
 let onboardStep = 0;
 
 function onboardShowStep(i) {
-  onboardStep = Math.max(0, Math.min(2, i));
+  onboardStep = Math.max(0, Math.min(3, i));
   onboardSteps?.forEach((el) => {
     const s = Number(el.getAttribute('data-step'));
     el.hidden = s !== onboardStep;
@@ -2727,8 +2727,12 @@ function onboardShowStep(i) {
     onboardSyncHotkey();
     onboardRenderHotkeyHint();
   }
-  // Intercept real hotkey presses only while the test step is active so
-  // we don't accidentally start a recording during onboarding.
+  if (onboardStep === 3) onboardEnterPractice();
+  else onboardLeavePractice();
+  // Intercept real hotkey presses only while step 2's binding-test is
+  // active. Step 3 needs the real recording path so the hotkey triggers
+  // an actual record session (intercepted further upstream in main.js
+  // via the separate `onboardingPracticeMode` flag).
   const inTest = onboardStep === 2;
   try { window.listenk?.setOnboardingHotkeyTest?.(inTest); } catch {}
 }
@@ -2841,6 +2845,73 @@ window.listenk?.onOnboardingHotkeyFired?.(() => {
   if (testStatus) testStatus.textContent = t('onboard.hotkey.testDetected');
 });
 
+// ── Practice step (4) ───────────────────────────────────────────────
+// Full record → transcript round-trip scoped to the onboarding overlay.
+// Real hotkey, real HUD, real stream helper — the only difference vs.
+// normal use is that main.js's `onboardingPracticeMode` flag diverts
+// `stream-final` to a dedicated IPC channel so no paste happens and no
+// post-processing runs. The transcript shows up inside this card.
+
+function resetPracticeCard() {
+  const card = $('onboardPracticeCard');
+  const result = $('onboardPracticeResult');
+  const kbd = $('onboardPracticeKbd');
+  if (result) result.textContent = '';
+  if (kbd) {
+    const sel = $('onboardHotkey');
+    kbd.textContent = HOTKEY_LABELS[sel?.value] || '⇧⇧';
+  }
+  if (card) card.setAttribute('data-state', 'ready');
+}
+
+function onboardEnterPractice() {
+  resetPracticeCard();
+  try { window.listenk?.setOnboardingPractice?.(true); } catch {}
+}
+
+function onboardLeavePractice() {
+  try { window.listenk?.setOnboardingPractice?.(false); } catch {}
+}
+
+// While practice mode is on, main still forwards `stream-partial` events
+// normally. That drives the HUD's live-text (which we want — the user
+// should learn the HUD). We piggyback on the renderer-side partial
+// listener to flip the card into its "recording" visual the moment the
+// helper starts producing audio.
+window.listenk?.onStreamPartial?.((text) => {
+  if (onboardStep !== 3) return;
+  const card = $('onboardPracticeCard');
+  if (!card) return;
+  if ((text || '').trim() || card.getAttribute('data-state') === 'ready') {
+    card.setAttribute('data-state', 'recording');
+  }
+});
+
+// Practice-final is the diverted stream-final that only fires in practice
+// mode. We both populate the card *and* reset the renderer's streaming
+// bookkeeping, since the normal `onStreamFinal` handler (which does that
+// reset) isn't firing in this path.
+window.listenk?.onOnboardingPracticeFinal?.((text) => {
+  // Renderer-side streaming state cleanup — onStreamFinal does this for
+  // normal recordings but never runs during practice.
+  streamingActive = false;
+  latestPartial = '';
+  transcribeStartMs = null;
+
+  if (onboardStep !== 3) return;
+  const card = $('onboardPracticeCard');
+  const result = $('onboardPracticeResult');
+  const trimmed = (text || '').trim();
+  if (result) {
+    result.textContent = trimmed || t('onboard.practice.empty');
+  }
+  if (card) card.setAttribute('data-state', 'done');
+});
+
+$('onboardPracticeRetry')?.addEventListener('click', () => {
+  resetPracticeCard();
+});
+
 async function onboardFinish() {
   // Persist current onboarding-picked hotkey through the same IPC the
   // settings page uses, so nothing drifts out of sync.
@@ -2849,8 +2920,11 @@ async function onboardFinish() {
     try { await window.listenk.setHotkey?.(onboardHotkeySel.value); } catch {}
   }
   try { await window.listenk.setOnboardingDone?.(true); } catch {}
-  // Re-enable normal hotkey behaviour before the overlay goes away.
+  // Re-enable normal hotkey + stream behaviour before the overlay goes
+  // away. Belt-and-suspenders: both flags get cleared even if the user
+  // skipped from an intermediate step.
   try { await window.listenk.setOnboardingHotkeyTest?.(false); } catch {}
+  try { await window.listenk.setOnboardingPractice?.(false); } catch {}
   onboardEl.hidden = true;
 }
 
@@ -2875,6 +2949,8 @@ $('onboardStart')?.addEventListener('click', () => onboardShowStep(1));
 $('onboardBack1')?.addEventListener('click', () => onboardShowStep(0));
 $('onboardNext1')?.addEventListener('click', () => onboardShowStep(2));
 $('onboardBack2')?.addEventListener('click', () => onboardShowStep(1));
+$('onboardNext2')?.addEventListener('click', () => onboardShowStep(3));
+$('onboardBack3')?.addEventListener('click', () => onboardShowStep(2));
 $('onboardDone')?.addEventListener('click', () => onboardFinish());
 $('onboardSkip')?.addEventListener('click', () => onboardFinish());
 $('onboardHotkey')?.addEventListener('change', () => {

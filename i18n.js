@@ -222,6 +222,15 @@ const strings = {
     'onboard.done': '완료 · 시작',
     'onboard.skip': '건너뛰기',
 
+    'onboard.practice.title': '한 번 해볼까요',
+    'onboard.practice.desc': '단축키를 누르고 아무 말이나 해보세요 — 바로 여기 카드에 결과가 나타납니다.',
+    'onboard.practice.promptReady': '단축키를 한 번 탭하고 말하세요. 다시 탭하면 녹음이 끝납니다.',
+    'onboard.practice.example': '예: "안녕 Listen K, 이건 내 첫 녹음이야."',
+    'onboard.practice.promptRecording': '듣고 있어요… 다시 단축키를 눌러 멈추세요.',
+    'onboard.practice.doneLabel': '이렇게 들렸어요',
+    'onboard.practice.empty': '음성을 잡지 못했어요. 다시 시도해보세요.',
+    'onboard.practice.retry': '다시 해보기',
+
     // ── Field labels / help ────────────────────────────────────────────
     'field.engine.title': '전사 엔진',
     'field.engine.help': 'Apple Speech 는 빠르고 경량, WhisperKit 은 정확, whisper.cpp 는 배치 전용.',
@@ -645,6 +654,15 @@ const strings = {
     'onboard.done': 'Done · Start',
     'onboard.skip': 'Skip',
 
+    'onboard.practice.title': 'Try it out',
+    'onboard.practice.desc': 'Press your hotkey and say anything — the text appears right here so you can see it work end-to-end.',
+    'onboard.practice.promptReady': 'Tap your hotkey and speak. Tap again to stop.',
+    'onboard.practice.example': 'e.g. "Hello Listen K, this is my first recording."',
+    'onboard.practice.promptRecording': "Listening… tap your hotkey again to stop.",
+    'onboard.practice.doneLabel': 'You said',
+    'onboard.practice.empty': "Didn't catch anything. Give it another try.",
+    'onboard.practice.retry': 'Try again',
+
     'field.engine.title': 'Transcription engine',
     'field.engine.help': 'Apple Speech is fast and lightweight, WhisperKit is accurate, whisper.cpp is batch-only.',
     'field.whisperModel.title': 'Transcription model',
@@ -1060,6 +1078,15 @@ const strings = {
     'onboard.done': '完了 · 開始',
     'onboard.skip': 'スキップ',
 
+    'onboard.practice.title': '試してみましょう',
+    'onboard.practice.desc': 'ショートカットを押して何か話してみてください — このカードに結果が表示されます。',
+    'onboard.practice.promptReady': 'ショートカットを押して話してください。もう一度押すと停止します。',
+    'onboard.practice.example': '例: 「こんにちは Listen K、これは初めての録音です。」',
+    'onboard.practice.promptRecording': '聞いています… もう一度ショートカットを押して停止。',
+    'onboard.practice.doneLabel': 'こう聞こえました',
+    'onboard.practice.empty': '音声を検出できませんでした。もう一度どうぞ。',
+    'onboard.practice.retry': 'もう一度',
+
     'field.engine.title': '文字起こしエンジン',
     'field.engine.help': 'Apple Speech は高速・軽量、WhisperKit は高精度、whisper.cpp はバッチ専用。',
     'field.whisperModel.title': '文字起こしモデル',
@@ -1474,6 +1501,15 @@ const strings = {
     'onboard.back': '上一步',
     'onboard.done': '完成 · 开始',
     'onboard.skip': '跳过',
+
+    'onboard.practice.title': '来试一次',
+    'onboard.practice.desc': '按下快捷键随便说几句 — 结果就在这张卡片里显示,你能看到整个流程。',
+    'onboard.practice.promptReady': '按一下快捷键开始说话,再按一下停止。',
+    'onboard.practice.example': '例如: "你好 Listen K,这是我的第一次录音。"',
+    'onboard.practice.promptRecording': '正在听… 再按一次快捷键停止。',
+    'onboard.practice.doneLabel': '听到的内容',
+    'onboard.practice.empty': '没有捕获到语音,再试一次。',
+    'onboard.practice.retry': '再试一次',
 
     'field.engine.title': '转录引擎',
     'field.engine.help': 'Apple Speech 快速轻量, WhisperKit 准确, whisper.cpp 仅批处理。',

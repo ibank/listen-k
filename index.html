@@ -577,6 +577,7 @@
         <span class="step-dot" data-step="0"></span>
         <span class="step-dot" data-step="1"></span>
         <span class="step-dot" data-step="2"></span>
+        <span class="step-dot" data-step="3"></span>
       </div>
 
       <!-- Step 0: Welcome -->
@@ -639,6 +640,49 @@
         <div class="onboard-hint" id="onboardHotkeyHint"></div>
         <div class="onboard-actions split">
           <button class="btn-hero ghost" id="onboardBack2" type="button" data-i18n="onboard.back">Back</button>
+          <button class="btn-hero rec" id="onboardNext2" type="button">
+            <span data-i18n="onboard.next">Next</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Step 3: Practice recording. First full round-trip the user does
+           (hotkey → HUD → speak → stop → text appears). Post-process and
+           paste are deliberately bypassed so a broken Ollama config or a
+           missing focused target doesn't turn a training moment into a
+           failure. The transcript lands inside the card itself. -->
+      <section class="onboard-step" data-step="3" hidden>
+        <h2 data-i18n="onboard.practice.title">Try it out</h2>
+        <p data-i18n="onboard.practice.desc">Press your hotkey and say anything — the text appears right here so you can see it work end-to-end.</p>
+
+        <div class="onboard-practice-card" id="onboardPracticeCard" data-state="ready">
+          <!-- Ready state: big hotkey glyph + prompt -->
+          <div class="onboard-practice-ready">
+            <div class="onboard-practice-kbd" id="onboardPracticeKbd">⇧⇧</div>
+            <div class="onboard-practice-prompt" data-i18n="onboard.practice.promptReady">Tap your hotkey and speak. Tap again to stop.</div>
+            <div class="onboard-practice-example" data-i18n="onboard.practice.example">e.g. "Hello Listen K, this is my first recording."</div>
+          </div>
+
+          <!-- Recording state: waveform + live hint -->
+          <div class="onboard-practice-recording">
+            <div class="onboard-practice-wave" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span>
+            </div>
+            <div class="onboard-practice-prompt" data-i18n="onboard.practice.promptRecording">Listening… tap your hotkey again to stop.</div>
+          </div>
+
+          <!-- Done state: the quoted transcript -->
+          <div class="onboard-practice-done">
+            <div class="onboard-practice-done-label" data-i18n="onboard.practice.doneLabel">You said</div>
+            <blockquote class="onboard-practice-result" id="onboardPracticeResult"></blockquote>
+            <button class="onboard-practice-retry" id="onboardPracticeRetry" type="button" data-i18n="onboard.practice.retry">Try again</button>
+          </div>
+        </div>
+
+        <div class="onboard-actions split">
+          <button class="btn-hero ghost" id="onboardBack3" type="button" data-i18n="onboard.back">Back</button>
           <button class="btn-hero rec" id="onboardDone" type="button" data-i18n="onboard.done">Done · Start</button>
         </div>
       </section>

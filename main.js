@@ -1189,10 +1189,31 @@ function handleStreamEvent(event) {
       break;
     case 'final':
       cancelHudSafetyHide();
-      if (mainWindow) safeSend(mainWindow,'stream-final', event.text || '');
-      // Belt-and-suspenders: if the renderer's post-process + paste pipeline
-      // never reports back within 15 s, force the HUD away.
-      scheduleHudSafetyHide(15000);
+      if (onboardingPracticeMode) {
+        if (onboardingPracticeDiscardNextFinal) {
+          // User bailed out of the practice step mid-recording.
+          // Drop the transcript on the floor and clear the divert so
+          // the next real recording takes the normal paste path.
+          onboardingPracticeMode = false;
+          onboardingPracticeDiscardNextFinal = false;
+        } else {
+          // Normal practice flow: hand the transcription to the
+          // onboarding overlay instead of the post-process + paste
+          // pipeline. No paste, no Ollama/rules — but we still flash
+          // the HUD's green ✓ + hide it so the user sees the "done"
+          // cue exactly like they will in normal use.
+          if (mainWindow) safeSend(mainWindow, 'onboarding-practice-final', event.text || '');
+        }
+        isRecording = false;
+        isProcessing = false;
+        flashHudDone();
+        updateTrayMenu();
+      } else {
+        if (mainWindow) safeSend(mainWindow,'stream-final', event.text || '');
+        // Belt-and-suspenders: if the renderer's post-process + paste pipeline
+        // never reports back within 15 s, force the HUD away.
+        scheduleHudSafetyHide(15000);
+      }
       break;
     case 'stopped':
       break;
@@ -2335,6 +2356,38 @@ ipcMain.handle('set-onboarding-done', (_e, done) => {
 let onboardingHotkeyTest = false;
 ipcMain.handle('set-onboarding-hotkey-test', (_e, enabled) => {
   onboardingHotkeyTest = Boolean(enabled);
+  return { ok: true };
+});
+
+// Onboarding step 4 "practice" mode: renderer puts main into a flag where
+// real recording + HUD happen (so the user learns the flow), but the
+// stream-final event is diverted to the onboarding overlay instead of
+// the normal post-process + paste pipeline. The hotkey works normally.
+let onboardingPracticeMode = false;
+// Set when the user navigates away from the practice step (or finishes
+// onboarding) while a recording is still in flight. Keeps the practice
+// divert in place so the final transcript doesn't accidentally get
+// pasted into the saved frontmost app after the overlay is gone.
+let onboardingPracticeDiscardNextFinal = false;
+ipcMain.handle('set-onboarding-practice', (_e, enabled) => {
+  const wasEnabled = onboardingPracticeMode;
+  const turningOff = wasEnabled && !enabled;
+
+  if (turningOff && (isRecording || isProcessing)) {
+    // Can't just flip the flag — the stream helper still has audio in
+    // flight and will emit a `final`. Keep the divert on, mark it for
+    // discard, and send `stop` so the final lands quickly.
+    onboardingPracticeDiscardNextFinal = true;
+    if (transcribeStream && transcribeStreamReady) {
+      try {
+        transcribeStream.stdin.write(JSON.stringify({ cmd: 'stop' }) + '\n');
+      } catch {}
+    }
+    return { ok: true, deferred: true };
+  }
+
+  onboardingPracticeMode = Boolean(enabled);
+  onboardingPracticeDiscardNextFinal = false;
   return { ok: true };
 });
 ipcMain.handle('set-ui-locale', (_e, loc) => {
