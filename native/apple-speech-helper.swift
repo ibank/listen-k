@@ -123,9 +123,24 @@ func startStream() {
             }
         }
         if let err = error {
-            // Cancelled stops are a normal path — don't surface those as errors.
             let nsErr = err as NSError
-            if !(nsErr.domain == "kAFAssistantErrorDomain" && nsErr.code == 216) {
+            // `kAFAssistantErrorDomain` errors are SFSpeechRecognizer's
+            // internal bookkeeping for "nothing usable came out of this
+            // session" — cancelled stops (216), no-speech timeouts
+            // (203 / 1101 / 1110 depending on OS version), and various
+            // session-ended variants. None of them are actionable for
+            // the user, but the non-216 ones were leaking out as an
+            // angry red "스트리밍 오류" chip that stuck until the next
+            // recording. Treat the whole domain as an "empty final" —
+            // the renderer's empty-final path already flashes a brief
+            // "음성이 감지되지 않음" status and auto-clears. Real errors
+            // (permission, audio engine, unknown domain) still surface.
+            if nsErr.domain == "kAFAssistantErrorDomain" {
+                emit(["type": "final", "text": ""])
+                streaming = false
+                currentRequest = nil
+                currentTask = nil
+            } else {
                 emit(["type": "error", "message": "\(err.localizedDescription)"])
             }
         }
