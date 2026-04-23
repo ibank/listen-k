@@ -1603,40 +1603,64 @@ function postProcessingMode() {
   return cfg.mode || 'off';
 }
 
-function listWhisperKitModels() {
-  const root = resPath('models', 'whisperkit');
-  if (!fs.existsSync(root)) return [];
-  try {
-    return fs
-      .readdirSync(root)
-      .filter((n) => {
+// User-writable directory for models downloaded in-app. The signed app
+// bundle is read-only, so anything the user pulls via the Engine page
+// lands here — this side of the FS is mutable and already per-user
+// (Application Support).
+function whisperKitUserRoot() {
+  return path.join(app.getPath('userData'), 'models', 'whisperkit');
+}
+
+// Returns the directory that actually holds a given model name, checking
+// the user-writable root first so downloaded variants override any bundled
+// namesake. Null when neither root has it.
+function whisperKitModelPath(name) {
+  if (!name) return null;
+  const userRoot = whisperKitUserRoot();
+  const userDir = path.join(userRoot, name);
+  if (fs.existsSync(userDir)) return userDir;
+  const bundled = path.join(resPath('models', 'whisperkit'), name);
+  if (fs.existsSync(bundled)) return bundled;
+  return null;
+}
+
+function listInstalledWhisperKitModels() {
+  const names = new Set();
+  for (const root of [resPath('models', 'whisperkit'), whisperKitUserRoot()]) {
+    if (!fs.existsSync(root)) continue;
+    try {
+      for (const n of fs.readdirSync(root)) {
         try {
-          return fs.statSync(path.join(root, n)).isDirectory();
-        } catch { return false; }
-      })
-      .sort();
-  } catch {
-    return [];
+          if (fs.statSync(path.join(root, n)).isDirectory()) names.add(n);
+        } catch {}
+      }
+    } catch {}
   }
+  return Array.from(names).sort();
+}
+
+// Back-compat alias — existing callers (status dashboard) expect a flat
+// list of installed model names. Now merged across bundled + user-writable.
+function listWhisperKitModels() {
+  return listInstalledWhisperKitModels();
 }
 
 function findWhisperKitModel() {
-  const root = resPath('models', 'whisperkit');
-
   // Honour explicit user override before falling back to auto-pick.
   const cfg = loadConfig();
   if (cfg.whisperKitModel) {
-    const explicit = path.join(root, cfg.whisperKitModel);
-    if (fs.existsSync(explicit)) return explicit;
+    const explicit = whisperKitModelPath(cfg.whisperKitModel);
+    if (explicit) return explicit;
   }
 
-  // Default preference: large-v3-turbo first (the bundled default). Turbo
-  // distills decoder layers so it's ~2x faster with minimal accuracy loss
-  // on English; non-English (esp. Korean) is slightly weaker than full
-  // large-v3, so we still fall back to non-turbo if present. Small/base
-  // variants rank last since they exist only as a low-RAM escape hatch.
+  // Default preference: large-v3-turbo first when available. Turbo distills
+  // decoder layers so it's ~2x faster with minimal accuracy loss on
+  // English; non-English (esp. Korean) is slightly weaker than full
+  // large-v3, so we still fall back to non-turbo if present. base ranks
+  // after the larger variants because it's the always-bundled floor —
+  // shipped mainly so Apple Speech has a working WhisperKit fallback.
   const preferred = [
-    'openai_whisper-large-v3-v20240930_turbo_632MB', // bundled default (turbo)
+    'openai_whisper-large-v3-v20240930_turbo_632MB',
     'openai_whisper-large-v3-v20240930_turbo',
     'openai_whisper-large-v3_turbo_954MB',
     'openai_whisper-large-v3_turbo',
@@ -1652,14 +1676,12 @@ function findWhisperKitModel() {
     'openai_whisper-tiny',
   ];
   for (const name of preferred) {
-    const p = path.join(root, name);
-    if (fs.existsSync(p)) return p;
+    const p = whisperKitModelPath(name);
+    if (p) return p;
   }
-  // Fallback: take whatever is there.
-  try {
-    const entries = fs.readdirSync(root).map((n) => path.join(root, n)).filter((p) => fs.statSync(p).isDirectory());
-    if (entries.length) return entries[0];
-  } catch {}
+  // Fallback: take whatever is installed.
+  const installed = listInstalledWhisperKitModels();
+  if (installed.length) return whisperKitModelPath(installed[0]);
   return null;
 }
 
@@ -1973,6 +1995,187 @@ ipcMain.handle('list-whisper-models', () => {
     selected: cfg.whisperKitModel || null,
     active: path.basename(findWhisperKitModel() || ''),
   };
+});
+
+// ── WhisperKit model catalog + in-app downloader ──────────────────
+// Curated list of WhisperKit variants we expose on the Engine page.
+// Sizes are approximate (bytes on disk after download); actual files
+// may differ by a few MB depending on shard layout. `tag` is an
+// i18n-friendly short identifier; `label` is a fallback when locale
+// strings haven't loaded yet.
+const WHISPERKIT_CATALOG = [
+  { name: 'openai_whisper-base',                           tag: 'base',     sizeMB: 150,  label: 'Base',     recommendedFor: 'low-memory fallback' },
+  { name: 'openai_whisper-small',                          tag: 'small',    sizeMB: 500,  label: 'Small',    recommendedFor: 'balanced speed + quality' },
+  { name: 'openai_whisper-large-v3-v20240930_turbo_632MB', tag: 'turbo',    sizeMB: 632,  label: 'Turbo',    recommendedFor: 'fastest large-v3 · default' },
+  { name: 'openai_whisper-large-v3-v20240930_626MB',       tag: 'accurate', sizeMB: 626,  label: 'Accurate', recommendedFor: 'highest quality (non-English)' },
+];
+
+// in-flight downloads keyed by model name → { proc, aborted }
+const activeWhisperKitPulls = new Map();
+
+ipcMain.handle('whisperkit-catalog', () => {
+  const cfg = loadConfig();
+  const active = path.basename(findWhisperKitModel() || '');
+  return {
+    catalog: WHISPERKIT_CATALOG.map((entry) => {
+      const userRoot = whisperKitUserRoot();
+      const bundledPath = path.join(resPath('models', 'whisperkit'), entry.name);
+      const userPath = path.join(userRoot, entry.name);
+      const bundled = fs.existsSync(bundledPath);
+      const downloaded = fs.existsSync(userPath);
+      return {
+        ...entry,
+        installed: bundled || downloaded,
+        bundled,
+        downloading: activeWhisperKitPulls.has(entry.name),
+        isActive: entry.name === active,
+        isSelected: entry.name === (cfg.whisperKitModel || null),
+      };
+    }),
+    selected: cfg.whisperKitModel || null,
+    active,
+  };
+});
+
+ipcMain.handle('whisperkit-download', async (_e, name) => {
+  if (!name || !WHISPERKIT_CATALOG.find((m) => m.name === name)) {
+    return { ok: false, reason: 'unknown model' };
+  }
+  if (activeWhisperKitPulls.has(name)) {
+    return { ok: false, reason: 'already downloading' };
+  }
+  const helper = findTranscribeHelper();
+  if (!helper) return { ok: false, reason: 'transcribe-helper missing' };
+
+  const userRoot = whisperKitUserRoot();
+  try { fs.mkdirSync(userRoot, { recursive: true }); } catch {}
+
+  // Don't re-download if the model is already present (either bundled or
+  // in the user directory) — just report success so the UI reconciles.
+  if (whisperKitModelPath(name)) {
+    safeSend(mainWindow, 'whisperkit-download-progress', {
+      name, fraction: 1, status: 'complete',
+    });
+    return { ok: true, alreadyInstalled: true };
+  }
+
+  return await new Promise((resolve) => {
+    const proc = spawn(helper, ['--download', name, userRoot, '--json-progress'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const state = { proc, aborted: false };
+    activeWhisperKitPulls.set(name, state);
+
+    let stdoutBuf = '';
+    let lastError = '';
+
+    proc.stdout.on('data', (chunk) => {
+      stdoutBuf += chunk.toString('utf8');
+      const lines = stdoutBuf.split('\n');
+      stdoutBuf = lines.pop();
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let evt;
+        try { evt = JSON.parse(trimmed); } catch {
+          console.warn('[whisperkit] malformed progress line:', trimmed.slice(0, 200));
+          continue;
+        }
+        if (evt.type === 'download-progress') {
+          safeSend(mainWindow, 'whisperkit-download-progress', {
+            name,
+            fraction: Number(evt.fraction) || 0,
+            completed: evt.completed || 0,
+            total: evt.total || 0,
+            status: 'downloading',
+          });
+        } else if (evt.type === 'download-complete') {
+          safeSend(mainWindow, 'whisperkit-download-progress', {
+            name, fraction: 1, status: 'complete', path: evt.path,
+          });
+        } else if (evt.type === 'download-error') {
+          lastError = String(evt.message || 'unknown');
+        }
+      }
+    });
+
+    proc.stderr.on('data', (chunk) => {
+      const text = chunk.toString('utf8');
+      // WhisperKit logs noise goes to stderr; only surface on exit.
+      if (text) lastError = text.trim().split('\n').slice(-1)[0] || lastError;
+    });
+
+    proc.on('error', (err) => {
+      activeWhisperKitPulls.delete(name);
+      safeSend(mainWindow, 'whisperkit-download-progress', {
+        name, status: 'error', message: err.message,
+      });
+      resolve({ ok: false, reason: err.message });
+    });
+
+    proc.on('close', (code) => {
+      activeWhisperKitPulls.delete(name);
+      if (state.aborted) {
+        // User-initiated cancel; remove any partial directory so a retry
+        // starts clean rather than resuming a half-complete shard tree.
+        const partial = path.join(userRoot, name);
+        try { fs.rmSync(partial, { recursive: true, force: true }); } catch {}
+        safeSend(mainWindow, 'whisperkit-download-progress', {
+          name, status: 'cancelled',
+        });
+        resolve({ ok: false, cancelled: true });
+        return;
+      }
+      if (code === 0) {
+        resolve({ ok: true, path: path.join(userRoot, name) });
+      } else {
+        safeSend(mainWindow, 'whisperkit-download-progress', {
+          name, status: 'error', message: lastError || `exit ${code}`,
+        });
+        resolve({ ok: false, reason: lastError || `exit ${code}` });
+      }
+    });
+  });
+});
+
+ipcMain.handle('whisperkit-cancel', (_e, name) => {
+  const state = activeWhisperKitPulls.get(name);
+  if (!state) return { ok: false, reason: 'not downloading' };
+  state.aborted = true;
+  try { state.proc.kill('SIGTERM'); } catch {}
+  return { ok: true };
+});
+
+ipcMain.handle('whisperkit-delete', (_e, name) => {
+  if (!name || !WHISPERKIT_CATALOG.find((m) => m.name === name)) {
+    return { ok: false, reason: 'unknown model' };
+  }
+  const userDir = path.join(whisperKitUserRoot(), name);
+  if (!fs.existsSync(userDir)) {
+    // Bundled models can't be removed from a signed read-only bundle;
+    // surface this clearly so the UI can disable the button.
+    return { ok: false, reason: 'bundled' };
+  }
+  // Refuse to delete the model that's actively driving the stream —
+  // the helper still holds its Core ML files open.
+  if (isRecording || isProcessing) {
+    return { ok: false, reason: 'busy' };
+  }
+  const cfg = loadConfig();
+  const isActive = (cfg.whisperKitModel === name) || (path.basename(findWhisperKitModel() || '') === name);
+  try {
+    fs.rmSync(userDir, { recursive: true, force: true });
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+  // If we just removed the selected model, clear the selection so
+  // findWhisperKitModel falls back to the preferred order.
+  if (isActive) {
+    delete cfg.whisperKitModel;
+    saveConfig(cfg);
+    respawnStream();
+  }
+  return { ok: true };
 });
 
 ipcMain.handle('set-whisper-model', (_e, name) => {

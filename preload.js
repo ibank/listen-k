@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld('listenk', {
   statsClear: () => ipcRenderer.invoke('stats-clear'),
   listWhisperModels: () => ipcRenderer.invoke('list-whisper-models'),
   setWhisperModel: (name) => ipcRenderer.invoke('set-whisper-model', name),
+  whisperkitCatalog: () => ipcRenderer.invoke('whisperkit-catalog'),
+  whisperkitDownload: (name) => ipcRenderer.invoke('whisperkit-download', name),
+  whisperkitCancel: (name) => ipcRenderer.invoke('whisperkit-cancel', name),
+  whisperkitDelete: (name) => ipcRenderer.invoke('whisperkit-delete', name),
+  onWhisperkitDownloadProgress: (cb) =>
+    ipcRenderer.on('whisperkit-download-progress', (_e, payload) => cb(payload)),
   getEngine: () => ipcRenderer.invoke('get-engine'),
   setEngine: (engine) => ipcRenderer.invoke('set-engine', engine),
   getOllamaModel: () => ipcRenderer.invoke('get-ollama-model'),

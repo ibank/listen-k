@@ -4,9 +4,17 @@ import WhisperKit
 
 // Modes
 //   --check
-//   --download <variant> <dest-root>
+//   --download <variant> <dest-root> [--json-progress]
 //   --audio <wav> --model-dir <dir> [--language <code>]    (batch)
 //   --stream --model-dir <dir> [--language <code>]          (persistent streaming)
+//
+// Download
+//   Plain:     human text on stderr; final model path on stdout (line).
+//   --json-progress:
+//     stdout NDJSON events, one per line, each flushed immediately:
+//       {"type":"download-progress","fraction":0.42,"completed":...,"total":...}
+//       {"type":"download-complete","path":"/abs/path/to/variant"}
+//       {"type":"download-error","message":"..."}
 //
 // Streaming protocol
 //   stdin:  NDJSON commands
@@ -33,7 +41,8 @@ struct TranscribeHelper {
         if args.first == "--download" {
             let variant = args[safe: 1] ?? "openai_whisper-small"
             let destRoot = args[safe: 2] ?? "models/whisperkit"
-            await runDownload(variant: variant, destRoot: destRoot)
+            let jsonProgress = args.contains("--json-progress")
+            await runDownload(variant: variant, destRoot: destRoot, jsonProgress: jsonProgress)
             return
         }
 
@@ -54,23 +63,60 @@ struct TranscribeHelper {
 
     // MARK: - Download
 
-    static func runDownload(variant: String, destRoot: String) async {
+    static func runDownload(variant: String, destRoot: String, jsonProgress: Bool) async {
         do {
             let url = URL(fileURLWithPath: destRoot, isDirectory: true)
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
 
-            writeStderr("downloading \(variant) → \(destRoot)/\(variant)/ ...\n")
+            if !jsonProgress {
+                writeStderr("downloading \(variant) → \(destRoot)/\(variant)/ ...\n")
+            }
+
+            // Throttle progress events: Foundation's Progress can fire hundreds
+            // of times per second; that's useful for a UI but wasteful across an
+            // IPC boundary. Emit at most once per 150 ms unless the fraction has
+            // moved by >= 1 %, plus always forward the final 100 %.
+            var lastEmitTs = Date.distantPast
+            var lastFraction: Double = -1
+
+            let progressCb: ((Progress) -> Void)? = jsonProgress ? { progress in
+                let now = Date()
+                let frac = progress.fractionCompleted
+                let byTime = now.timeIntervalSince(lastEmitTs) >= 0.15
+                let byDelta = abs(frac - lastFraction) >= 0.01
+                let atEnd = frac >= 1.0 && lastFraction < 1.0
+                guard byTime || byDelta || atEnd else { return }
+                lastEmitTs = now
+                lastFraction = frac
+                emit([
+                    "type": "download-progress",
+                    "fraction": frac,
+                    "completed": progress.completedUnitCount,
+                    "total": progress.totalUnitCount,
+                ])
+            } : nil
 
             let path = try await WhisperKit.download(
                 variant: variant,
                 downloadBase: url,
                 useBackgroundSession: false,
-                from: "argmaxinc/whisperkit-coreml"
+                from: "argmaxinc/whisperkit-coreml",
+                progressCallback: progressCb
             )
-            print(path.path)
+
+            if jsonProgress {
+                emit(["type": "download-complete", "path": path.path])
+            } else {
+                print(path.path)
+            }
         } catch {
-            writeStderr("download failed: \(error)\n")
-            exit(1)
+            if jsonProgress {
+                emit(["type": "download-error", "message": "\(error)"])
+                exit(1)
+            } else {
+                writeStderr("download failed: \(error)\n")
+                exit(1)
+            }
         }
     }
 
