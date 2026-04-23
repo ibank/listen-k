@@ -168,10 +168,15 @@ function safeSend(win, channel, ...args) {
   }
 }
 
-const HUD_WIDTH = 260;
-// Window needs to accommodate the 50px pill + ~26px context bar (pill on
-// top) + 8px padding top/bottom. 100px gives a bit of breathing room for
-// glow shadows so nothing clips at the edges.
+// The pill itself is constrained by CSS (min 240 px / max 680 px with
+// live text). The window is transparent, so extra width is invisible —
+// the pill self-centres within via `justify-content: space-between` +
+// `margin: auto`. Sizing the window to 720 px gives the pill room to
+// grow to its full 680 px max-width plus a little glow-shadow padding;
+// the previous 260 px cap clipped long partial transcripts.
+const HUD_WIDTH = 720;
+// 50 px pill + ~26 px context bar on top + 8 px padding = ~84 px; 100 px
+// adds breathing room for the glow drop-shadow so nothing clips.
 const HUD_HEIGHT = 100;
 
 function positionHudOnActiveScreen() {
