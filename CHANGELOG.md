@@ -12,6 +12,34 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.7.1] — 2026-04-23
+
+### Fixed
+- **Auto-update now has a visible path to apply itself.** Before this,
+  v0.6.0+ pulled new builds in the background but the only cue was a
+  toast that vanished in seconds, and install was gated on the user
+  quitting the app — which the menubar-only architecture actively
+  works against (closing the window hides the app rather than quits
+  it). Real-world users saw "Update available" once and then ran on
+  the old version for days waiting for an install that wasn't coming.
+  - New persistent banner pinned to the top of the dashboard when an
+    update has finished downloading: "v0.7.1 has been downloaded …
+    Restart now to apply it immediately" with a primary **Restart &
+    install** button and a **Later** dismiss that only hides it for
+    the current session.
+  - The Usage-page "Check for updates" button flips to **Restart &
+    install vX.Y.Z** once the background download completes, so users
+    who open Usage before noticing the banner still land on the
+    action without needing another round-trip to the network.
+  - New IPCs `get-update-state` / `install-update-now` +
+    `update-state` event, plus a new internal `pendingUpdateVersion`
+    tracker in main. `autoUpdater.quitAndInstall(true, true)` is
+    invoked with `forceRunAfter=true` so the user lands back in the
+    dashboard instead of an empty dock.
+  - Existing `toast.updateReady` reworded across all four locales to
+    point at the banner instead of implying "just wait until you
+    quit".
+
 ## [0.7.0] — 2026-04-23
 
 ### Added
@@ -545,7 +573,8 @@ Initial preview.
 - Light mode, multi-monitor HUD placement, arm64-only distribution.
 - Optional Ollama post-processing with a rule-based fallback.
 
-[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/ibank/listen-k/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/ibank/listen-k/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/ibank/listen-k/compare/v0.6.3...v0.7.0
 [0.6.3]: https://github.com/ibank/listen-k/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/ibank/listen-k/compare/v0.6.1...v0.6.2
