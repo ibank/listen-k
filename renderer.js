@@ -2988,6 +2988,19 @@ async function maybeShowOnboarding() {
   onboardShowStep(0);
 }
 
+// Re-poll the permission list whenever the app regains focus while the
+// onboarding overlay sits on step 1. The typical flow is: user clicks
+// "Open System Settings", toggles the permission, Cmd-Tabs back — at
+// that point the existing list still reflects the pre-grant state
+// because nothing re-ran collectStatus(). Tying the refresh to the
+// focus event picks up the change the instant they come back, without
+// needing a visible "Refresh" button.
+window.addEventListener('focus', () => {
+  if (!onboardEl || onboardEl.hidden) return;
+  if (onboardStep !== 1) return;
+  onboardRenderPermissions();
+});
+
 $('onboardStart')?.addEventListener('click', () => onboardShowStep(1));
 $('onboardBack1')?.addEventListener('click', () => onboardShowStep(0));
 $('onboardNext1')?.addEventListener('click', () => onboardShowStep(2));
