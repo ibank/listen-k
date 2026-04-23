@@ -104,21 +104,30 @@ let callback: CGEventTapCallBack = { (_, type, event, _) in
 
 let mask = CGEventMask(1 << CGEventType.flagsChanged.rawValue)
 
-// Session-level tap instead of HID-level, to sidestep the first-launch
-// "Listen K wants to receive keystrokes" macOS TCC disclosure dialog.
-// The kernel shows that prompt whenever any process calls
-// CGEvent.tapCreate at `.cghidEventTap`, independent of the
-// eventsOfInterest mask — it fires even though our listen-only
-// modifier-only tap doesn't actually need Input Monitoring to work.
-// `.cgSessionEventTap` operates at the user's login session after
-// events pass through the HID subsystem; listen-only session taps for
-// modifier-flag events work without an IM prompt on macOS 13+.
-// (We still don't need Input Monitoring in either case; this is
-// purely about whether the OS shows the disclosure dialog.)
+// `.defaultTap` instead of `.listenOnly` — looks backwards, reads
+// right once you know TCC's mapping. macOS gates CGEventTap on two
+// different TCC services depending on `options`, not tap location:
+//
+//   .listenOnly → kTCCServiceListenEvent  (Input Monitoring)
+//   .defaultTap → kTCCServicePostEvent    (Accessibility)
+//
+// The v0.7.6 "move the tap to .cgSessionEventTap" attempt did nothing
+// — the prompt is tied to `options`, not `tap`. Since paste-helper
+// already forces the user through the Accessibility prompt (for
+// CGEvent.post when injecting ⌘V), switching fn-listener's tap to
+// `.defaultTap` funnels us through the same service. The user sees a
+// single Accessibility disclosure on first launch instead of one for
+// Accessibility and a separate "키스트로크 받는 중" Input Monitoring
+// one. Crucially, `.defaultTap` does not force modification — it
+// just permits it. The callback still returns the event unchanged
+// (line 102: `Unmanaged.passUnretained(event)`), so behaviourally
+// this is identical to listen-only from the event-delivery side.
+// `.headInsertEventTap` keeps us at the front of the session tap
+// chain so we see flagsChanged events before any other filtering.
 guard let tap = CGEvent.tapCreate(
-    tap: .cgSessionEventTap,
+    tap: .cghidEventTap,
     place: .headInsertEventTap,
-    options: .listenOnly,
+    options: .defaultTap,
     eventsOfInterest: mask,
     callback: callback,
     userInfo: nil
