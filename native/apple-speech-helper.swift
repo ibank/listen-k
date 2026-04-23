@@ -109,40 +109,65 @@ func startStream() {
     }
     currentRequest = request
 
+    // Benign `kAFAssistantErrorDomain` codes — cancelled stops, no-speech
+    // timeouts, session-ended variants. Not actionable for the user; treat
+    // as an empty final so the renderer shows its brief auto-clearing
+    // "음성이 감지되지 않음" chip. Any OTHER code in this domain (on-device
+    // model missing, locale model missing, network unreachable on a non-
+    // on-device session, etc.) is a real diagnostic event — surface it
+    // as an error so the user has a chance to act, and log the code to
+    // stderr so operators can see which one actually fired.
+    let benignAFCodes: Set<Int> = [203, 216, 1101, 1110, 1700]
+
     currentTask = recognizer.recognitionTask(with: request) { result, error in
+        var partialText: String? = nil
+        var finalText: String? = nil
+        var errorMessage: String? = nil
+        var shouldClear = false
+
         if let result = result {
             let text = result.bestTranscription.formattedString
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if result.isFinal {
-                emit(["type": "final", "text": text])
-                streaming = false
-                currentRequest = nil
-                currentTask = nil
+                finalText = text
+                shouldClear = true
             } else if !text.isEmpty {
-                emit(["type": "partial", "text": text])
+                partialText = text
             }
         }
         if let err = error {
             let nsErr = err as NSError
-            // `kAFAssistantErrorDomain` errors are SFSpeechRecognizer's
-            // internal bookkeeping for "nothing usable came out of this
-            // session" — cancelled stops (216), no-speech timeouts
-            // (203 / 1101 / 1110 depending on OS version), and various
-            // session-ended variants. None of them are actionable for
-            // the user, but the non-216 ones were leaking out as an
-            // angry red "스트리밍 오류" chip that stuck until the next
-            // recording. Treat the whole domain as an "empty final" —
-            // the renderer's empty-final path already flashes a brief
-            // "음성이 감지되지 않음" status and auto-clears. Real errors
-            // (permission, audio engine, unknown domain) still surface.
             if nsErr.domain == "kAFAssistantErrorDomain" {
-                emit(["type": "final", "text": ""])
-                streaming = false
-                currentRequest = nil
-                currentTask = nil
+                writeStderr("[speech] kAFAssistantErrorDomain code=\(nsErr.code) \(err.localizedDescription)\n")
+                if benignAFCodes.contains(nsErr.code) {
+                    finalText = ""
+                } else {
+                    errorMessage = "speech error (AF \(nsErr.code)): \(err.localizedDescription)"
+                }
             } else {
-                emit(["type": "error", "message": "\(err.localizedDescription)"])
+                errorMessage = err.localizedDescription
             }
+            shouldClear = true
+        }
+
+        if shouldClear {
+            // Serialise with startStream/stopStream's state mutations —
+            // this callback fires on an arbitrary queue, so without the
+            // lock a user-initiated stop racing the recognizer's own
+            // termination could observe half-reset state and skip the
+            // audioEngine.stop() / tap-removal cleanup entirely.
+            lock.lock()
+            streaming = false
+            currentRequest = nil
+            currentTask = nil
+            lock.unlock()
+        }
+
+        if let t = partialText { emit(["type": "partial", "text": t]) }
+        if let msg = errorMessage {
+            emit(["type": "error", "message": msg])
+        } else if let t = finalText {
+            emit(["type": "final", "text": t])
         }
     }
 
@@ -205,6 +230,17 @@ DispatchQueue.global(qos: .userInitiated).async {
             default:
                 emit(["type": "error", "message": "unknown cmd: \(cmd)"])
             }
+        }
+    }
+    // readLine() returning nil == EOF on stdin == parent Electron process
+    // closed the pipe (either SIGTERM'd us or crashed). Without this, a
+    // crashed Electron leaves us running forever with the mic indicator
+    // lit in the menu bar. Tear down cleanly and exit.
+    writeStderr("[stdin] EOF — parent died, shutting down\n")
+    DispatchQueue.main.async {
+        stopStream()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            exit(0)
         }
     }
 }

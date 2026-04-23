@@ -61,6 +61,12 @@ var keyIsDown: Set<Int64> = []
 var lastTapTime: CFAbsoluteTime = 0
 let DOUBLE_TAP_WINDOW: CFAbsoluteTime = 0.38
 
+// Holds a reference to the CGEventTap so the callback can re-enable it
+// after the system times it out. Assigned once tapCreate returns below;
+// the callback only fires after CFRunLoopRun starts, by which point this
+// has been written.
+var tapRef: CFMachPort?
+
 let callback: CGEventTapCallBack = { (_, type, event, _) in
     switch type {
     case .flagsChanged:
@@ -92,9 +98,18 @@ let callback: CGEventTapCallBack = { (_, type, event, _) in
         }
 
     case .tapDisabledByTimeout, .tapDisabledByUserInput:
+        // The system disables a tap when its callback runs too slowly
+        // or on various lifecycle edges (sleep/wake, fast user switch).
+        // The previous comment promised "will be re-enabled by main"
+        // but nothing in Electron ever did — taps stayed dead and the
+        // hotkey silently stopped working until the user relaunched.
+        // Re-enable in-place so the helper recovers transparently.
         FileHandle.standardError.write(
-            "tap disabled, will be re-enabled by main\n".data(using: .utf8)!
+            "tap disabled (\(type == .tapDisabledByTimeout ? "timeout" : "userInput")) — re-enabling\n".data(using: .utf8)!
         )
+        if let t = tapRef {
+            CGEvent.tapEnable(tap: t, enable: true)
+        }
 
     default:
         break
@@ -138,6 +153,7 @@ guard let tap = CGEvent.tapCreate(
     exit(1)
 }
 
+tapRef = tap
 let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
 CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
 CGEvent.tapEnable(tap: tap, enable: true)

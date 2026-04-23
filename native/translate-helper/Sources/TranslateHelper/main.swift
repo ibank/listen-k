@@ -71,6 +71,7 @@ struct TranslateHelper {
             let prompt = buildPrompt(text: sourceText, targetLanguage: targetLang)
 
             let parameters = GenerateParameters(
+                maxTokens: maxTokens,
                 temperature: 0.2,
                 topP: 0.9
             )

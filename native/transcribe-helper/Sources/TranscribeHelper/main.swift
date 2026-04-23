@@ -360,7 +360,30 @@ struct TranscribeHelper {
         }
     }
 
+    /// Reject CLI paths that try to walk outside the directory they
+    /// appear to point at. Defence-in-depth against a hostile Electron
+    /// caller (or a future custom-model-dir setting) passing `../` or
+    /// a symlink that lands on sensitive files.
+    static func sanitizeModelDir(_ raw: String) -> URL? {
+        let url = URL(fileURLWithPath: raw, isDirectory: true).standardizedFileURL
+        // .standardized collapses `./` and resolves `..` textually. If
+        // `..` survived (absolute path starts with `/..`) or the path
+        // doesn't exist as a directory, refuse.
+        if url.path.contains("/..") { return nil }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir),
+              isDir.boolValue else { return nil }
+        return url
+    }
+
     static func runStream(modelDir: String, language: String, hfCache: String?) async {
+        guard let resolvedModelDir = sanitizeModelDir(modelDir) else {
+            emit(["type": "error", "message": "invalid --model-dir: \(modelDir)"])
+            writeStderr("[init] refusing model-dir (not a directory or traversal): \(modelDir)\n")
+            exit(2)
+        }
+        let modelDir = resolvedModelDir.path
+
         // Mic permission: this helper binary has its own TCC identity, so
         // it must be authorised independently of the Electron app that
         // spawned it. Without mic access, AudioStreamTranscriber reads
@@ -464,6 +487,16 @@ struct TranscribeHelper {
                 emit(["type": "error", "message": "unknown cmd: \(cmd)"])
             }
         }
+
+        // readLine() → nil means stdin hit EOF: the parent Electron
+        // process closed our pipe, either because it's shutting us down
+        // cleanly or because it itself crashed. Without this explicit
+        // stop-and-exit path, a crashed Electron leaves us running with
+        // the mic indicator lit and the AudioProcessor holding the
+        // audio device.
+        writeStderr("[stdin] EOF — parent died, shutting down\n")
+        await controller.stop()
+        exit(0)
     }
 
     // MARK: - Utilities
