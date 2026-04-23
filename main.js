@@ -1250,14 +1250,6 @@ function checkAccessibility() {
   });
 }
 
-function checkInputMonitoring() {
-  const helper = resPath('bin', 'fn-listener');
-  if (!fs.existsSync(helper)) return Promise.resolve(false);
-  return new Promise((resolve) => {
-    execFile(helper, ['--check'], (err) => resolve(!err));
-  });
-}
-
 function checkOllama() {
   return new Promise((resolve) => {
     const controller = new AbortController();
@@ -1425,7 +1417,6 @@ function isSetupComplete(s) {
   const hasEngine = (s.transcribeHelper && s.whisperKitModel) || (s.whisperBin && s.whisperModel);
   return (
     s.mic === 'granted' &&
-    s.inputMonitoring &&
     s.accessibility &&
     hasEngine
   );
@@ -1439,10 +1430,7 @@ function getAppBundlePath() {
 
 async function collectStatus() {
   const mic = systemPreferences.getMediaAccessStatus('microphone');
-  const [accessibility, inputMonitoring] = await Promise.all([
-    checkAccessibility(),
-    checkInputMonitoring(),
-  ]);
+  const accessibility = await checkAccessibility();
   const ollama = await checkOllama();
 
   const wkHelper = findTranscribeHelper();
@@ -1467,7 +1455,6 @@ async function collectStatus() {
 
   return {
     mic,
-    inputMonitoring,
     accessibility,
     transcribeHelper: wkHelper ? { path: wkHelper } : null,
     whisperKitModel: wkModel ? { path: wkModel } : null,
@@ -1485,14 +1472,12 @@ async function collectStatus() {
     ollama,
     packaged: app.isPackaged,
     appBundlePath: getAppBundlePath(),
-    fnListenerPath: resPath('bin', 'fn-listener'),
     pasteHelperPath: resPath('bin', 'paste-helper'),
   };
 }
 
 const SETTINGS_URLS = {
   mic: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
-  'input-monitoring': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent',
   accessibility: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
   keyboard: 'x-apple.systempreferences:com.apple.preference.keyboard',
 };

@@ -44,7 +44,7 @@ codesign --force --sign - bin/focus-helper
 codesign --force --deep --sign - bin/apple-speech-helper.app
 
 echo "컴파일 + ad-hoc 서명 완료:"
-echo "  bin/fn-listener           (입력 모니터링 권한 필요)"
+echo "  bin/fn-listener           (별도 권한 불필요 — flagsChanged listen-only tap)"
 echo "  bin/paste-helper          (손쉬운 사용 권한 필요)"
 echo "  bin/focus-helper          (별도 권한 불필요)"
 echo "  bin/apple-speech-helper   (음성 인식 + 마이크 권한 필요)"

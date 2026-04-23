@@ -751,28 +751,6 @@ async function renderStatus(statusArg) {
       : [],
   }));
 
-  const targetPath = s.packaged ? s.appBundlePath : s.fnListenerPath;
-  const targetLabel = s.packaged ? 'Listen K.app' : 'fn-listener';
-
-  const imCoveredByAx = s.inputMonitoring && s.accessibility;
-
-  rows.push(buildCheckRow({
-    state: s.inputMonitoring ? 'ok' : 'err',
-    glyph: s.inputMonitoring ? '✓' : '✕',
-    title: t('check.hotkey.title'),
-    desc: s.inputMonitoring
-      ? (imCoveredByAx ? t('check.hotkey.grantedAX') : t('check.hotkey.grantedIM'))
-      : t('check.hotkey.denied', { target: targetLabel, path: targetPath || '' }),
-    actions: s.inputMonitoring ? [] : [
-      { label: t('check.hotkey.openSettings'), primary: true, onClick: () => window.listenk.openSettingsPane('input-monitoring') },
-      targetPath && { label: t('check.hotkey.showFinder'), onClick: () => window.listenk.showInFinder(targetPath) },
-      targetPath && {
-        label: t('check.hotkey.copyPath'),
-        onClick: async () => { await copyToClipboard(targetPath); toast(t('toast.pathCopied')); },
-      },
-    ].filter(Boolean),
-  }));
-
   const axTargetPath = s.packaged ? s.appBundlePath : s.pasteHelperPath;
   const axTargetLabel = s.packaged ? 'Listen K.app' : 'paste-helper';
 
@@ -2799,16 +2777,6 @@ async function onboardRenderPermissions() {
         ? null
         : { labelKey: 'onboard.perm.openSettings', fn: () => window.listenk.openSettingsPane('accessibility') },
       iconSvg: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none"><circle cx="8" cy="4" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 6v4M5 8l3-2 3 2M6 14l2-4 2 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    },
-    {
-      key: 'im',
-      titleKey: 'onboard.perm.inputMonitoring',
-      descKey: 'onboard.perm.inputMonitoringDesc',
-      granted: Boolean(status.inputMonitoring) || Boolean(status.accessibility),
-      action: (status.inputMonitoring || status.accessibility)
-        ? null
-        : { labelKey: 'onboard.perm.openSettings', fn: () => window.listenk.openSettingsPane('input-monitoring') },
-      iconSvg: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M5 8h.01M8 8h.01M11 8h.01M4.5 10.5h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
     },
   ];
 

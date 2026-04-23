@@ -22,18 +22,12 @@ if args.count >= 2 && args[1] == "--check" {
 //   rshift-double — Right Shift (⇧) double-tap
 let mode = args.count >= 2 ? args[1] : "rshift-double"
 
-let access = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
-if access != kIOHIDAccessTypeGranted {
-    let reason: String
-    switch access {
-    case kIOHIDAccessTypeDenied: reason = "denied"
-    default: reason = "not-determined"
-    }
-    FileHandle.standardError.write(
-        "ERROR: Input Monitoring \(reason)\n".data(using: .utf8)!
-    )
-    exit(2)
-}
+// No IOHIDCheckAccess gate: the tap below is listen-only and subscribes
+// to `.flagsChanged` events only. macOS doesn't gate modifier-flag taps
+// behind Input Monitoring (that permission guards keystroke content), so
+// the tap creates successfully regardless of the TCC state of this
+// helper. `--check` above is still offered for diagnostics callers that
+// want to know the permission state explicitly.
 
 // Virtual key codes (see HIToolbox/Events.h)
 let KC_RIGHT_COMMAND: Int64 = 0x36
