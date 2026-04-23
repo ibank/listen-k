@@ -1606,12 +1606,21 @@ ipcMain.handle('get-update-state', () => ({
 ipcMain.handle('install-update-now', () => {
   if (!app.isPackaged) return { ok: false, reason: 'dev' };
   if (!pendingUpdateVersion) return { ok: false, reason: 'not-downloaded' };
+  // CRITICAL: flip the "actually quitting" flag so mainWindow's
+  // close-preventing handler doesn't veto the quit. We're LSUIElement
+  // and the close handler swallows close → hide, which was cancelling
+  // quitAndInstall() — the window vanished, the app kept running the
+  // OLD version, and reopening from the tray showed the button stuck
+  // on "Restarting…" (v0.7.1 → v0.7.3 regression).
+  app.isQuitting = true;
   // quitAndInstall(isSilent, isForceRunAfter) — the defaults (true, false)
   // leave the new app *not* launched. We explicitly want forceRunAfter
   // so the user lands back in the dashboard, same as a normal cold boot.
   setImmediate(() => {
     try { autoUpdater.quitAndInstall(true, true); } catch (err) {
       console.warn('[updater] quitAndInstall failed:', err && err.message);
+      // Quit failed → undo the flag so the user can still interact.
+      app.isQuitting = false;
     }
   });
   return { ok: true, version: pendingUpdateVersion };

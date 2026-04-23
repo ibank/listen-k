@@ -3070,20 +3070,33 @@ function applyUpdateBanner({ pendingUpdateVersion }) {
 
 async function installUpdateNow() {
   const btn = $('updateInstallBtn');
+  const restoreBtn = () => {
+    if (btn) { btn.disabled = false; btn.textContent = t('banner.update.install'); }
+  };
   if (btn) {
     btn.disabled = true;
     btn.textContent = t('banner.update.installing');
   }
+  // Defense in depth: if quitAndInstall silently fails on main (e.g. the
+  // window close-handler cancels the quit), the button would otherwise
+  // sit on "Restarting…" forever. On success the whole app is gone
+  // before this timer fires.
+  const stuckTimer = setTimeout(() => {
+    restoreBtn();
+    toast(t('banner.update.installStuck'));
+  }, 5000);
   try {
     const res = await window.listenk?.installUpdateNow?.();
     if (res && res.ok === false) {
+      clearTimeout(stuckTimer);
       toast(t('banner.update.installFail', { reason: res.reason || '?' }));
-      if (btn) { btn.disabled = false; btn.textContent = t('banner.update.install'); }
+      restoreBtn();
     }
     // Success path: main quits the app immediately — no UI follow-up needed.
   } catch (err) {
+    clearTimeout(stuckTimer);
     toast(t('banner.update.installFail', { reason: err.message || '?' }));
-    if (btn) { btn.disabled = false; btn.textContent = t('banner.update.install'); }
+    restoreBtn();
   }
 }
 

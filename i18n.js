@@ -73,6 +73,7 @@ const strings = {
     'banner.update.install': '재시작하여 설치',
     'banner.update.installing': '재시작 중…',
     'banner.update.installFail': '재시작 실패: {reason}',
+    'banner.update.installStuck': '재시작이 막혔어요. 트레이 메뉴 → Quit 으로 수동 종료 후 다시 실행해 주세요.',
     'banner.update.dismiss': '나중에',
 
     // ── Page titles / actions ──────────────────────────────────────────
@@ -508,6 +509,7 @@ const strings = {
     'banner.update.install': 'Restart & install',
     'banner.update.installing': 'Restarting…',
     'banner.update.installFail': "Couldn't restart: {reason}",
+    'banner.update.installStuck': 'Restart is stuck. Quit from the tray menu and relaunch manually.',
     'banner.update.dismiss': 'Later',
 
     'page.status.title': 'Setup status',
@@ -932,6 +934,7 @@ const strings = {
     'banner.update.install': '再起動してインストール',
     'banner.update.installing': '再起動中…',
     'banner.update.installFail': '再起動失敗: {reason}',
+    'banner.update.installStuck': '再起動が進みません。トレイメニューから Quit して手動で再起動してください。',
     'banner.update.dismiss': '後で',
 
     'page.status.title': 'セットアップ状態',
@@ -1356,6 +1359,7 @@ const strings = {
     'banner.update.install': '重启并安装',
     'banner.update.installing': '重启中…',
     'banner.update.installFail': '重启失败: {reason}',
+    'banner.update.installStuck': '重启卡住了。请从托盘菜单退出后手动重新启动。',
     'banner.update.dismiss': '稍后',
 
     'page.status.title': '设置状态',
