@@ -310,6 +310,13 @@ const strings = {
     'usage.about.checkFailed': '확인 실패: {reason}',
     'usage.about.devBuild': '개발 빌드 — 업데이트 확인 비활성',
 
+    'usage.feedback.title': '피드백',
+    'usage.feedback.sub': '잘 되는 점, 아쉬운 점 모두 알려주세요',
+    'usage.feedback.email': '이메일로 의견 보내기',
+    'usage.feedback.issue': '버그 / 이슈 신고',
+    'usage.feedback.discussion': '토론 / 기능 제안',
+    'usage.feedback.star': '★ GitHub 에 별 주기',
+
     // ── Status-page check rows ────────────────────────────────────────
     'check.mic.title': '마이크 접근',
     'check.mic.granted': '허용됨',
@@ -445,6 +452,10 @@ const strings = {
     'tray.state.idle': '⚪ 대기',
     'tray.menu.open': '창 열기',
     'tray.menu.toggleRecord': '녹음 토글',
+    'tray.menu.feedback': '피드백',
+    'tray.menu.feedbackEmail': '이메일로 의견 보내기',
+    'tray.menu.reportIssue': '버그 / 이슈 신고',
+    'tray.menu.discussions': '토론 / 기능 제안',
     'tray.menu.quit': '종료',
 
     // ── Stats page ────────────────────────────────────────────────────
@@ -760,6 +771,13 @@ const strings = {
     'usage.about.checkFailed': 'Check failed: {reason}',
     'usage.about.devBuild': 'Development build — update check disabled',
 
+    'usage.feedback.title': 'Feedback',
+    'usage.feedback.sub': "Tell us what works — and what doesn't",
+    'usage.feedback.email': 'Send feedback by email',
+    'usage.feedback.issue': 'Report a bug',
+    'usage.feedback.discussion': 'Discussions / feature ideas',
+    'usage.feedback.star': '★ Star on GitHub',
+
     'check.mic.title': 'Microphone access',
     'check.mic.granted': 'Granted',
     'check.mic.denied': 'Denied. Enable in System Settings.',
@@ -891,6 +909,10 @@ const strings = {
     'tray.state.idle': '⚪ Idle',
     'tray.menu.open': 'Open window',
     'tray.menu.toggleRecord': 'Toggle record',
+    'tray.menu.feedback': 'Feedback',
+    'tray.menu.feedbackEmail': 'Send feedback by email',
+    'tray.menu.reportIssue': 'Report a bug',
+    'tray.menu.discussions': 'Discussions / feature ideas',
     'tray.menu.quit': 'Quit',
 
     'stats.section.summary': 'Summary',
@@ -1204,6 +1226,13 @@ const strings = {
     'usage.about.checkFailed': '確認失敗: {reason}',
     'usage.about.devBuild': '開発ビルド — アップデート確認は無効',
 
+    'usage.feedback.title': 'フィードバック',
+    'usage.feedback.sub': '良い点も残念な点もお聞かせください',
+    'usage.feedback.email': 'メールで意見を送る',
+    'usage.feedback.issue': 'バグ報告',
+    'usage.feedback.discussion': 'ディスカッション / 機能リクエスト',
+    'usage.feedback.star': '★ GitHub でスターを付ける',
+
     'check.mic.title': 'マイクアクセス',
     'check.mic.granted': '許可済み',
     'check.mic.denied': '拒否されました。システム設定で許可してください。',
@@ -1335,6 +1364,10 @@ const strings = {
     'tray.state.idle': '⚪ 待機',
     'tray.menu.open': 'ウィンドウを開く',
     'tray.menu.toggleRecord': '録音トグル',
+    'tray.menu.feedback': 'フィードバック',
+    'tray.menu.feedbackEmail': 'メールで意見を送る',
+    'tray.menu.reportIssue': 'バグ報告',
+    'tray.menu.discussions': 'ディスカッション / 機能リクエスト',
     'tray.menu.quit': '終了',
 
     'stats.section.summary': 'サマリー',
@@ -1648,6 +1681,13 @@ const strings = {
     'usage.about.checkFailed': '检查失败: {reason}',
     'usage.about.devBuild': '开发版本 — 更新检查已禁用',
 
+    'usage.feedback.title': '反馈',
+    'usage.feedback.sub': '好用的、不顺手的, 都欢迎告诉我们',
+    'usage.feedback.email': '通过邮件发送反馈',
+    'usage.feedback.issue': '报告问题',
+    'usage.feedback.discussion': '讨论 / 功能建议',
+    'usage.feedback.star': '★ 在 GitHub 加星',
+
     'check.mic.title': '麦克风访问',
     'check.mic.granted': '已允许',
     'check.mic.denied': '已拒绝。请在系统设置中允许。',
@@ -1779,6 +1819,10 @@ const strings = {
     'tray.state.idle': '⚪ 待机',
     'tray.menu.open': '打开窗口',
     'tray.menu.toggleRecord': '切换录音',
+    'tray.menu.feedback': '反馈',
+    'tray.menu.feedbackEmail': '通过邮件发送反馈',
+    'tray.menu.reportIssue': '报告问题',
+    'tray.menu.discussions': '讨论 / 功能建议',
     'tray.menu.quit': '退出',
 
     'stats.section.summary': '摘要',

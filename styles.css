@@ -1770,6 +1770,14 @@ kbd {
 .about-status[data-state="update"]  { color: var(--accent, var(--text-1)); font-weight: 500; }
 .about-status[data-state="error"]   { color: var(--err); }
 
+/* Feedback row in the About card: row of action buttons. Wraps on narrow
+   widths because the four buttons together exceed the default card width. */
+.about-row.feedback-row {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: var(--space-2);
+}
+
 /* ========== History list (이력 page) ========== */
 
 .history-list {

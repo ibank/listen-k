@@ -12,6 +12,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.8.1] — 2026-05-19
+
+### Added
+- **In-app feedback channels.** Usage page now has a dedicated
+  "Feedback" card with four one-click buttons: send feedback by
+  email (mailto link prefilled with the running version),
+  report a bug (GitHub Issues new-issue form), open Discussions
+  (feature ideas / questions), and star on GitHub. The tray's
+  right-click native menu gains a matching "Feedback" submenu
+  so the channels are reachable without opening the main window.
+  Each destination is wired through a hardcoded IPC handler in
+  main.js, matching the existing `open-ollama-download` /
+  `open-settings-pane` pattern — a compromised renderer can't
+  pivot the new openers into an arbitrary-URL primitive.
+
+### Changed
+- **electron 41.2.2 → 41.3.0** (#4). Pulls in five upstream fixes
+  (`printToPDF` no longer permanently breaks after a single invalid
+  `pageRanges` rejection, hidden `WebContentsView` drag attribution,
+  macOS update path unblocked when another app held the system
+  update loop, build with `enable_pdf=false`, frameless transparent
+  window resize on Windows) and bumps the bundled Node runtime to
+  v24.15.0. None of these change Listen K behaviour; the macOS
+  update fix is the only one we could plausibly hit, and only in
+  pathological host states.
+
 ## [0.8.0] — 2026-05-19
 
 User-facing release: surfaces a previously-silent failure mode in the

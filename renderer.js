@@ -3258,6 +3258,11 @@ function syncAboutUpdateBtn({ pendingUpdateVersion }) {
 
 $('aboutUpdateBtn')?.addEventListener('click', runUpdateCheck);
 
+$('feedbackEmailBtn')?.addEventListener('click', () => { window.listenk?.openFeedbackEmail?.(); });
+$('feedbackIssueBtn')?.addEventListener('click', () => { window.listenk?.openIssues?.(); });
+$('feedbackDiscussBtn')?.addEventListener('click', () => { window.listenk?.openDiscussions?.(); });
+$('feedbackStarBtn')?.addEventListener('click', () => { window.listenk?.openRepo?.(); });
+
 // ── Update-ready banner (dashboard) ──────────────────────────────────
 // v0.6.0 already pulled new builds in the background via electron-updater
 // but only advertised them via a toast that vanished in seconds, and

@@ -494,6 +494,23 @@ function updateTrayMenu() {
     { label: tr('tray.menu.open'), click: () => showWindowNonIntrusive() },
     { label: tr('tray.menu.toggleRecord'), click: () => handleFnPress() },
     { type: 'separator' },
+    {
+      label: tr('tray.menu.feedback'),
+      submenu: [
+        { label: tr('tray.menu.feedbackEmail'), click: () => {
+            const v = app.getVersion();
+            const subject = encodeURIComponent(`Listen K v${v} feedback`);
+            require('electron').shell.openExternal(`mailto:hello@listenk.com?subject=${subject}`);
+          } },
+        { label: tr('tray.menu.reportIssue'), click: () => {
+            require('electron').shell.openExternal('https://github.com/ibank/listen-k/issues/new');
+          } },
+        { label: tr('tray.menu.discussions'), click: () => {
+            require('electron').shell.openExternal('https://github.com/ibank/listen-k/discussions');
+          } },
+      ],
+    },
+    { type: 'separator' },
     { label: tr('tray.menu.quit'), click: () => { app.isQuitting = true; app.quit(); } },
   ]);
   if (trayWindow && trayWindow.isVisible()) sendTraySnapshot();
@@ -2262,6 +2279,30 @@ ipcMain.handle('request-mic', async () => {
 // this into an arbitrary-URL primitive.
 ipcMain.handle('open-ollama-download', () => {
   require('electron').shell.openExternal('https://ollama.com/download');
+  return true;
+});
+
+// Feedback channels. Each is a hardcoded URL so a compromised renderer
+// can't pivot these into an arbitrary-URL primitive (same pattern as
+// open-ollama-download / open-settings-pane). The mailto subject
+// injects the running version so support reports arrive already tagged
+// — encodeURIComponent keeps any unexpected characters safe.
+ipcMain.handle('open-feedback-email', () => {
+  const v = app.getVersion();
+  const subject = encodeURIComponent(`Listen K v${v} feedback`);
+  require('electron').shell.openExternal(`mailto:hello@listenk.com?subject=${subject}`);
+  return true;
+});
+ipcMain.handle('open-issues', () => {
+  require('electron').shell.openExternal('https://github.com/ibank/listen-k/issues/new');
+  return true;
+});
+ipcMain.handle('open-discussions', () => {
+  require('electron').shell.openExternal('https://github.com/ibank/listen-k/discussions');
+  return true;
+});
+ipcMain.handle('open-repo', () => {
+  require('electron').shell.openExternal('https://github.com/ibank/listen-k');
   return true;
 });
 
