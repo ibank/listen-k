@@ -311,6 +311,33 @@ body {
   margin-right: 2px;
 }
 
+/* Error state — surfaces user-actionable failures (e.g. Apple Speech
+   with Siri/Dictation disabled) when the main window is closed and no
+   toast is reachable. Same layout as 'done', recolored red. */
+.pill[data-state='error'] {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 90, 95, 0.5),
+    0 0 40px rgba(255, 90, 95, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.pill[data-state='error'] .wave,
+.pill[data-state='error'] .spinner,
+.pill[data-state='error'] .cursor { display: none; }
+.pill[data-state='error'] .btn.confirm { display: none; }
+.pill[data-state='error'] .btn.cancel { opacity: 0.7; }
+.pill[data-state='error'] .live-text {
+  display: flex !important;
+  color: #ff7f84;
+  font-weight: 500;
+  opacity: 1;
+  white-space: normal;
+}
+.pill[data-state='error'] .live-text .live-text-body::before {
+  content: '⚠ ';
+  margin-right: 2px;
+}
+
 @keyframes text-fade-in {
   from { opacity: 0; transform: translateX(4px); }
   to   { opacity: 1; transform: translateX(0); }

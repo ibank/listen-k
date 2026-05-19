@@ -59,11 +59,23 @@ api?.onState?.((state) => {
   const effective = known.has(state) ? state : 'idle';
   pill.dataset.state = effective;
 
-  if (effective === 'recording' || effective === 'idle' || effective === 'error') {
+  if (effective === 'recording' || effective === 'idle') {
     // Whatever partial was on screen is no longer relevant — clear it
     // so the next recording starts from a blank pill.
     if (liveTextBody) liveTextBody.textContent = '';
     pill.dataset.hasText = 'false';
+  }
+  if (effective === 'error') {
+    // The accompanying hud-message arrives separately (onMessage below)
+    // and writes the localized error into liveTextBody. We leave any
+    // existing text in place here so the message survives a race where
+    // hud-message lands a tick before hud-state. If no message is set
+    // by the time we paint, fall back to a generic '!' marker so the
+    // user at least sees that something errored.
+    if (liveTextBody && !liveTextBody.textContent) {
+      liveTextBody.textContent = '!';
+    }
+    pill.dataset.hasText = 'true';
   }
   if (effective === 'done') {
     // Show the success line in place of live text. hasText=true makes
@@ -71,6 +83,17 @@ api?.onState?.((state) => {
     if (liveTextBody) liveTextBody.textContent = doneText();
     pill.dataset.hasText = 'true';
   }
+});
+
+// Distinct from onPartial: this is a one-shot error message pushed by
+// main when the stream helper fails in a way the user needs to see
+// (e.g. Apple Speech with Siri/Dictation disabled). Painted into the
+// same liveTextBody slot — CSS keys off pill[data-state='error'] to
+// recolor it red rather than the partial-text white.
+api?.onMessage?.((text) => {
+  if (!liveTextBody) return;
+  liveTextBody.textContent = (text || '').trim();
+  pill.dataset.hasText = liveTextBody.textContent ? 'true' : 'false';
 });
 
 api?.onPartial?.((text) => {

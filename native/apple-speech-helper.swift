@@ -123,6 +123,7 @@ func startStream() {
         var partialText: String? = nil
         var finalText: String? = nil
         var errorMessage: String? = nil
+        var errorCode: String? = nil
         var shouldClear = false
 
         if let result = result {
@@ -137,8 +138,21 @@ func startStream() {
         }
         if let err = error {
             let nsErr = err as NSError
-            if nsErr.domain == "kAFAssistantErrorDomain" {
-                writeStderr("[speech] kAFAssistantErrorDomain code=\(nsErr.code) \(err.localizedDescription)\n")
+            writeStderr("[speech] error domain=\(nsErr.domain) code=\(nsErr.code) desc=\(err.localizedDescription)\n")
+            // Since iOS 17 / macOS Sonoma, SFSpeechRecognizer fails with
+            // "Siri and Dictation are disabled" when both system features
+            // are off — even though isAvailable returns true and
+            // authorizationStatus() reports .authorized. Apple provides
+            // no API to query this state up front (FB13235751), so we
+            // detect it from the localized error string. Domain has
+            // shifted across releases (kAFAssistantErrorDomain on older
+            // macOS, other domains on newer), so match the message text
+            // regardless of domain.
+            let desc = err.localizedDescription.lowercased()
+            if desc.contains("siri") || desc.contains("dictation") {
+                errorCode = "siri-disabled"
+                errorMessage = err.localizedDescription
+            } else if nsErr.domain == "kAFAssistantErrorDomain" {
                 if benignAFCodes.contains(nsErr.code) {
                     finalText = ""
                 } else {
@@ -157,15 +171,30 @@ func startStream() {
             // termination could observe half-reset state and skip the
             // audioEngine.stop() / tap-removal cleanup entirely.
             lock.lock()
+            let wasStreaming = streaming
             streaming = false
             currentRequest = nil
             currentTask = nil
             lock.unlock()
+            // Tear down the audio engine here too. When the recognition
+            // task self-terminates (final result, or an early error like
+            // siri-disabled), the next user-initiated stopStream() sees
+            // `streaming=false` and skips the audioEngine.stop() — which
+            // leaves the input node's tap installed and the mic capture
+            // running, lighting up the macOS orange microphone indicator
+            // indefinitely. Match the stopStream() teardown here so the
+            // mic releases as soon as the task is done.
+            if wasStreaming {
+                audioEngine.stop()
+                audioEngine.inputNode.removeTap(onBus: 0)
+            }
         }
 
         if let t = partialText { emit(["type": "partial", "text": t]) }
         if let msg = errorMessage {
-            emit(["type": "error", "message": msg])
+            var event: [String: Any] = ["type": "error", "message": msg]
+            if let code = errorCode { event["code"] = code }
+            emit(event)
         } else if let t = finalText {
             emit(["type": "final", "text": t])
         }

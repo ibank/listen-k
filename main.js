@@ -10,6 +10,7 @@ const {
   Tray,
   nativeImage,
   Menu,
+  Notification,
 } = require('electron');
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
@@ -382,10 +383,56 @@ function flashHudDone(durationMs = 900) {
 
 function hideHud() {
   if (hudDoneTimer) { clearTimeout(hudDoneTimer); hudDoneTimer = null; }
+  if (hudErrorTimer) { clearTimeout(hudErrorTimer); hudErrorTimer = null; }
   if (!hudWindow) return;
   if (hudWindow.isVisible()) hudWindow.hide();
   safeSend(hudWindow,'hud-reset');
   cancelHudSafetyHide();
+}
+
+// Surface a user-facing error through the HUD itself. Used when the main
+// dashboard window is hidden (the common case for a background hotkey
+// app) and a stream-error toast wouldn't be visible. The HUD pops up
+// red, holds the message for ~4 s, then auto-clears.
+let hudErrorTimer = null;
+function showActionableHudError(message) {
+  if (!hudWindow) return;
+  positionHudOnActiveScreen();
+  safeSend(hudWindow,'hud-message', message || '');
+  safeSend(hudWindow,'hud-state', 'error');
+  sendHudContext('error');
+  if (!hudWindow.isVisible()) hudWindow.showInactive();
+  if (hudErrorTimer) clearTimeout(hudErrorTimer);
+  hudErrorTimer = setTimeout(() => {
+    hudErrorTimer = null;
+    hideHud();
+  }, 4000);
+}
+
+// Native macOS notification for siri-disabled. Visible even when both
+// the dashboard and the HUD are out of the user's eye-line (different
+// Space, fullscreen app, etc.). Clicking it deep-links to the Siri
+// pane so the fix is one tap away.
+//
+// Module-scoped reference so the Notification object isn't garbage-
+// collected before macOS gets a chance to render it or fire `click`.
+// Electron's Notification API doesn't keep its own strong reference.
+let lastSiriNotification = null;
+function notifySiriDisabled() {
+  if (!Notification.isSupported()) return;
+  try {
+    lastSiriNotification = new Notification({
+      title: tr('status.siriDisabled'),
+      body: tr('status.siriDisabledHint'),
+      silent: false,
+    });
+    lastSiriNotification.on('click', () => {
+      require('electron').shell.openExternal(SETTINGS_URLS.siri);
+    });
+    lastSiriNotification.show();
+  } catch (err) {
+    console.warn('[notify] siri-disabled notification failed:', err.message);
+  }
 }
 
 let trayWindow = null;
@@ -1348,8 +1395,23 @@ function handleStreamEvent(event) {
         const snippet = msg.length > 200 ? `${msg.slice(0, 200)}…(+${msg.length - 200})` : msg;
         console.error('[stream] error:', snippet);
       }
-      if (mainWindow) safeSend(mainWindow,'stream-error', event.message || '');
-      if (!isRecording) {
+      if (mainWindow) safeSend(mainWindow,'stream-error', { message: event.message || '', code: event.code || null });
+      // For codes the user MUST act on (currently just siri-disabled —
+      // Apple Speech can't start without Siri or Dictation enabled), the
+      // main window may be hidden, so a stream-error toast is invisible.
+      // Surface the error through the HUD (always summonable even with
+      // the dashboard closed) and a macOS Notification (click-to-open
+      // the Siri pane).
+      if (event.code === 'siri-disabled') {
+        showActionableHudError(tr('status.siriDisabled'));
+        notifySiriDisabled();
+        // Tear down recording state — the helper has already aborted
+        // this task, so leaving isRecording/isProcessing stuck would
+        // freeze the tray indicator and block the next hotkey press.
+        isRecording = false;
+        isProcessing = false;
+        updateTrayMenu();
+      } else if (!isRecording) {
         isProcessing = false;
         hideHud();
         updateTrayMenu();
@@ -1623,6 +1685,11 @@ const SETTINGS_URLS = {
   mic: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
   accessibility: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
   keyboard: 'x-apple.systempreferences:com.apple.preference.keyboard',
+  // macOS 14+ Siri pane (Apple Intelligence & Siri). Apple Speech engine
+  // (SFSpeechRecognizer) silently fails with "Siri and Dictation are
+  // disabled" if neither is enabled, so we deep-link the user here.
+  siri: 'x-apple.systempreferences:com.apple.Siri-Settings.extension',
+  dictation: 'x-apple.systempreferences:com.apple.preference.keyboard?Dictation',
 };
 
 app.whenReady().then(async () => {
@@ -1680,9 +1747,7 @@ app.whenReady().then(async () => {
   createTrayWindow();
   log('tray window created');
 
-  globalShortcut.register('CommandOrControl+Shift+Space', () => {
-    handleFnPress();
-  });
+  registerAltHotkey();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -2787,4 +2852,29 @@ ipcMain.handle('set-hotkey', (_e, mode) => {
   saveConfig(cfg);
   restartFnListener();
   return { ok: true, mode };
+});
+
+// Alternate global hotkey ⌘⇧Space. Optional because macOS uses this same
+// combo for the emoji/character picker — leaving it always-on hijacks a
+// well-known system shortcut. Default to off so new installs don't shadow
+// the picker; existing users who relied on it can opt back in.
+function altHotkeyEnabled() {
+  const cfg = loadConfig();
+  return cfg.altHotkey === true;
+}
+function registerAltHotkey() {
+  globalShortcut.unregister('CommandOrControl+Shift+Space');
+  if (altHotkeyEnabled()) {
+    globalShortcut.register('CommandOrControl+Shift+Space', () => {
+      handleFnPress();
+    });
+  }
+}
+ipcMain.handle('get-alt-hotkey', () => altHotkeyEnabled());
+ipcMain.handle('set-alt-hotkey', (_e, enabled) => {
+  const cfg = loadConfig();
+  cfg.altHotkey = !!enabled;
+  saveConfig(cfg);
+  registerAltHotkey();
+  return { ok: true, enabled: cfg.altHotkey };
 });

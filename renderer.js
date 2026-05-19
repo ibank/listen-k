@@ -9,6 +9,7 @@ const toneSel = $('tone');
 const modeSel = $('mode');
 const hotkeySel = $('hotkey');
 const streamingSel = $('streaming');
+const altHotkeySel = $('altHotkey');
 const whisperModelSel = $('whisperModel');
 const engineSel = $('engine');
 const openaiKeyInput = $('openaiKey');
@@ -593,6 +594,12 @@ async function cleanupWithOllama(raw, opts = {}) {
 // so the toggle-record fallback is gated by streamingActive below.
 let streamingActive = false;
 let latestPartial = '';
+// Sticky flag set when the Apple Speech helper reports a `siri-disabled`
+// stream error. macOS provides no API to query Siri/Dictation enabled state
+// (FB13235751), so once we observe the failure we keep showing the fix-it
+// row on the dashboard until the user successfully records again (cleared
+// by stream-ready or stream-final).
+let appleSpeechSiriBlocked = false;
 
 // Transcription timing — used to estimate audioSec for the streaming path
 // where the renderer doesn't hold the raw WAV buffer. Legacy batch path can
@@ -649,6 +656,8 @@ window.listenk?.onStreamFinal?.(async (text) => {
   const finalText = (text || latestPartial || '').trim();
   streamingActive = false;
   latestPartial = '';
+  // Successful round-trip clears any previous Siri-disabled diagnosis.
+  appleSpeechSiriBlocked = false;
   showRecent();
   rawEl.textContent = finalText;
 
@@ -677,11 +686,31 @@ window.listenk?.onToast?.((msg) => {
   if (msg) toast(msg, 2500);
 });
 
-window.listenk?.onStreamError?.((message) => {
+window.listenk?.onStreamError?.((message, code) => {
   streamingActive = false;
-  setStatus(t('status.streamError', { message }), 'error');
-  cleanEl.textContent = message;
-  window.listenk?.setState?.({ recording: false, processing: false });
+  if (code === 'siri-disabled') {
+    // SFSpeechRecognizer refused to start because Siri and Dictation are
+    // both disabled in System Settings. There's no public API to detect
+    // this up front (FB13235751), so we surface it here. Set a flag the
+    // dashboard's check row reads so the user can hit "Open Siri Settings"
+    // without leaving this page.
+    setStatus(t('status.siriDisabled'), 'error');
+    cleanEl.textContent = t('status.siriDisabledHint');
+    toast(t('toast.siriDisabled'), 4000);
+    appleSpeechSiriBlocked = true;
+    if (typeof refresh === 'function') refresh();
+  } else {
+    setStatus(t('status.streamError', { message }), 'error');
+    cleanEl.textContent = message;
+  }
+  // For siri-disabled, the main process has already cleared isRecording/
+  // isProcessing AND popped its own actionable HUD via showActionableHudError.
+  // Re-broadcasting set-state here races with that HUD because main's
+  // set-state handler calls hideHud() when both flags are false — which
+  // would yank the red error pill off-screen the moment after it appeared.
+  if (code !== 'siri-disabled') {
+    window.listenk?.setState?.({ recording: false, processing: false });
+  }
   // Auto-clear the chip back to idle/ready so a one-off error doesn't
   // leave an angry red badge sitting in the titlebar for the rest of
   // the session. 2.5 s is long enough to be readable but short enough
@@ -884,6 +913,24 @@ async function renderStatus(statusArg) {
             toast(t('toast.copiedAs', { text: 'npm run model:ggml:base' }));
           },
         },
+      ],
+    }));
+  }
+
+  // Apple Speech precondition: Siri or Dictation must be enabled in System
+  // Settings. macOS exposes no API to query this, so we show an info row
+  // when the engine is Apple — upgraded to an error row once we've actually
+  // observed a `siri-disabled` failure from the helper.
+  if (usingApple) {
+    const blocked = appleSpeechSiriBlocked;
+    rows.push(buildCheckRow({
+      state: blocked ? 'err' : 'info',
+      glyph: blocked ? '✕' : 'ⓘ',
+      title: t('check.apple.title'),
+      desc: blocked ? t('check.apple.blocked') : t('check.apple.desc'),
+      actions: [
+        { label: t('check.apple.openSiri'), primary: blocked, onClick: () => window.listenk.openSettingsPane('siri') },
+        { label: t('check.apple.openDictation'), onClick: () => window.listenk.openSettingsPane('dictation') },
       ],
     }));
   }
@@ -2325,7 +2372,7 @@ async function restoreSettings() {
   if (!api) return;
 
   const safe = async (fn) => { try { return await fn(); } catch { return null; } };
-  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels, openaiKeyInfo, openaiModel, uiLocaleInfo, theme] = await Promise.all([
+  const [hotkey, language, streaming, engine, mode, tone, translateTarget, ollamaModel, wkModels, openaiKeyInfo, openaiModel, uiLocaleInfo, theme, altHotkey] = await Promise.all([
     safe(() => api.getHotkey?.()),
     safe(() => api.getLanguage?.()),
     safe(() => api.getStreaming?.()),
@@ -2339,6 +2386,7 @@ async function restoreSettings() {
     safe(() => api.getOpenAiModel?.()),
     safe(() => api.getUiLocale?.()),
     safe(() => api.getTheme?.()),
+    safe(() => api.getAltHotkey?.()),
   ]);
 
   // Apply UI locale BEFORE painting any translated DOM so the first render
@@ -2356,6 +2404,9 @@ async function restoreSettings() {
 
   if (streamingSel) streamingSel.value = streaming === false ? 'off' : 'on';
   syncStreamingSeg();
+
+  if (altHotkeySel) altHotkeySel.value = altHotkey === true ? 'on' : 'off';
+  syncAltHotkeySeg();
 
   if (engine && engineSel) engineSel.value = engine;
   applyEngineVisibility(engine || 'whisperkit');
@@ -2485,6 +2536,30 @@ streamingSegEl?.querySelectorAll('button').forEach((btn) => {
     if (!streamingSel || streamingSel.value === v) return;
     streamingSel.value = v;
     streamingSel.dispatchEvent(new Event('change'));
+  });
+});
+
+altHotkeySel?.addEventListener('change', async () => {
+  if (!settingsReady) return;
+  const enabled = altHotkeySel.value === 'on';
+  syncAltHotkeySeg();
+  await api.setAltHotkey?.(enabled);
+  toast(t('toast.altHotkey', { label: enabled ? t('field.streaming.on') : t('field.streaming.off') }));
+});
+
+const altHotkeySegEl = $('altHotkeySeg');
+function syncAltHotkeySeg() {
+  if (!altHotkeySegEl || !altHotkeySel) return;
+  altHotkeySegEl.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('active', b.getAttribute('data-value') === altHotkeySel.value);
+  });
+}
+altHotkeySegEl?.querySelectorAll('button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const v = btn.getAttribute('data-value');
+    if (!altHotkeySel || altHotkeySel.value === v) return;
+    altHotkeySel.value = v;
+    altHotkeySel.dispatchEvent(new Event('change'));
   });
 });
 
@@ -2878,6 +2953,23 @@ async function onboardRenderPermissions() {
       iconSvg: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none"><circle cx="8" cy="4" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 6v4M5 8l3-2 3 2M6 14l2-4 2 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     },
   ];
+
+  // Only relevant for Apple Speech: SFSpeechRecognizer silently fails if
+  // Siri *and* Dictation are both disabled in System Settings (since
+  // macOS Sonoma / iOS 17, FB13235751). There is no API to query that
+  // state, so the row is informational — we can't tick it green, but
+  // we can give the user a direct deep-link to fix it.
+  if (status.selectedEngine === 'apple') {
+    items.push({
+      key: 'siri',
+      titleKey: 'onboard.perm.siri',
+      descKey: 'onboard.perm.siriDesc',
+      granted: false,
+      info: true,
+      action: { labelKey: 'check.apple.openSiri', fn: () => window.listenk.openSettingsPane('siri') },
+      iconSvg: '<svg viewBox="0 0 16 16" width="16" height="16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.5v3.8M8 11v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    });
+  }
 
   listEl.innerHTML = '';
   for (const item of items) {

@@ -71,9 +71,14 @@ contextBridge.exposeInMainWorld('listenk', {
   setTranslateTarget: (target) => ipcRenderer.invoke('set-translate-target', target),
   getStreaming: () => ipcRenderer.invoke('get-streaming'),
   setStreaming: (enabled) => ipcRenderer.invoke('set-streaming', enabled),
+  getAltHotkey: () => ipcRenderer.invoke('get-alt-hotkey'),
+  setAltHotkey: (enabled) => ipcRenderer.invoke('set-alt-hotkey', enabled),
   onStreamPartial: (cb) => ipcRenderer.on('stream-partial', (_e, text) => cb(text)),
   onStreamFinal: (cb) => ipcRenderer.on('stream-final', (_e, text) => cb(text)),
-  onStreamError: (cb) => ipcRenderer.on('stream-error', (_e, msg) => cb(msg)),
+  onStreamError: (cb) => ipcRenderer.on('stream-error', (_e, payload) => {
+    if (typeof payload === 'string') cb(payload, null);
+    else cb(payload?.message || '', payload?.code || null);
+  }),
   onStreamReady: (cb) => ipcRenderer.on('stream-ready', () => cb()),
   onToast: (cb) => ipcRenderer.on('toast', (_e, msg) => cb(msg)),
   onNavigatePage: (cb) => ipcRenderer.on('navigate-page', (_e, id) => cb(id)),

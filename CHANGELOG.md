@@ -12,6 +12,67 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+## [0.8.0] — 2026-05-19
+
+User-facing release: surfaces a previously-silent failure mode in the
+Apple Speech engine, and gives back control of the `⌘⇧Space` system
+shortcut. Existing installs will auto-update.
+
+### Added
+- **Apple Speech now tells the user when Siri / Dictation are disabled.**
+  Since iOS 17 / macOS Sonoma, `SFSpeechRecognizer` silently aborts the
+  recognition task with `"Siri and Dictation are disabled"` whenever
+  both system features are off — but `isAvailable` keeps returning
+  `true` and `authorizationStatus()` keeps reporting `.authorized`,
+  so there is no API to check up front (FB13235751). The helper now
+  parses the localized error string (domain-agnostic, since macOS 26
+  emits it under a non-`kAFAssistantErrorDomain` domain) and tags the
+  event with `code: "siri-disabled"`. main.js routes that into three
+  channels so the user sees the problem no matter where their
+  attention is:
+  - A red HUD pill with the localized `⚠ Siri/받아쓰기 비활성` text
+    that holds for 4 s before auto-clearing.
+  - A native macOS notification whose click action deep-links to
+    System Settings → Apple Intelligence & Siri.
+  - A dashboard "Siri or Dictation" check row that flips from info
+    (ⓘ, visible whenever the Apple engine is selected) to error
+    (✕, after we've actually observed a failure) with one-tap
+    "Open Siri Settings" / "Open Dictation Settings" buttons.
+  The onboarding step-1 permission list also gains an informational
+  row when the Apple engine is selected, so first-run users learn
+  the requirement before they hit it.
+- **`⌘⇧Space` alternate hotkey is now an opt-in setting.** Hotkey &
+  Input page → "Alternate ⌘⇧Space" toggle. New installs default to
+  **off** so the macOS emoji / character picker keeps its system-
+  reserved combo; existing users who relied on the alternate path
+  can switch it back on with one click. The primary hotkey
+  (Right ⇧ double-tap, fn, etc.) is unaffected.
+
+### Changed
+- **Helper releases the microphone the instant a recognition task
+  ends, not on next user stop.** When the Apple Speech task self-
+  terminates (a final result, or an early error like the new
+  `siri-disabled` path), the helper now calls
+  `audioEngine.stop()` + `removeTap(onBus:)` immediately. The
+  user-initiated `stopStream` previously skipped that teardown
+  whenever the task had already cleared `streaming`, leaving the
+  mic capture (and the macOS orange microphone indicator) running
+  until the next hotkey press.
+- **HUD gains an `error` visual state.** Same layout as the existing
+  `done` state, recolored red with a `⚠` glyph. Used by main.js's
+  `showActionableHudError()` whenever a recoverable, user-actionable
+  error happens while the dashboard window is hidden — previously
+  these errors only fired toasts that were invisible without the
+  main window.
+
+### Fixed
+- **stream-error IPC now carries a structured `{message, code}`
+  payload instead of a bare string.** The renderer can branch on
+  the code to render specialised UX (e.g. the new siri-disabled
+  banner with action buttons) while still falling back to the
+  original message-string handling. Preload remains backwards-
+  compatible with the legacy string form.
+
 ## [0.7.9] — 2026-04-24
 
 A broad hardening + polish release based on a code-review pass. No

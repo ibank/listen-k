@@ -270,6 +270,23 @@
 
           <div class="field-row">
             <div class="field-info">
+              <div class="field-title" data-i18n="field.altHotkey.title">Alternate ⌘⇧Space</div>
+              <div class="field-help" data-i18n="field.altHotkey.help">Also toggle recording when ⌘⇧Space is pressed. Disabling this restores macOS's emoji picker.</div>
+            </div>
+            <div class="field-control">
+              <div class="seg" id="altHotkeySeg" role="tablist">
+                <button type="button" data-value="on" role="tab" data-i18n="field.streaming.on">On</button>
+                <button type="button" data-value="off" role="tab" data-i18n="field.streaming.off">Off</button>
+              </div>
+              <select id="altHotkey" hidden>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field-info">
               <div class="field-title" data-i18n="field.lang.title">Language</div>
               <div class="field-help" data-i18n="field.lang.help">Whisper transcription language hint. Apple Speech uses the locale as-is.</div>
             </div>
