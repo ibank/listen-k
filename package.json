@@ -61,8 +61,8 @@
     "dist:dir": "electron-builder --mac --dir"
   },
   "devDependencies": {
-    "electron": "^41.3.0",
-    "electron-builder": "^26.8.1"
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.2"
   },
   "build": {
     "appId": "com.eazler.listenk",
@@ -175,6 +175,6 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.8.9"
   }
 }
