@@ -5,7 +5,7 @@ let package = Package(
     name: "transcribe-helper",
     platforms: [.macOS(.v14)],
     dependencies: [
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.13.0"),
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "1.1.0"),
     ],
     targets: [
         .executableTarget(
